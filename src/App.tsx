@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UNIVERSITIES, getUniversity } from './data/catalog';
-import { checkAi, extractSyllabus } from './lib/api';
+import { AiUnavailableError, evaluateCourse, extractSyllabus, getAiMode, type AiMode } from './lib/api';
+import { candidatesFromEvaluation } from './lib/aiMatch';
 import { matchCourse } from './lib/match';
 import { buildPlan, pickKey, resolvePick, type Picks } from './lib/plan';
 import type { CourseResult, MyCourse } from './lib/types';
@@ -12,6 +13,11 @@ import { Book, Logo, Plan, Sparkle } from './components/Icons';
 
 type Tab = 'analyze' | 'plan';
 
+/** 과목·학교 조합별 AI 분석 상태 */
+export type EvalState = { status: 'running' } | { status: 'error'; message: string };
+
+const evalKey = (courseId: string, schoolId: string) => `${courseId}:${schoolId}`;
+
 export default function App() {
   const [courses, setCourses] = useStored<MyCourse[]>('cb.courses', []);
   const [schoolId, setSchoolId] = useStored('cb.school', UNIVERSITIES[0].id);
@@ -20,20 +26,66 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('analyze');
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string[]>([]);
-  const [ai, setAi] = useState(false);
+  const [aiMode, setAiMode] = useState<AiMode>(null);
+  const [evals, setEvals] = useState<Record<string, EvalState>>({});
+  const [queue, setQueue] = useState<{ courseId: string; schoolId: string }[]>([]);
+  const running = useRef(false);
 
   useEffect(() => {
-    void checkAi().then(setAi);
+    void getAiMode().then(setAiMode);
   }, []);
 
   const school = getUniversity(schoolId);
   const tuitionPerCredit = tuition[school.id] ?? school.tuitionPerCredit;
 
   const results = useMemo(
-    () => new Map<string, CourseResult>(courses.map((c) => [c.id, matchCourse(c, school)])),
+    () =>
+      new Map<string, CourseResult>(
+        courses.map((c) => {
+          const ev = c.evaluations?.[school.id];
+          return [c.id, ev ? { candidates: candidatesFromEvaluation(ev, c, school) } : matchCourse(c, school)];
+        }),
+      ),
     [courses, school],
   );
   const plan = useMemo(() => buildPlan(courses, results, school, picks, tuitionPerCredit), [courses, results, school, picks, tuitionPerCredit]);
+
+  const enqueue = useCallback((items: { courseId: string; schoolId: string }[]) => {
+    if (items.length) setQueue((q) => [...q, ...items.filter((i) => !q.some((x) => x.courseId === i.courseId && x.schoolId === i.schoolId))]);
+  }, []);
+
+  // AI 분석은 한 번에 하나씩 실행한다.
+  useEffect(() => {
+    if (running.current || queue.length === 0) return;
+    const [job, ...rest] = queue;
+    const course = courses.find((c) => c.id === job.courseId);
+    if (!aiMode || !course || course.evaluations?.[job.schoolId]) {
+      setQueue(rest);
+      return;
+    }
+    running.current = true;
+    const key = evalKey(job.courseId, job.schoolId);
+    setEvals((e) => ({ ...e, [key]: { status: 'running' } }));
+    evaluateCourse(course, getUniversity(job.schoolId))
+      .then((evaluation) => {
+        setCourses((prev) =>
+          prev.map((c) => (c.id === job.courseId ? { ...c, evaluations: { ...c.evaluations, [job.schoolId]: evaluation } } : c)),
+        );
+        setEvals(({ [key]: _, ...e }) => e);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'AI 분석에 실패했어요.';
+        setEvals((e) => ({ ...e, [key]: { status: 'error', message } }));
+        if (err instanceof AiUnavailableError && err.permanent) {
+          setAiMode(null);
+          setQueue([]);
+        }
+      })
+      .finally(() => {
+        running.current = false;
+        setQueue((q) => q.filter((x) => !(x.courseId === job.courseId && x.schoolId === job.schoolId)));
+      });
+  }, [queue, courses, aiMode, setCourses]);
 
   const addCourse = useCallback(
     async (text: string, fileName: string) => {
@@ -42,6 +94,7 @@ export default function App() {
         const { parsed, source } = await extractSyllabus(text);
         const course: MyCourse = { id: crypto.randomUUID(), createdAt: Date.now(), fileName, rawText: text, parsed, source, grade: '' };
         setCourses((prev) => [course, ...prev]);
+        enqueue([{ courseId: course.id, schoolId }]);
       } finally {
         setBusy((b) => {
           const i = b.indexOf(fileName);
@@ -49,11 +102,17 @@ export default function App() {
         });
       }
     },
-    [setCourses],
+    [setCourses, enqueue, schoolId],
   );
+
+  const changeSchool = (id: string) => {
+    setSchoolId(id);
+    enqueue(courses.filter((c) => !c.evaluations?.[id]).map((c) => ({ courseId: c.id, schoolId: id })));
+  };
 
   const open = openId ? courses.find((c) => c.id === openId) : undefined;
   const picked = (c: MyCourse) => resolvePick(c, results.get(c.id), school, picks);
+  const evalOf = (c: MyCourse) => evals[evalKey(c.id, school.id)];
   const closeDetail = useCallback(() => setOpenId(null), []);
 
   return (
@@ -72,8 +131,11 @@ export default function App() {
             {plan.credits > 0 && <span className="count-tag">{plan.credits}</span>}
           </button>
         </nav>
-        <span className={`ai-status${ai ? ' on' : ''}`} title={ai ? 'Claude가 강의계획서를 분석해요' : '브라우저에서 규칙 기반으로 분석해요'}>
-          <Sparkle width={14} height={14} /> {ai ? 'AI 분석 켜짐' : '오프라인 분석'}
+        <span
+          className={`ai-status${aiMode ? ' on' : ''}`}
+          title={aiMode ? 'Claude가 수업 내용을 비교해요' : '키워드 일치로 추정해요'}
+        >
+          <Sparkle width={14} height={14} /> {aiMode ? 'AI 내용 분석' : '키워드 분석'}
         </span>
       </header>
 
@@ -82,10 +144,11 @@ export default function App() {
           <AnalyzeScreen
             school={school}
             schools={UNIVERSITIES}
-            onSchool={setSchoolId}
+            onSchool={changeSchool}
             courses={courses}
             results={results}
             picked={picked}
+            evalOf={evalOf}
             busy={busy}
             onAdd={addCourse}
             onOpen={setOpenId}
@@ -121,6 +184,19 @@ export default function App() {
           school={school}
           picked={picked(open)}
           pickState={picks[pickKey(school.id, open.id)]}
+          aiAvailable={aiMode !== null}
+          evalState={evalOf(open)}
+          onEvaluate={() => {
+            setEvals(({ [evalKey(open.id, school.id)]: _, ...e }) => e);
+            setCourses((prev) =>
+              prev.map((c) => {
+                if (c.id !== open.id || !c.evaluations?.[school.id]) return c;
+                const { [school.id]: _, ...rest } = c.evaluations;
+                return { ...c, evaluations: rest };
+              }),
+            );
+            enqueue([{ courseId: open.id, schoolId: school.id }]);
+          }}
           onPick={(id) =>
             setPicks((p) => {
               const next = { ...p };

@@ -1,3 +1,4 @@
+import type { EvalState } from '../App';
 import type { CandidateMatch, CourseResult, MyCourse, University } from '../lib/types';
 import { CourseTile, LikelihoodBadge } from './common';
 import { Chevron, Search } from './Icons';
@@ -10,12 +11,13 @@ interface Props {
   courses: MyCourse[];
   results: Map<string, CourseResult>;
   picked: (course: MyCourse) => CandidateMatch | null;
+  evalOf: (course: MyCourse) => EvalState | undefined;
   busy: string[];
   onAdd: (text: string, fileName: string) => Promise<void>;
   onOpen: (id: string) => void;
 }
 
-export function AnalyzeScreen({ school, schools, onSchool, courses, results, picked, busy, onAdd, onOpen }: Props) {
+export function AnalyzeScreen({ school, schools, onSchool, courses, results, picked, evalOf, busy, onAdd, onOpen }: Props) {
   return (
     <div className="screen">
       <header className="hero">
@@ -52,6 +54,7 @@ export function AnalyzeScreen({ school, schools, onSchool, courses, results, pic
               const top = results.get(c.id)?.candidates[0];
               const pick = picked(c);
               const shown = pick ?? top;
+              const analyzing = evalOf(c)?.status === 'running';
               return (
                 <button key={c.id} className="course-card" onClick={() => onOpen(c.id)}>
                   <CourseTile code={c.parsed.code} area={shown?.course.area ?? null} />
@@ -73,7 +76,15 @@ export function AnalyzeScreen({ school, schools, onSchool, courses, results, pic
                       <span className="body-sm muted">비슷한 과목을 찾지 못했어요</span>
                     )}
                     <div className="row-between">
-                      {shown ? <LikelihoodBadge likelihood={shown.likelihood} /> : <span />}
+                      {analyzing ? (
+                        <span className="badge">
+                          <span className="spinner spinner-sm" /> AI가 수업 내용 비교 중
+                        </span>
+                      ) : shown ? (
+                        <LikelihoodBadge likelihood={shown.likelihood} />
+                      ) : (
+                        <span />
+                      )}
                       <Chevron width={16} height={16} className="muted" />
                     </div>
                   </div>

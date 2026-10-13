@@ -31,11 +31,37 @@ export interface MyCourse {
   source: ExtractSource;
   /** 전적 대학 성적 (선택) */
   grade: string;
+  /** 학교 id별 AI 내용 비교 결과 */
+  evaluations?: Record<string, AiEvaluation>;
+}
+
+/** Claude가 판단한 단원별 내용 일치 (검증 후 저장되는 형태) */
+export interface AiUnitJudgment {
+  unit: string;
+  /** 0–100: 단원 학습 목표를 같은 깊이로 가르친 정도 */
+  coverage: number;
+  evidence: { where: string; quote: string }[];
+  reason: string;
+}
+
+export interface AiCourseJudgment {
+  code: string;
+  level: 'same' | 'lower' | 'higher';
+  levelNote: string;
+  summary: string;
+  units: AiUnitJudgment[];
+}
+
+export interface AiEvaluation {
+  evaluatedAt: number;
+  candidates: AiCourseJudgment[];
 }
 
 export interface CatalogUnit {
   name: string;
   nameKo: string;
+  /** 이 단원을 이수했다고 보기 위한 학습 내용 (AI 비교 기준) */
+  objectives: string;
   keywords: string[];
 }
 
@@ -50,6 +76,8 @@ export interface CatalogCourse {
   /** 전공 기초 / 교양 */
   category: 'major' | 'ge';
   description: string;
+  /** 과목 수준 (예: 이공계 미적분 vs 경영 미적분) */
+  level: string;
   units: CatalogUnit[];
   textbooks: string[];
 }
@@ -73,6 +101,8 @@ export interface EvidenceSegment {
   week: number | null;
   text: string;
   matchedKeywords: string[];
+  /** AI가 원문에서 그대로 인용한 근거 (전체 하이라이트) */
+  quote?: boolean;
 }
 
 export interface UnitMatch {
@@ -82,6 +112,8 @@ export interface UnitMatch {
   evidence: EvidenceSegment[];
   /** 예: "3–5주차" */
   weekRange: string | null;
+  /** AI 판단 이유 */
+  reason?: string;
 }
 
 export type Likelihood = 'high' | 'medium' | 'low';
@@ -93,6 +125,9 @@ export interface CandidateMatch {
   units: UnitMatch[];
   textbookMatch: string | null;
   warnings: string[];
+  /** ai: Claude 내용 비교, keyword: 키워드 기반 추정 */
+  method: 'ai' | 'keyword';
+  summary?: string;
 }
 
 export interface CourseResult {

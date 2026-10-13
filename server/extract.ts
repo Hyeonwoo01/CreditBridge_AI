@@ -56,3 +56,46 @@ export async function extractWithClaude(text: string): Promise<ExtractedSyllabus
   }
   return response.parsed_output;
 }
+
+const EvaluationSchema = z.object({
+  candidates: z.array(
+    z.object({
+      code: z.string(),
+      level: z.enum(['same', 'lower', 'higher']),
+      levelNote: z.string(),
+      summary: z.string(),
+      units: z.array(
+        z.object({
+          unit: z.string(),
+          coverage: z.number(),
+          evidence: z.array(z.object({ where: z.string(), quote: z.string() })),
+          reason: z.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
+/** 강의 내용 비교. 응답 검증(인용문 확인 등)은 클라이언트의 validateEvaluation이 맡는다. */
+export async function evaluateWithClaude(prompt: string): Promise<z.infer<typeof EvaluationSchema>> {
+  client ??= new Anthropic();
+  const response = await client.beta.messages.parse({
+    model: 'claude-opus-5-5',
+    max_tokens: 16000,
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    output_config: {
+      effort: 'medium',
+      format: betaZodOutputFormat(EvaluationSchema),
+    },
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  if (response.stop_reason === 'refusal') {
+    throw new Error('The model declined to evaluate this course.');
+  }
+  if (response.stop_reason === 'max_tokens' || !response.parsed_output) {
+    throw new Error('Could not parse the evaluation.');
+  }
+  return response.parsed_output;
+}

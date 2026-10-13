@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { evidenceSentence } from '../lib/match';
+import type { EvalState } from '../App';
 import type { CandidateMatch, CourseResult, MyCourse, University } from '../lib/types';
 import { CourseTile, Highlighted, LikelihoodBadge, Meter } from './common';
 import { Alert, Back, Check, Laurel, Sparkle, Trash } from './Icons';
@@ -12,13 +13,16 @@ interface Props {
   school: University;
   picked: CandidateMatch | null;
   pickState: string | undefined;
+  aiAvailable: boolean;
+  evalState: EvalState | undefined;
+  onEvaluate: () => void;
   onPick: (catalogId: string | null) => void;
   onUpdate: (patch: Partial<MyCourse>) => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-export function CourseDetail({ course, result, school, picked, pickState, onPick, onUpdate, onDelete, onClose }: Props) {
+export function CourseDetail({ course, result, school, picked, pickState, aiAvailable, evalState, onEvaluate, onPick, onUpdate, onDelete, onClose }: Props) {
   const { candidates } = result;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewId, setViewId] = useState(picked?.course.id ?? candidates[0]?.course.id);
@@ -98,6 +102,13 @@ export function CourseDetail({ course, result, school, picked, pickState, onPick
             </div>
           </div>
 
+          <AiBanner
+            method={view?.method ?? (course.evaluations?.[school.id] ? 'ai' : 'keyword')}
+            aiAvailable={aiAvailable}
+            evalState={evalState}
+            onEvaluate={onEvaluate}
+          />
+
           {!view ? (
             <div className="empty">
               <p className="title-md">{school.name}에서 비슷한 과목을 찾지 못했어요</p>
@@ -129,6 +140,7 @@ export function CourseDetail({ course, result, school, picked, pickState, onPick
                 </strong>{' '}
                 {view.course.title} · {view.course.credits} {school.creditLabel}
               </p>
+              {view.summary && <p className="ai-summary body-sm">{view.summary}</p>}
 
               {view.warnings.length > 0 && (
                 <ul className="warnings">
@@ -142,7 +154,11 @@ export function CourseDetail({ course, result, school, picked, pickState, onPick
 
               <section className="detail-section">
                 <h3 className="display-sm">단원별 일치 근거</h3>
-                <p className="muted body-sm">강의계획서에서 찾은 근거 구절을 하이라이트했어요. 어드바이저에게 그대로 보여줄 수 있어요.</p>
+                <p className="muted body-sm">
+                  {view.method === 'ai'
+                    ? '본교 단원의 학습 목표를 실제로 가르쳤는지 비교했어요. 하이라이트는 강의계획서 원문 그대로의 인용이에요.'
+                    : '강의계획서에서 찾은 키워드를 하이라이트했어요. 개요에서 언급만 된 내용은 절반까지만 인정해요.'}
+                </p>
                 {view.units.map((u) => (
                   <div className="unit" key={u.unit.name}>
                     <div className="row-between">
@@ -152,22 +168,23 @@ export function CourseDetail({ course, result, school, picked, pickState, onPick
                       <span className="title-sm">{Math.round(u.coverage * 100)}%</span>
                     </div>
                     <Meter value={u.coverage} />
+                    {u.reason && <p className="body-sm unit-reason">{u.reason}</p>}
                     {u.evidence.length > 0 ? (
                       <>
-                        <p className="evidence-summary body-sm">{evidenceSentence(course, u, view.course)}</p>
+                        {view.method === 'keyword' && <p className="evidence-summary body-sm">{evidenceSentence(course, u, view.course)}</p>}
                         <ul className="evidence">
                           {u.evidence.map((e, i) => (
                             <li key={i}>
                               <span className="evidence-where">{e.where}</span>
                               <span>
-                                <Highlighted text={e.text} keywords={e.matchedKeywords} />
+                                {e.quote ? <mark>{e.text}</mark> : <Highlighted text={e.text} keywords={e.matchedKeywords} />}
                               </span>
                             </li>
                           ))}
                         </ul>
                       </>
                     ) : (
-                      <p className="muted body-sm">관련 내용을 찾지 못했어요.</p>
+                      !u.reason && <p className="muted body-sm">관련 내용을 찾지 못했어요.</p>
                     )}
                   </div>
                 ))}
@@ -250,6 +267,54 @@ export function CourseDetail({ course, result, school, picked, pickState, onPick
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function AiBanner({
+  method,
+  aiAvailable,
+  evalState,
+  onEvaluate,
+}: {
+  method: 'ai' | 'keyword';
+  aiAvailable: boolean;
+  evalState: EvalState | undefined;
+  onEvaluate: () => void;
+}) {
+  if (evalState?.status === 'running') {
+    return (
+      <div className="ai-banner">
+        <span className="spinner" />
+        <span className="body-sm">AI가 강의계획서와 본교 단원별 학습 목표를 비교하고 있어요. 30초~1분 정도 걸려요.</span>
+      </div>
+    );
+  }
+  if (method === 'ai') {
+    return (
+      <div className="ai-banner ai-banner-on">
+        <Sparkle width={16} height={16} />
+        <span className="body-sm">
+          <strong>AI 내용 분석</strong> · 단어가 아니라 실제로 가르친 내용과 깊이, 과목 수준을 비교했어요.
+        </span>
+        {aiAvailable && (
+          <button className="btn-link body-sm" onClick={onEvaluate}>
+            다시 분석
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="ai-banner">
+      <span className="body-sm">
+        <strong>키워드 추정</strong> · {evalState?.status === 'error' ? evalState.message : '같은 단어가 나오는지로 추정한 결과예요.'}
+      </span>
+      {aiAvailable && (
+        <button className="btn-link body-sm" onClick={onEvaluate}>
+          AI로 내용 비교하기
+        </button>
+      )}
     </div>
   );
 }

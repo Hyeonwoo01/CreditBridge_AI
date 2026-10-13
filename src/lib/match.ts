@@ -9,12 +9,14 @@ import type {
   UnitMatch,
   University,
 } from './types';
-import { findPhrase, summarizeWeeks, tokenize, type Token } from './text';
+import { findPhrase, phraseStems, summarizeWeeks, tokenize, type Token } from './text';
 
 interface Segment {
   where: string;
   week: number | null;
   text: string;
+  /** 실제 수업 내용(주차·학습 목표)인지, 개요에서 언급만 된 것인지 */
+  taught: boolean;
   tokens: Token[];
 }
 
@@ -52,11 +54,11 @@ function buildSegments(p: ParsedSyllabus, rawText: string): Segment[] {
   const raw: Omit<Segment, 'tokens'>[] = [];
   for (const w of p.weeks) {
     const n = weekNumber(w.label);
-    raw.push({ where: n !== null ? `${n}주차` : w.label, week: n, text: w.topic });
+    raw.push({ where: n !== null ? `${n}주차` : w.label, week: n, text: w.topic, taught: true });
   }
-  p.outcomes.forEach((o) => raw.push({ where: '학습 목표', week: null, text: o }));
-  splitSentences(p.description).forEach((s) => raw.push({ where: '강의 개요', week: null, text: s }));
-  p.keyTopics.forEach((k) => raw.push({ where: '핵심 개념', week: null, text: k }));
+  p.outcomes.forEach((o) => raw.push({ where: '학습 목표', week: null, text: o, taught: true }));
+  splitSentences(p.description).forEach((s) => raw.push({ where: '강의 개요', week: null, text: s, taught: false }));
+  p.keyTopics.forEach((k) => raw.push({ where: '핵심 개념', week: null, text: k, taught: false }));
 
   // 구조화된 내용이 거의 없으면 원문 줄 단위로 대신 비교한다.
   if (raw.length < 3) {
@@ -64,31 +66,42 @@ function buildSegments(p: ParsedSyllabus, rawText: string): Segment[] {
       .split(/\n+/)
       .map((l) => l.trim())
       .filter((l) => l.length > 3)
-      .forEach((l) => raw.push({ where: '원문', week: null, text: l }));
+      .forEach((l) => raw.push({ where: '원문', week: null, text: l, taught: true }));
   }
   return raw.map((s) => ({ ...s, tokens: tokenize(s.text) }));
 }
 
-/** 키워드 60% 이상이 확인되면 해당 단원은 충분히 다룬 것으로 본다. */
-function unitCoverage(matched: number, total: number): number {
-  return Math.min(1, matched / Math.max(1, Math.ceil(total * 0.6)));
+/**
+ * 단일 단어("work", "function")는 다른 뜻으로 쓰이기 쉬워 구(phrase)의 절반만 인정한다.
+ */
+function keywordWeight(kw: string): number {
+  return phraseStems(kw).length > 1 ? 1 : 0.5;
 }
+
+/** 개요에서 언급만 되고 주차·학습 목표에 없는 단원은 절반까지만 인정한다. */
+const MENTION_ONLY_CAP = 0.5;
 
 function matchUnits(course: CatalogCourse, segments: Segment[]): UnitMatch[] {
   return course.units.map((unit) => {
     const matched = new Set<string>();
     const evidence: EvidenceSegment[] = [];
+    let taught = false;
     for (const seg of segments) {
       const kws = unit.keywords.filter((kw) => findPhrase(seg.tokens, kw).length > 0);
       if (kws.length === 0) continue;
       kws.forEach((k) => matched.add(k));
+      taught ||= seg.taught;
       evidence.push({ where: seg.where, week: seg.week, text: seg.text, matchedKeywords: kws });
     }
     evidence.sort((a, b) => b.matchedKeywords.length - a.matchedKeywords.length);
     const weeks = evidence.map((e) => e.week).filter((w): w is number => w !== null);
+    // 가중치 합의 60% 이상이 확인되면 해당 단원은 충분히 다룬 것으로 본다.
+    const total = unit.keywords.reduce((sum, k) => sum + keywordWeight(k), 0);
+    const found = [...matched].reduce((sum, k) => sum + keywordWeight(k), 0);
+    const coverage = Math.min(taught ? 1 : MENTION_ONLY_CAP, found / (total * 0.6));
     return {
       unit,
-      coverage: unitCoverage(matched.size, unit.keywords.length),
+      coverage,
       matchedKeywords: [...matched],
       evidence: evidence.slice(0, 4),
       weekRange: summarizeWeeks(weeks),
@@ -134,7 +147,7 @@ function scoreCourse(
     if (u.coverage < 0.34) warnings.push(`'${u.unit.nameKo}' 단원 내용이 강의계획서에서 거의 확인되지 않아요.`);
   }
 
-  return { course, score, likelihood: likelihoodOf(score), units, textbookMatch, warnings };
+  return { course, score, likelihood: likelihoodOf(score), units, textbookMatch, warnings, method: 'keyword' };
 }
 
 export function matchCourse(myCourse: MyCourse, school: University): CourseResult {
