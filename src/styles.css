@@ -140,7 +140,7 @@ main {
 /* Top nav */
 .top-nav {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 20;
   height: 64px;
   display: flex;
@@ -1001,8 +1001,18 @@ textarea:focus,
   flex: none;
 }
 
-.print-only {
-  display: none;
+.report-text {
+  font-size: 12px;
+}
+
+.btn-danger-pill {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-full);
+  background: var(--error);
+  color: var(--canvas);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 /* Tablet */
@@ -1094,38 +1104,5 @@ textarea:focus,
     order: 2;
     position: sticky;
     top: 104px;
-  }
-}
-
-@media print {
-  .top-nav,
-  .bottom-nav,
-  .plan-layout,
-  .hero,
-  .no-print {
-    display: none !important;
-  }
-
-  .print-only {
-    display: block;
-  }
-
-  .report {
-    font-size: 12px;
-    color: #000;
-  }
-
-  .report h1 {
-    font-size: 18px;
-    margin-bottom: 4px;
-  }
-
-  .report h2 {
-    font-size: 14px;
-    margin: 16px 0 4px;
-  }
-
-  .report article {
-    break-inside: avoid;
   }
 }

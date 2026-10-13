@@ -20,6 +20,7 @@ interface Props {
 
 export function CourseDetail({ course, result, school, picked, pickState, onPick, onUpdate, onDelete, onClose }: Props) {
   const { candidates } = result;
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewId, setViewId] = useState(picked?.course.id ?? candidates[0]?.course.id);
   const view = candidates.find((c) => c.course.id === viewId) ?? candidates[0];
   const p = course.parsed;
@@ -44,15 +45,15 @@ export function CourseDetail({ course, result, school, picked, pickState, onPick
             <Back />
           </button>
           <span className="title-sm ellipsis">{p.code || '과목 상세'}</span>
-          <button
-            className="icon-btn"
-            onClick={() => {
-              if (confirm('이 과목을 삭제할까요?')) onDelete();
-            }}
-            aria-label="삭제"
-          >
-            <Trash />
-          </button>
+          {confirmDelete ? (
+            <button className="btn-danger-pill" onClick={onDelete} onBlur={() => setConfirmDelete(false)} autoFocus>
+              삭제하기
+            </button>
+          ) : (
+            <button className="icon-btn" onClick={() => setConfirmDelete(true)} aria-label="삭제">
+              <Trash />
+            </button>
+          )}
         </div>
 
         <div className="sheet-body">

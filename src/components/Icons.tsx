@@ -18,7 +18,7 @@ export const Check = (p: P) => (<svg {...base} {...p}><path d="m5 12 5 5 9-10" /
 export const Chevron = (p: P) => (<svg {...base} {...p}><path d="m9 6 6 6-6 6" /></svg>);
 export const Alert = (p: P) => (<svg {...base} {...p}><path d="M12 3 2 20h20L12 3z" /><path d="M12 10v4M12 17.5v.01" /></svg>);
 export const Sparkle = (p: P) => (<svg {...base} {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" /></svg>);
-export const Print = (p: P) => (<svg {...base} {...p}><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3" /><path d="M7 14h10v7H7z" /></svg>);
+export const Copy = (p: P) => (<svg {...base} {...p}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" /></svg>);
 export const Book = (p: P) => (<svg {...base} {...p}><path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2V5z" /><path d="M4 19a2 2 0 0 1 2-2h14" /></svg>);
 export const Plan = (p: P) => (<svg {...base} {...p}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>);
 export const Text = (p: P) => (<svg {...base} {...p}><path d="M4 6h16M4 12h16M4 18h10" /></svg>);
