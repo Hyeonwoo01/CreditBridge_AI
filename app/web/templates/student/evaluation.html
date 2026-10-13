@@ -2,15 +2,15 @@
 {% from "partials/macros.html" import rec_badge, time %}
 {% block nav %}{% include "student/_nav.html" %}{% endblock %}
 {% block content %}
-<p class="mb-4 text-sm text-muted"><a class="underline" href="/student/requests/{{ v.request.public_id }}">← 과목 목록</a></p>
+<p class="mb-4 text-sm text-muted"><a class="underline" href="/student/requests/{{ v.request.id }}">← 과목 목록</a></p>
 {% include "partials/evaluation.html" %}
 
 {% if v.evaluation.recommendation in ('insufficient', 'elective', 'none') and v.request.status == 'draft' and not v.decision %}
-<form method="post" action="/student/syllabi/{{ v.syllabus.public_id }}/supplement" enctype="multipart/form-data" class="mt-8 grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
+<form method="post" action="/student/syllabi/{{ v.syllabus.id }}/supplement" enctype="multipart/form-data" class="mt-8 grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <span class="font-semibold">보완 자료 올리고 다시 분석</span>
   <span class="text-sm text-muted">주차별 상세 계획, 교재 목차, 시험지 등을 올리면 원문에 덧붙여 다시 분석해요. 이전 결과는 기록으로 남아요.</span>
-  <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.txt,.docx" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
+  <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
   <button class="btn-secondary w-fit">보완 자료 제출</button>
 </form>
 {% endif %}
@@ -19,7 +19,7 @@
 <section class="mt-10 grid gap-2">
   <h2 class="text-xl font-semibold tracking-[-0.18px]">이전 분석 기록</h2>
   {% for p in v.previous %}
-  <a class="flex items-center justify-between rounded-sm bg-surface-soft px-4 py-3 text-sm" href="/student/evaluations/{{ p.public_id }}"><span>{{ time(p.created_at) }}</span><span class="flex items-center gap-2">{{ rec_badge(p.recommendation) }}{% if p.probability is not none %}{{ p.probability | round | int }}%{% endif %}</span></a>
+  <a class="flex items-center justify-between rounded-sm bg-surface-soft px-4 py-3 text-sm" href="/student/evaluations/{{ p.id }}"><span>{{ time(p.created_at) }}</span><span class="flex items-center gap-2">{{ rec_badge(p.recommendation) }}{% if p.coverage is not none %}커버리지 {{ p.coverage | pct }}{% endif %}</span></a>
   {% endfor %}
 </section>
 {% endif %}

@@ -1,26 +1,11 @@
-from dataclasses import dataclass
-
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.db.types import to_vector_text
 from app.models import Course, Syllabus, SyllabusChunk
-
-
-@dataclass(frozen=True)
-class ChunkHit:
-    course_id: int
-    chunk_id: int
-    concept: str
-    distance: float
 
 
 def get(session: Session, syllabus_id: int) -> Syllabus | None:
     return session.get(Syllabus, syllabus_id)
-
-
-def get_by_public_id(session: Session, public_id: str) -> Syllabus | None:
-    return session.scalars(select(Syllabus).where(Syllabus.public_id == public_id)).first()
 
 
 def of_request(session: Session, request_id: int) -> list[Syllabus]:
@@ -74,15 +59,22 @@ def reference_concepts(session: Session, course_ids: list[int]) -> dict[int, lis
     return out
 
 
-def nearest_target_chunks(session: Session, embedding: list[float], institution_id: int, k: int) -> list[ChunkHit]:
-    """대상 대학 기준 강의계획서 청크 중 코사인 거리가 가까운 k개 (MariaDB 벡터 인덱스 사용)."""
-    vec = func.VEC_FromText(to_vector_text(embedding))
-    distance = func.VEC_DISTANCE_COSINE(SyllabusChunk.embedding, vec).label("distance")
+def in_request_with_hash(session: Session, request_id: int, content_hash: str) -> Syllabus | None:
+    stmt = select(Syllabus).where(Syllabus.transfer_request_id == request_id, Syllabus.content_hash == content_hash)
+    return session.scalars(stmt).first()
+
+
+def analyzed_with_hash(session: Session, content_hash: str, exclude_id: int) -> Syllabus | None:
+    """같은 원본으로 이미 추출을 마친 강의계획서 (LLM 재호출 없이 결과를 재사용할 출처)."""
     stmt = (
-        select(Course.id, SyllabusChunk.id, SyllabusChunk.concept, distance)
-        .join(Course, Course.reference_syllabus_id == SyllabusChunk.syllabus_id)
-        .where(Course.institution_id == institution_id)
-        .order_by(distance)
-        .limit(k)
+        select(Syllabus)
+        .where(
+            Syllabus.content_hash == content_hash,
+            Syllabus.id != exclude_id,
+            Syllabus.status == "ready",
+            Syllabus.extracted_json.is_not(None),
+        )
+        .order_by(Syllabus.id)
+        .limit(1)
     )
-    return [ChunkHit(course_id=r[0], chunk_id=r[1], concept=r[2], distance=float(r[3])) for r in session.execute(stmt)]
+    return session.scalars(stmt).first()

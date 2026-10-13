@@ -10,10 +10,6 @@ def get(session: Session, evaluation_id: int) -> CourseEvaluation | None:
     return session.get(CourseEvaluation, evaluation_id)
 
 
-def get_by_public_id(session: Session, public_id: str) -> CourseEvaluation | None:
-    return session.scalars(select(CourseEvaluation).where(CourseEvaluation.public_id == public_id)).first()
-
-
 def latest_for_syllabus(session: Session, syllabus_id: int) -> CourseEvaluation | None:
     stmt = (
         select(CourseEvaluation)

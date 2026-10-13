@@ -57,3 +57,13 @@ class DecisionResult(StrEnum):
 class EvidenceSide(StrEnum):
     SOURCE = "source"  # 학생 강의계획서
     TARGET = "target"  # 대상 대학 기준 강의계획서
+
+
+class ReasonCode(StrEnum):
+    """교수 판정 선택형 사유 (FR-09)."""
+
+    WEEKS_INSUFFICIENT = "weeks_insufficient"  # 주차 범위 부족
+    LEVEL_DIFFERENCE = "level_difference"  # 수준 차이
+    NO_LAB = "no_lab"  # 실험·실습 미포함
+    PREREQUISITE_DIFFERENCE = "prerequisite_difference"  # 선수과목 차이
+    OTHER = "other"  # 기타 (메모 필수)

@@ -8,10 +8,10 @@
 </header>
 <section class="mt-6 grid gap-3">
   {% for it in items %}
-  <a href="/professor/evaluations/{{ it.evaluation.public_id }}" class="card grid gap-2 p-5 hover:shadow-card">
+  <a href="/professor/evaluations/{{ it.evaluation.id }}" class="card grid gap-2 p-5 hover:shadow-card">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <span class="font-semibold">{{ it.syllabus.course_code }} {{ it.syllabus.course_title }}</span>
-      <span class="flex items-center gap-2">{{ rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.probability is not none and it.evaluation.recommendation == 'direct' %}<strong class="tabular-nums">{{ it.evaluation.probability | round | int }}%</strong>{% endif %}</span>
+      <span class="flex items-center gap-2">{{ rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.coverage is not none and it.candidate %}<strong class="tabular-nums" title="개념 커버리지">{{ it.evaluation.coverage | pct }}</strong>{% endif %}</span>
     </div>
     <span class="text-sm text-muted">→ {{ it.candidate.code if it.candidate else '후보 없음' }} · 배정 {{ time(it.assignment.assigned_at, "date") }}{% if it.delegated_from %} · {{ it.delegated_from.name }} 교수 부재로 대리 배정{% endif %}</span>
   </a>
@@ -25,7 +25,7 @@
   <p class="text-sm font-semibold md:col-span-3">부재 설정{% if user.away_until %} <span class="font-normal text-muted">· {{ user.away_until }}까지 부재</span>{% endif %}</p>
   <label class="field"><span>부재 일수 (0이면 복귀)</span><input class="input h-11" type="number" name="days" min="0" max="120" value="0"></label>
   <label class="field"><span>대리 심사 교수</span>
-    <select name="delegate_id" class="input h-11"><option value="">선택 안 함</option>{% for c in colleagues %}<option value="{{ c.public_id }}" {% if c.id == user.delegate_user_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+    <select name="delegate_id" class="input h-11"><option value="">선택 안 함</option>{% for c in colleagues %}<option value="{{ c.id }}" {% if c.id == user.delegate_user_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
   </label>
   <button class="btn-secondary h-11">저장</button>
 </form>

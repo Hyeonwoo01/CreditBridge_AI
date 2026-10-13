@@ -17,7 +17,9 @@ class Decision(IdMixin, Base):
     action: Mapped[str] = mapped_column(String(10))
     result: Mapped[str] = mapped_column(String(10))
     target_course_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("courses.id"))
-    reason: Mapped[str] = mapped_column(Text, default="")
+    # 선택형 사유 코드 (반려·AI 추천과 다른 판정이면 1개 이상), 기타일 때만 메모 필수
+    reason_codes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    reason_memo: Mapped[str] = mapped_column(Text, default="")
     ai_recommendation_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
     conflict_acknowledged: Mapped[bool] = mapped_column(default=False)
     decided_at: Mapped[datetime] = mapped_column(default=utcnow)

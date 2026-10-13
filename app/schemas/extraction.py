@@ -19,6 +19,10 @@ class SyllabusExtraction(BaseModel):
     textbooks: list[str] = Field(description="Required or recommended textbooks")
     prerequisites: list[str] = Field(description="Prerequisite or corequisite courses")
     assessment: list[str] = Field(description="Grading components with weights as written")
+    disciplines: list[str] = Field(
+        description="1-3 academic disciplines the course belongs to, in English and most specific first "
+        "(e.g. ['Mathematics'], ['Mathematics', 'Computer Science']); empty if unclear"
+    )
 
     def missing_fields(self) -> list[str]:
         """기재 없음으로 표시할 필드 (FR-04)."""
@@ -31,3 +35,10 @@ class SyllabusExtraction(BaseModel):
             "credits": self.credits is not None,
         }
         return [name for name, present in checks.items() if not present]
+
+    @classmethod
+    def from_stored(cls, data: dict[str, object] | None) -> "SyllabusExtraction | None":
+        """저장된 extracted_json → 스키마. 예전 결과에 없던 필드는 비어 있는 값으로 채운다."""
+        if not data:
+            return None
+        return cls.model_validate({"disciplines": [], **data})

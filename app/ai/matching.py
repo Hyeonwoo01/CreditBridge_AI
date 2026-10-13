@@ -1,55 +1,113 @@
-"""후보 과목 검색: 학생 강의계획서 청크와 대상 과목 기준 강의계획서 청크의 벡터 거리 (FR-05)."""
+"""Claude 비교로 매핑·개념별 커버리지 산출 (FR-05, FR-06). 근거 구절은 원문 검증을 통과한 것만 남긴다."""
 
-from collections import defaultdict
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass
 
-from sqlalchemy.orm import Session
+from app.ai import injection
+from app.ai.evidence import verify_quotes
+from app.ai.llm_client import LLMClient, LLMResult
+from app.ai.prompts_loader import load_prompt
+from app.schemas.evaluation import CandidateJudgment, EvaluationOutput
+from app.schemas.results import ConceptResult, EvidenceView
 
-from app.repositories import syllabi as syllabus_repo
 
-# 이 유사도 이상이면 대상 개념이 다뤄졌을 가능성이 있다고 본다 (bge-m3 코사인)
-CONCEPT_HIT_SIMILARITY = 0.55
-NEIGHBORS_PER_CHUNK = 12
+@dataclass(frozen=True)
+class Reference:
+    """비교 대상 과목과 기준 강의계획서."""
 
-
-@dataclass
-class CandidateCourse:
     course_id: int
-    score: float
-    hit_concepts: set[str] = field(default_factory=set)
+    code: str
+    title: str
+    credits: float
+    level: str
+    syllabus_id: int
+    text: str
+    concepts: list[str]
 
 
-def find_candidates(
-    session: Session, chunk_embeddings: list[list[float]], target_institution_id: int, limit: int = 5
-) -> list[CandidateCourse]:
-    if not chunk_embeddings:
-        return []
-    best_per_chunk: dict[int, list[float]] = defaultdict(list)
-    concepts_hit: dict[int, set[str]] = defaultdict(set)
-    for embedding in chunk_embeddings:
-        best: dict[int, float] = {}
-        for hit in syllabus_repo.nearest_target_chunks(session, embedding, target_institution_id, NEIGHBORS_PER_CHUNK):
-            similarity = 1.0 - hit.distance
-            best[hit.course_id] = max(best.get(hit.course_id, 0.0), similarity)
-            if similarity >= CONCEPT_HIT_SIMILARITY:
-                concepts_hit[hit.course_id].add(hit.concept)
-        for course_id, similarity in best.items():
-            best_per_chunk[course_id].append(similarity)
+@dataclass(frozen=True)
+class VerifiedSpan:
+    side: str  # source | target
+    syllabus_id: int
+    start: int
+    end: int
+    concept: str
 
-    concept_counts = {
-        cid: len(chunks) for cid, chunks in syllabus_repo.reference_concepts(session, list(best_per_chunk)).items()
-    }
-    candidates = []
-    for course_id, sims in best_per_chunk.items():
-        total = max(concept_counts.get(course_id, 1), 1)
-        concept_share = len(concepts_hit[course_id]) / total
-        mean_similarity = sum(sims) / len(chunk_embeddings)
-        candidates.append(
-            CandidateCourse(
-                course_id=course_id,
-                score=0.6 * concept_share + 0.4 * mean_similarity,
-                hit_concepts=concepts_hit[course_id],
+
+def build_prompt(
+    target_institution: str, references: list[Reference], credits: float | None, student_text: str
+) -> tuple[str, str]:
+    """평가 프롬프트와 프롬프트 버전. 학생 문서의 의심 문구 줄은 제외하고 넣는다."""
+    blocks = []
+    for ref in references:
+        header = json.dumps(
+            {
+                "course_code": ref.code,
+                "title": ref.title,
+                "credits": ref.credits,
+                "level": ref.level,
+                "concepts": ref.concepts,
+            },
+            ensure_ascii=False,
+        )
+        blocks.append(f"<candidate>\n{header}\n<reference_syllabus>\n{ref.text}\n</reference_syllabus>\n</candidate>")
+    prompt = load_prompt("evaluation")
+    rendered = prompt.render(
+        target_institution=target_institution,
+        candidates="\n".join(blocks),
+        credits=f"{credits:g}" if credits is not None else "not stated",
+        student_syllabus=injection.sanitize(student_text, injection.detect(student_text)),
+    )
+    return rendered, prompt.version
+
+
+def compare(llm: LLMClient, prompt: str) -> LLMResult[EvaluationOutput]:
+    return llm.parse(prompt, EvaluationOutput, effort="medium")
+
+
+def concept_results(
+    judgment: CandidateJudgment, ref: Reference, student_text: str, student_syllabus_id: int
+) -> tuple[list[ConceptResult], list[VerifiedSpan]]:
+    """대상 과목의 필수 개념 순서대로 판단을 정리한다. coverage는 Claude가 매긴 원점수(0~1)이고,
+    근거 검증에 따른 보정은 services/scoring.py가 한다. 응답에 빠진 개념은 판단 불가로 둔다."""
+    by_name = {c.concept.strip().lower(): c for c in judgment.concepts}
+    results: list[ConceptResult] = []
+    spans: list[VerifiedSpan] = []
+    for concept in ref.concepts:
+        j = by_name.get(concept.strip().lower())
+        if j is None:
+            results.append(
+                ConceptResult(
+                    concept=concept,
+                    status="unclear",
+                    coverage=0.0,
+                    reason="",
+                    verified=False,
+                    source_evidence=[],
+                    target_evidence=[],
+                )
+            )
+            continue
+        context = f"{ref.code}|{concept}"[:255]
+        src = verify_quotes(student_text, j.source_quotes, context=context)
+        tgt = verify_quotes(ref.text, j.target_quotes, context=context)
+        spans += [VerifiedSpan("source", student_syllabus_id, s.start, s.end, context) for s in src]
+        spans += [VerifiedSpan("target", ref.syllabus_id, s.start, s.end, context) for s in tgt]
+        results.append(
+            ConceptResult(
+                concept=concept,
+                status=j.status,
+                coverage=j.coverage / 100,
+                reason=j.reason,
+                verified=bool(src),
+                source_evidence=[
+                    EvidenceView(side="source", text=student_text[s.start : s.end], char_start=s.start, char_end=s.end)
+                    for s in src
+                ],
+                target_evidence=[
+                    EvidenceView(side="target", text=ref.text[s.start : s.end], char_start=s.start, char_end=s.end)
+                    for s in tgt
+                ],
             )
         )
-    candidates.sort(key=lambda c: c.score, reverse=True)
-    return candidates[:limit]
+    return results, spans

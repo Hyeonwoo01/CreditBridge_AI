@@ -12,14 +12,15 @@
     <h2 class="font-semibold">사람 판정</h2>
     {% if v.decision %}
     <p>결과 <strong>{{ v.decision.result | rec }}</strong>{% if v.decided_target %} ({{ v.decided_target.code }}){% endif %} · {{ v.decision.action | action }} · 판정자 {{ v.decided_by.name if v.decided_by else '' }} · {{ time(v.decision.decided_at) }}</p>
-    <p>사유: {{ v.decision.reason or '없음 (AI 추천과 동일)' }}</p>
-    <p class="text-muted">판정 당시 AI 추천: {{ v.decision.ai_recommendation_snapshot.recommendation | rec }} · 확률 {{ v.decision.ai_recommendation_snapshot.probability }} · 신뢰도 {{ v.decision.ai_recommendation_snapshot.confidence | conf }} · {{ v.decision.ai_recommendation_snapshot.prompt_version }}</p>
+    <p>사유: {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}없음 (AI 추천과 동일){% endif %}</p>
+    {% set snap = v.decision.ai_recommendation_snapshot %}
+    <p class="text-muted">판정 당시 AI 추천: {{ snap.recommendation | rec }} · 커버리지 {{ snap.coverage | pct }} · 신뢰도 {{ snap.confidence | conf }} · {{ snap.prompt_version }}</p>
     {% if v.decision.conflict_acknowledged %}<p class="text-error">과거 판정과 다른 결과임을 확인하고 확정함</p>{% endif %}
     {% else %}<p class="text-muted">아직 판정되지 않았어요.</p>{% endif %}
   </section>
   <section class="grid gap-1">
     <h2 class="font-semibold">AI 추천</h2>
-    <p>{{ ev.recommendation | rec }} · 직접 인정 가능성 {{ ev.probability if ev.probability is not none else '–' }}% · 신뢰도 {{ ev.confidence | conf }} · 후보 {{ v.candidate.code if v.candidate else '없음' }} · 모델 {{ ev.model or '–' }}</p>
+    <p>{{ ev.recommendation | rec }} · 커버리지 {{ ev.coverage | pct }} · 신뢰도 {{ ev.confidence | conf }} · 후보 {{ v.candidate.code if v.candidate else '없음' }} · 모델 {{ ev.model or '–' }}</p>
   </section>
   {% if v.primary %}
   <section class="grid gap-2">

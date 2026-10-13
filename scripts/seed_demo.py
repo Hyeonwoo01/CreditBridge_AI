@@ -1,23 +1,25 @@
-"""데모 데이터: 대상 대학(MSU) 카탈로그, 출신 대학, 데모 계정, 작년 선형대수 판정 이력.
+"""데모 데이터: 대상 대학(MSU) 카탈로그와 기준 강의계획서, 출신 대학, 데모 계정, 작년 선형대수 판정 이력.
 
-실행: uv run python -m scripts.seed_demo   (DB 마이그레이션 후, 임베딩 모델 bge-m3 필요)
+실행: uv run python -m scripts.seed_demo   (DB 마이그레이션 후)
 비밀번호는 모두 demo1234 — 로컬 데모 전용이다.
 """
 
 from datetime import timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.embedding import Embedder, get_embedder
 from app.ai.evidence import locate
 from app.db.base import utcnow
 from app.db.session import SessionLocal
 from app.models import Course, CourseEvaluation, Decision, Institution, Syllabus, SyllabusChunk, TransferRequest, User
+from app.services.analysis import content_hash
 from app.services.auth import hash_password
 from scripts.catalog_data import MSU_COURSES, reference_syllabus_text
 
 DEMO_PASSWORD = "demo1234"
+DEMO_DATA = Path(__file__).parent / "demo_data"
 
 
 def _user(
@@ -38,7 +40,7 @@ def _user(
     return user
 
 
-def seed(session: Session, embedder: Embedder) -> None:
+def seed(session: Session) -> None:
     if session.scalars(select(Institution).where(Institution.name == "Midwest State University")).first():
         print("already seeded")
         return
@@ -54,6 +56,7 @@ def seed(session: Session, embedder: Embedder) -> None:
         ref = Syllabus(
             institution_id=msu.id,
             raw_text=text,
+            content_hash=content_hash(text.encode()),
             course_code=c.code,
             course_title=c.title,
             credits=c.credits,
@@ -62,9 +65,7 @@ def seed(session: Session, embedder: Embedder) -> None:
         )
         session.add(ref)
         session.flush()
-        sentences = [sentence for _, sentence in c.concepts]
-        vectors = embedder.embed([f"{name}: {sentence}" for name, sentence in c.concepts])
-        for (name, sentence), vec, week in zip(c.concepts, vectors, range(1, len(sentences) + 1), strict=True):
+        for week, (name, sentence) in enumerate(c.concepts, start=1):
             span = locate(text, sentence)
             session.add(
                 SyllabusChunk(
@@ -74,7 +75,6 @@ def seed(session: Session, embedder: Embedder) -> None:
                     text=sentence,
                     char_start=span.start if span else None,
                     char_end=span.end if span else None,
-                    embedding=vec,
                 )
             )
         session.add(
@@ -90,13 +90,14 @@ def seed(session: Session, embedder: Embedder) -> None:
         )
     session.flush()
 
-    _user(session, "jiwon@student.example", "이지원", "student", None)
+    # MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다
+    _user(session, "jiwon@student.example", "이지원", "student", msu)
     _user(session, "rachel@msu.example", "Rachel Morgan", "evaluator", msu)
     _user(session, "admin@msu.example", "MSU Admin", "admin", msu)
     professors = {
         "Mathematics": [("dkim@msu.example", "Daniel Kim"), ("lchen@msu.example", "Laura Chen")],
         "Computer Science and Engineering": [("oali@msu.example", "Omar Ali"), ("spark@msu.example", "Sarah Park")],
-        "Physics": [("mbrown@msu.example", "Mike Brown")],
+        "Physics": [("mbrown@msu.example", "Mike Brown"), ("ewong@msu.example", "Emily Wong")],
         "Chemistry": [("alopez@msu.example", "Ana Lopez")],
         "English": [("jreed@msu.example", "Jane Reed")],
         "History": [("twhite@msu.example", "Tom White")],
@@ -105,24 +106,27 @@ def seed(session: Session, embedder: Embedder) -> None:
         dept: [_user(session, e, n, "professor", msu, dept) for e, n in people] for dept, people in professors.items()
     }
 
-    # 작년에 다른 학생의 같은 선형대수 과목이 직접 인정된 이력 (일관성 경보 시나리오, TS-05)
-    senior = _user(session, "senior@student.example", "선배 학생", "student", None)
+    # 작년에 다른 학생의 같은 선형대수 강의계획서가 직접 인정된 이력 (일관성 경보 시나리오, TS-05)
+    senior = _user(session, "senior@student.example", "선배 학생", "student", msu)
     retired = _user(session, "retired@msu.example", "Prof. Emeritus Hall", "professor", msu, "Retired")
     last_year = utcnow() - timedelta(days=365)
     past_request = TransferRequest(
         student_id=senior.id,
         source_institution_id=hankuk.id,
         target_institution_id=msu.id,
+        major="Computer Science and Engineering",
         status="decided",
         submitted_at=last_year,
     )
     session.add(past_request)
     session.flush()
+    past_text = (DEMO_DATA / "linear_algebra_detailed.txt").read_text(encoding="utf-8")
     past_syllabus = Syllabus(
         institution_id=hankuk.id,
         transfer_request_id=past_request.id,
         owner_id=senior.id,
-        raw_text="(archived)",
+        raw_text=past_text,
+        content_hash=content_hash(b"archived:", past_text.encode()),
         course_code="MATH 201",
         course_title="Linear Algebra",
         credits=3,
@@ -139,8 +143,8 @@ def seed(session: Session, embedder: Embedder) -> None:
         candidate_course_id=linalg.id,
         status="done",
         recommendation="direct",
-        probability=88,
         confidence="high",
+        coverage=0.9,
         created_at=last_year,
     )
     session.add(past_eval)
@@ -152,7 +156,7 @@ def seed(session: Session, embedder: Embedder) -> None:
             action="approve",
             result="direct",
             target_course_id=linalg.id,
-            reason="",
+            reason_codes=[],
             ai_recommendation_snapshot={"recommendation": "direct"},
             decided_at=last_year,
         )
@@ -164,4 +168,4 @@ def seed(session: Session, embedder: Embedder) -> None:
 
 if __name__ == "__main__":
     with SessionLocal() as s:
-        seed(s, get_embedder())
+        seed(s)

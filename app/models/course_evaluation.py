@@ -3,10 +3,10 @@ from typing import Any
 from sqlalchemy import JSON, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, IdMixin, IdType, PublicIdMixin
+from app.db.base import Base, CreatedAtMixin, IdMixin, IdType
 
 
-class CourseEvaluation(IdMixin, PublicIdMixin, CreatedAtMixin, Base):
+class CourseEvaluation(IdMixin, CreatedAtMixin, Base):
     """과목별 AI 분석 결과. 재분석 시 새 행을 추가해 이전 결과를 보존한다."""
 
     __tablename__ = "course_evaluations"
@@ -16,8 +16,8 @@ class CourseEvaluation(IdMixin, PublicIdMixin, CreatedAtMixin, Base):
     candidate_course_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("courses.id"), index=True)
     status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
     recommendation: Mapped[str | None] = mapped_column(String(20), index=True)
-    # 직접 인정 가능성(%). 정보 부족이면 NULL
-    probability: Mapped[float | None] = mapped_column(Numeric(5, 2, asdecimal=False))
+    # 1순위 후보 과목의 개념 커버리지 0~1 (MVP는 판정 확률을 계산하지 않는다)
+    coverage: Mapped[float | None] = mapped_column(Numeric(4, 3, asdecimal=False))
     confidence: Mapped[str | None] = mapped_column(String(10), index=True)
     level_flag: Mapped[str | None] = mapped_column(String(10))  # same / lower / higher
     # 상위 후보 3개와 개념별 커버리지, 정보 부족 진단, 경고

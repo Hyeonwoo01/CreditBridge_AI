@@ -1,9 +1,16 @@
 {% from "partials/macros.html" import time %}
 {% if v.history %}
-<section class="mt-8 rounded-md border border-amber bg-[#fff8ec] p-5">
+{% set conflicting = v.history | selectattr("same_target") | selectattr("same_syllabus") | list %}
+<section class="mt-8 rounded-md border {{ 'border-amber bg-[#fff8ec]' if conflicting else 'border-hairline' }} p-5">
   <h2 class="font-semibold">같은 과목의 과거 판정 {{ v.history | length }}건</h2>
+  <p class="mt-1 text-xs text-muted">같은 대상 과목을 두고 내용이 비슷한 강의계획서로 내린 판정과 결과가 다르면, 확정 전에 경보가 떠요.</p>
   <ul class="mt-2 grid gap-1 text-sm">
-    {% for h in v.history %}<li>{{ time(h.decided_at, "date") }} · <strong>{{ h.result | rec }}</strong>{% if h.target_code %} ({{ h.target_code }}){% endif %}{% if h.reason %} — {{ h.reason }}{% endif %}</li>{% endfor %}
+    {% for h in v.history %}
+    <li>{{ time(h.decided_at, "date") }} · <strong>{{ h.result | rec }}</strong>{% if h.target_code %} ({{ h.target_code }}){% endif %}
+      · 강의계획서 유사도 {{ h.similarity | pct }}{% if not h.same_syllabus %} <span class="text-muted">(개편된 강의계획서)</span>{% endif %}{% if not h.same_target %} <span class="text-muted">(다른 대상 과목)</span>{% endif %}
+      {% if h.reason_codes %} — {% for c in h.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if h.reason_memo %}: {{ h.reason_memo }}{% endif %}
+    </li>
+    {% endfor %}
   </ul>
 </section>
 {% endif %}

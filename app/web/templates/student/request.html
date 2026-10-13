@@ -14,18 +14,18 @@
   <div class="grid gap-8">
     {% if req.status == 'draft' %}
     <section class="grid gap-4 md:grid-cols-2">
-      <form method="post" action="/student/requests/{{ req.public_id }}/syllabi" enctype="multipart/form-data" class="grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
+      <form method="post" action="/student/requests/{{ req.id }}/syllabi" enctype="multipart/form-data" class="grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <span class="font-semibold">강의계획서 올리기</span>
-        <span class="text-sm text-muted">PDF·스캔 이미지·TXT·DOCX, 여러 과목을 한 번에 (최대 30건, 파일당 20MB)</span>
-        <input type="file" name="files" multiple required accept=".pdf,.jpg,.jpeg,.png,.txt,.md,.docx" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
+        <span class="text-sm text-muted">PDF 또는 스캔 이미지(JPG·PNG), 여러 과목을 한 번에 (최대 30건, 파일당 20MB)</span>
+        <input type="file" name="files" multiple required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
         <button class="btn-primary">분석 시작</button>
       </form>
-      <form method="post" action="/student/requests/{{ req.public_id }}/transcript" enctype="multipart/form-data" class="grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
+      <form method="post" action="/student/requests/{{ req.id }}/transcript" enctype="multipart/form-data" class="grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <span class="font-semibold">성적표 올리기 <span class="text-sm font-normal text-muted">(선택)</span></span>
         <span class="text-sm text-muted">이름·학번은 가려서 분석하고 원본은 암호화해 보관해요.{% if req.transcript_masked_name %} 등록됨: {{ req.transcript_masked_name }}{% endif %}</span>
-        <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.txt,.docx" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
+        <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
         <button class="btn-secondary">성적표 등록</button>
       </form>
     </section>
@@ -49,11 +49,11 @@
               <td class="py-3 pr-3">{{ e.title }}{% if e.code %} <span class="text-muted">({{ e.code }})</span>{% endif %}</td>
               <td class="py-3 pr-3 whitespace-nowrap">{{ e.credits if e.credits is not none else '–' }} · {{ e.grade or '–' }}</td>
               <td class="py-3">
-                <form method="post" action="/student/requests/{{ req.public_id }}/entries/{{ e.id }}" class="flex flex-wrap items-center gap-2">
+                <form method="post" action="/student/requests/{{ req.id }}/entries/{{ e.id }}" class="flex flex-wrap items-center gap-2">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <select name="syllabus_public_id" class="h-9 rounded-sm border border-hairline px-2">
+                  <select name="syllabus_id" class="h-9 rounded-sm border border-hairline px-2">
                     <option value="">연결 안 함</option>
-                    {% for row in view.rows %}<option value="{{ row.syllabus.public_id }}" {% if row.syllabus.id == e.syllabus_id %}selected{% endif %}>{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</option>{% endfor %}
+                    {% for row in view.rows %}<option value="{{ row.syllabus.id }}" {% if row.syllabus.id == e.syllabus_id %}selected{% endif %}>{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</option>{% endfor %}
                   </select>
                   {% if e.link_confirmed %}<span class="text-xs text-muted">확인됨</span>{% else %}<button class="btn-secondary btn-sm">확인</button><span class="text-xs text-error">확인 필요</span>{% endif %}
                 </form>
@@ -84,12 +84,12 @@
     </form>
     <p class="text-xs text-muted">추천과 신뢰도로 계산한 범위예요. 최종 인정 여부는 학과 교수 판정으로 정해져요.</p>
     {% if req.status == 'draft' %}
-    <form method="post" action="/student/requests/{{ req.public_id }}/submit">
+    <form method="post" action="/student/requests/{{ req.id }}/submit">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn-primary w-full" {% if view.processing or not view.rows %}disabled{% endif %}>학사처에 심사 요청</button>
     </form>
     {% endif %}
-    <form method="post" action="/student/requests/{{ req.public_id }}/delete-documents" onsubmit="return confirm('올린 원본 파일과 추출 텍스트를 모두 삭제할까요? 되돌릴 수 없어요.')">
+    <form method="post" action="/student/requests/{{ req.id }}/delete-documents" onsubmit="return confirm('올린 원본 파일과 추출 텍스트를 모두 삭제할까요? 되돌릴 수 없어요.')">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn-text text-sm text-muted">내 문서 삭제 요청</button>
     </form>

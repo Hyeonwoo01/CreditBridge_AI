@@ -23,9 +23,6 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     claude_model: str = ""
 
-    embedding_model: str = "BAAI/bge-m3"
-    embedding_dim: int = 1024
-
     session_secret: str = "change-me"
     celery_task_always_eager: bool = False
 

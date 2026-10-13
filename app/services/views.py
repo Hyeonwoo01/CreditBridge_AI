@@ -55,8 +55,8 @@ class EvaluationView:
         return self.result.candidates[0] if self.result and self.result.candidates else None
 
 
-def evaluation_view(session: Session, user: User, public_id: str, *, with_audit: bool = False) -> EvaluationView:
-    evaluation = evaluation_repo.get_by_public_id(session, public_id)
+def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_audit: bool = False) -> EvaluationView:
+    evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
         raise NotFoundError("분석 결과를 찾을 수 없어요.")
     ensure_can_view_evaluation(session, user, evaluation)
@@ -71,7 +71,7 @@ def evaluation_view(session: Session, user: User, public_id: str, *, with_audit:
         syllabus=syllabus,
         request=request,
         result=EvaluationResult.model_validate(evaluation.coverage_json) if evaluation.coverage_json else None,
-        extraction=SyllabusExtraction.model_validate(syllabus.extracted_json) if syllabus.extracted_json else None,
+        extraction=SyllabusExtraction.from_stored(syllabus.extracted_json),
         candidate=catalog_repo.get_course(session, evaluation.candidate_course_id)
         if evaluation.candidate_course_id
         else None,
@@ -86,21 +86,21 @@ def evaluation_view(session: Session, user: User, public_id: str, *, with_audit:
         previous=[e for e in evaluation_repo.history_for_syllabus(session, syllabus.id) if e.id != evaluation.id],
     )
     if with_audit:
-        view.audit = audit_repo.for_target(session, "course_evaluation", evaluation.public_id)
+        view.audit = audit_repo.for_target(session, "course_evaluation", str(evaluation.id))
     if user.role == "professor":
         view.target_courses = catalog_repo.courses_of(session, request.target_institution_id)
     return view
 
 
-def latest_evaluation_public_id(session: Session, user: User, syllabus_public_id: str) -> str | None:
-    syllabus = syllabus_repo.get_by_public_id(session, syllabus_public_id)
+def latest_evaluation_id(session: Session, user: User, syllabus_id: int) -> int | None:
+    syllabus = syllabus_repo.get(session, syllabus_id)
     if syllabus is None:
         return None
     ev = evaluation_repo.latest_for_syllabus(session, syllabus.id)
     if ev is None:
         return None
     ensure_can_view_evaluation(session, user, ev)
-    return ev.public_id
+    return ev.id
 
 
 @dataclass
@@ -113,9 +113,9 @@ class RequestView:
 
 
 def request_view(
-    session: Session, student: User, public_id: str, tuition: int | None, degree: int | None
+    session: Session, student: User, request_id: int, tuition: int | None, degree: int | None
 ) -> RequestView:
-    request = student_service.get_own_request(session, student, public_id)
+    request = student_service.get_own_request(session, student, request_id)
     rows = student_service.course_rows(session, request)
     target = request.target_institution
     simulation = student_service.simulate(
@@ -131,16 +131,28 @@ def request_view(
     return RequestView(request, rows, request_repo.transcript_entries(session, request.id), simulation, processing)
 
 
-def student_home(session: Session, student: User) -> tuple[list[TransferRequest], list[Institution], list[Institution]]:
-    return (
-        request_repo.of_student(session, student.id),
-        catalog_repo.source_institutions(session),
-        catalog_repo.target_institutions(session),
+@dataclass
+class StudentHome:
+    requests: list[TransferRequest]
+    sources: list[Institution]
+    target: Institution | None  # 입학이 확정된 소속 대학
+    majors: list[str]
+
+
+def student_home(session: Session, student: User) -> StudentHome:
+    target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
+    if target is not None and not target.is_target:
+        target = None
+    return StudentHome(
+        requests=request_repo.of_student(session, student.id),
+        sources=catalog_repo.source_institutions(session),
+        target=target,
+        majors=catalog_repo.departments_of(session, target.id) if target else [],
     )
 
 
-def own_syllabus(session: Session, student: User, public_id: str) -> Syllabus:
-    syllabus = syllabus_repo.get_by_public_id(session, public_id)
+def own_syllabus(session: Session, student: User, syllabus_id: int) -> Syllabus:
+    syllabus = syllabus_repo.get(session, syllabus_id)
     if syllabus is None or syllabus.owner_id != student.id:
         raise NotFoundError("강의계획서를 찾을 수 없어요.")
     return syllabus
@@ -198,7 +210,7 @@ def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:
         student = user_repo.get_by_id(session, request.student_id) if request else None
         out.append(
             {
-                "student_public_id": student.public_id if student else "",
+                "student_id": student.id if student else "",
                 "source_course": s.course_code or s.course_title,
                 "result": d.result,
                 "target_course": courses[d.target_course_id].code if d.target_course_id in courses else "",
@@ -210,8 +222,8 @@ def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:
     return out
 
 
-def request_public_id_of(session: Session, syllabus: Syllabus) -> str:
+def request_id_of(session: Session, syllabus: Syllabus) -> int:
     request = request_repo.get(session, syllabus.transfer_request_id) if syllabus.transfer_request_id else None
     if request is None:
         raise NotFoundError("편입 요청을 찾을 수 없어요.")
-    return request.public_id
+    return request.id

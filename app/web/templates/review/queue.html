@@ -21,7 +21,7 @@
   </select>
   <select name="sort" class="h-9 rounded-full border border-hairline px-3 text-sm" onchange="this.form.submit()">
     <option value="submitted" {% if sort == 'submitted' %}selected{% endif %}>접수일순</option>
-    <option value="probability" {% if sort == 'probability' %}selected{% endif %}>확률 높은 순</option>
+    <option value="coverage" {% if sort == 'coverage' %}selected{% endif %}>커버리지 높은 순</option>
     <option value="department" {% if sort == 'department' %}selected{% endif %}>학과순</option>
   </select>
 </form>
@@ -37,9 +37,9 @@
       <tbody>
       {% for row in rows %}
         <tr class="border-t border-hairline-soft align-top">
-          <td class="py-3"><input type="checkbox" name="evaluation_ids" value="{{ row.evaluation.public_id }}" aria-label="선택" {% if row.assignment %}disabled{% endif %}></td>
-          <td class="py-3 pr-3"><a class="font-semibold underline-offset-2 hover:underline" href="/review/evaluations/{{ row.evaluation.public_id }}">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</a><div class="text-muted">{{ row.request.source_institution.name }}</div></td>
-          <td class="py-3 pr-3"><div class="flex flex-wrap items-center gap-1.5">{{ rec_badge(row.evaluation.recommendation) }}{% if row.evaluation.probability is not none and row.evaluation.recommendation == 'direct' %}<strong class="tabular-nums">{{ row.evaluation.probability | round | int }}%</strong>{% endif %}</div><div class="mt-1 text-muted">{{ row.course.code if row.course else '후보 없음' }} · 신뢰도 {{ row.evaluation.confidence | conf }}</div></td>
+          <td class="py-3"><input type="checkbox" name="evaluation_ids" value="{{ row.evaluation.id }}" aria-label="선택" {% if row.assignment %}disabled{% endif %}></td>
+          <td class="py-3 pr-3"><a class="font-semibold underline-offset-2 hover:underline" href="/review/evaluations/{{ row.evaluation.id }}">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</a><div class="text-muted">{{ row.request.source_institution.name }}</div></td>
+          <td class="py-3 pr-3"><div class="flex flex-wrap items-center gap-1.5">{{ rec_badge(row.evaluation.recommendation) }}{% if row.evaluation.coverage is not none and row.course %}<strong class="tabular-nums" title="개념 커버리지">{{ row.evaluation.coverage | pct }}</strong>{% endif %}</div><div class="mt-1 text-muted">{{ row.course.code if row.course else '후보 없음' }} · 신뢰도 {{ row.evaluation.confidence | conf }}</div></td>
           <td class="py-3 pr-3">{{ row.department }}</td>
           <td class="py-3 pr-3 whitespace-nowrap">{{ time(row.request.submitted_at, "date") }}</td>
           <td class="py-3">{% if row.reviewer %}{{ row.reviewer.name }}{% if row.delegated %} <span class="badge text-error">대리 재배정</span>{% endif %}{% else %}<span class="text-muted">미배정</span>{% endif %}</td>

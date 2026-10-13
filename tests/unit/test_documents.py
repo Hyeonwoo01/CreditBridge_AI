@@ -1,6 +1,3 @@
-import io
-import zipfile
-
 import pymupdf
 import pytest
 
@@ -26,23 +23,21 @@ def test_pdf_text_layer_and_scanned_page_split() -> None:
     assert len(doc.scanned_pages) == 1 and doc.quality == 0.5
 
 
-def test_docx_and_txt() -> None:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr(
-            "word/document.xml",
-            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
-            "<w:p><w:r><w:t>Week 1: Vectors</w:t></w:r></w:p>"
-            "<w:p><w:r><w:t>Week 2: Matrices</w:t></w:r></w:p></w:body></w:document>",
-        )
-    assert extract(buf.getvalue(), "a.docx").text == "Week 1: Vectors\nWeek 2: Matrices"
-    assert extract("주차 1: 극한".encode("cp949"), "a.txt").text == "주차 1: 극한"
+def test_image_upload_becomes_a_page_to_transcribe() -> None:
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 20, 20), False)
+    png = pix.tobytes("png")
+    assert validate_upload("scan.png", png, max_mb=20) == ".png"
+    doc = extract(png, "scan.png")
+    assert doc.text == "" and len(doc.scanned_pages) == 1
 
 
 @pytest.mark.parametrize(
     ("name", "data", "message"),
     [
         ("a.exe", b"MZ", "지원하지 않는 형식"),
+        ("syllabus.docx", b"PK\x03\x04 docx", "PDF로 저장해서"),
+        ("syllabus.txt", b"Week 1: Limits", "지원하지 않는 형식"),
+        ("broken.png", b"not an image", "이미지를 열 수 없어요"),
         ("a.pdf", b"   ", "빈 파일"),
         ("a.pdf", b"%PDF-broken", "PDF를 열 수 없어요"),
     ],
@@ -56,4 +51,4 @@ def test_rejects_encrypted_and_oversized() -> None:
     with pytest.raises(UploadRejectedError, match="암호"):
         validate_upload("a.pdf", make_pdf(["secret"], password="pw"), max_mb=20)
     with pytest.raises(UploadRejectedError, match="20MB"):
-        validate_upload("a.txt", b"x" * (20 * 1024 * 1024 + 1), max_mb=20)
+        validate_upload("a.pdf", b"x" * (20 * 1024 * 1024 + 1), max_mb=20)

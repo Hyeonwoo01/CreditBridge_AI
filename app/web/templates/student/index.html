@@ -4,32 +4,41 @@
 {% block content %}
 <header class="grid gap-2">
   <h1 class="text-[28px] font-bold">내 편입 요청</h1>
-  <p class="text-muted">편입할 대학을 고르고 강의계획서를 올리면, 지원 전에도 예상 인정 결과를 볼 수 있어요.</p>
+  <p class="text-muted">강의계획서를 올리면 수강 신청 전에 과목별 예상 인정 결과와 근거를 볼 수 있어요.</p>
 </header>
 
+{% if home.target %}
 <form method="post" action="/student/requests" class="mt-6 flex flex-col gap-3 rounded-[32px] border border-hairline p-3 shadow-card md:flex-row md:items-center md:rounded-full md:pl-6">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label class="grid flex-1 gap-0.5 px-3 md:px-0">
     <span class="text-xs font-bold">다니던 대학</span>
     <select name="source_institution_id" class="bg-transparent text-sm text-body focus:outline-none" required>
-      {% for i in sources %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
+      {% for i in home.sources %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
     </select>
   </label>
   <span class="hidden h-8 w-px bg-hairline md:block"></span>
+  <div class="grid flex-1 gap-0.5 px-3 md:px-0">
+    <span class="text-xs font-bold">편입 대학</span>
+    <span class="text-sm text-body">{{ home.target.name }}</span>
+  </div>
+  <span class="hidden h-8 w-px bg-hairline md:block"></span>
   <label class="grid flex-1 gap-0.5 px-3 md:px-0">
-    <span class="text-xs font-bold">편입 희망 대학</span>
-    <select name="target_institution_id" class="bg-transparent text-sm text-body focus:outline-none" required>
-      {% for i in targets %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
+    <span class="text-xs font-bold">전공</span>
+    <select name="major" class="bg-transparent text-sm text-body focus:outline-none" required>
+      {% for m in home.majors %}<option value="{{ m }}" {% if m == 'Computer Science and Engineering' %}selected{% endif %}>{{ m }}</option>{% endfor %}
     </select>
   </label>
   <button class="btn-primary rounded-full md:h-12 md:w-auto">새 요청 만들기</button>
 </form>
+{% else %}
+<p class="mt-6 rounded-md bg-surface-soft p-6 text-sm text-body">입학이 확정된 대학에 소속된 계정만 편입 요청을 만들 수 있어요. 학사처에 계정 연결을 요청해 주세요.</p>
+{% endif %}
 
 <section class="mt-12 grid gap-4">
-  {% for r in requests %}
-  <a href="/student/requests/{{ r.public_id }}" class="card flex items-center justify-between gap-4 hover:shadow-card">
+  {% for r in home.requests %}
+  <a href="/student/requests/{{ r.id }}" class="card flex items-center justify-between gap-4 hover:shadow-card">
     <div class="grid gap-1">
-      <span class="font-semibold">{{ r.source_institution.name }} → {{ r.target_institution.name }}</span>
+      <span class="font-semibold">{{ r.source_institution.name }} → {{ r.target_institution.name }}{% if r.major %} · {{ r.major }}{% endif %}</span>
       <span class="text-sm text-muted">만든 날 {{ time(r.created_at, "date") }} · {{ {"draft": "준비 중 (사전 시뮬레이션)", "submitted": "학사처 심사 중", "decided": "판정 완료"}[r.status] }}</span>
     </div>
     <span aria-hidden="true">›</span>

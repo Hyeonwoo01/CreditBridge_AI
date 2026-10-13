@@ -16,10 +16,6 @@ def get_institution(session: Session, institution_id: int) -> Institution | None
     return session.get(Institution, institution_id)
 
 
-def get_institution_by_public_id(session: Session, public_id: str) -> Institution | None:
-    return session.scalars(select(Institution).where(Institution.public_id == public_id)).first()
-
-
 def get_course(session: Session, course_id: int) -> Course | None:
     return session.get(Course, course_id)
 
@@ -37,3 +33,10 @@ def courses_of(session: Session, institution_id: int) -> list[Course]:
 def course_by_code(session: Session, institution_id: int, code: str) -> Course | None:
     stmt = select(Course).where(Course.institution_id == institution_id, Course.code == code)
     return session.scalars(stmt).first()
+
+
+def departments_of(session: Session, institution_id: int) -> list[str]:
+    stmt = (
+        select(Course.department).where(Course.institution_id == institution_id).distinct().order_by(Course.department)
+    )
+    return list(session.scalars(stmt))

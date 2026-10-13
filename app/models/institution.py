@@ -1,10 +1,10 @@
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, IdMixin, PublicIdMixin
+from app.db.base import Base, CreatedAtMixin, IdMixin
 
 
-class Institution(IdMixin, PublicIdMixin, CreatedAtMixin, Base):
+class Institution(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "institutions"
 
     name: Mapped[str] = mapped_column(String(200))

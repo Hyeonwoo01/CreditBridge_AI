@@ -1,10 +1,10 @@
 from sqlalchemy import ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, IdMixin, IdType, PublicIdMixin
+from app.db.base import Base, CreatedAtMixin, IdMixin, IdType
 
 
-class Course(IdMixin, PublicIdMixin, CreatedAtMixin, Base):
+class Course(IdMixin, CreatedAtMixin, Base):
     """대상 대학 카탈로그 과목."""
 
     __tablename__ = "courses"

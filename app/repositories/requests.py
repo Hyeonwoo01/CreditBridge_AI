@@ -8,10 +8,6 @@ def get(session: Session, request_id: int) -> TransferRequest | None:
     return session.get(TransferRequest, request_id)
 
 
-def get_by_public_id(session: Session, public_id: str) -> TransferRequest | None:
-    return session.scalars(select(TransferRequest).where(TransferRequest.public_id == public_id)).first()
-
-
 def of_student(session: Session, student_id: int) -> list[TransferRequest]:
     stmt = (
         select(TransferRequest)

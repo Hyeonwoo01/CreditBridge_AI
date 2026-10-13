@@ -20,10 +20,10 @@
   <div class="flex flex-col items-center gap-2 text-center">
     {% if ev.recommendation == 'insufficient' %}
       <span class="text-[40px] font-bold leading-tight">정보 부족</span>
-      <span class="text-sm text-muted">확률을 계산하지 않았어요</span>
-    {% elif ev.probability is not none %}
-      <span class="rating">{{ ev.probability | round | int }}%</span>
-      <span class="text-sm text-muted">직접 인정 가능성 (예상치)</span>
+      <span class="text-sm text-muted">판단할 근거가 부족해 추천하지 않았어요</span>
+    {% elif ev.coverage is not none and v.candidate %}
+      <span class="rating">{{ ev.coverage | pct }}</span>
+      <span class="text-sm text-muted">{{ v.candidate.code }} 개념 커버리지</span>
     {% else %}
       <span class="text-[40px] font-bold leading-tight">{{ ev.recommendation | rec }}</span>
     {% endif %}
@@ -48,7 +48,7 @@
 <section class="mt-4 rounded-md border border-ink p-4">
   <p class="text-sm font-semibold">교수 최종 판정: {{ v.decision.result | rec }}{% if v.decided_target %} · {{ v.decided_target.code }}{% endif %}</p>
   <p class="mt-1 text-sm text-muted">{{ v.decided_by.name if v.decided_by else '' }} · {{ time(v.decision.decided_at) }} · {{ v.decision.action | action }}</p>
-  {% if v.decision.reason %}<p class="mt-2 text-sm">{{ v.decision.reason }}</p>{% endif %}
+  {% if v.decision.reason_codes %}<p class="mt-2 text-sm">사유: {% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}</p>{% endif %}
 </section>
 {% endif %}
 

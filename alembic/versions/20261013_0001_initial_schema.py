@@ -1,10 +1,10 @@
 """initial schema
 
-VECTOR(1024) 차원은 Settings.embedding_dim(bge-m3)과 같아야 한다.
+MySQL 8.0 호환 DDL만 사용한다 (MVP는 VECTOR 미사용).
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-10-13 05:32:44.640349
+Create Date: 2026-10-13 06:33:28.230689
 """
 
 from collections.abc import Sequence
@@ -28,12 +28,10 @@ def upgrade() -> None:
     sa.Column('tuition_per_credit', sa.Integer(), nullable=True),
     sa.Column('degree_credits', sa.Integer(), nullable=True),
     sa.Column('id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), autoincrement=True, nullable=False),
-    sa.Column('public_id', sa.String(length=36), nullable=False),
     sa.Column('created_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_institutions')),
-    sa.UniqueConstraint('public_id', name=op.f('uq_institutions_public_id')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_table('courses',
     sa.Column('institution_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=False),
@@ -44,15 +42,13 @@ def upgrade() -> None:
     sa.Column('level', sa.Text(), nullable=False),
     sa.Column('reference_syllabus_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=True),
     sa.Column('id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), autoincrement=True, nullable=False),
-    sa.Column('public_id', sa.String(length=36), nullable=False),
     sa.Column('created_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
     sa.ForeignKeyConstraint(['institution_id'], ['institutions.id'], name=op.f('fk_courses_institution_id_institutions')),
     sa.ForeignKeyConstraint(['reference_syllabus_id'], ['syllabi.id'], name=op.f('fk_courses_reference_syllabus_id_syllabi'), use_alter=True),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_courses')),
     sa.UniqueConstraint('institution_id', 'code', name=op.f('uq_courses_institution_id')),
-    sa.UniqueConstraint('public_id', name=op.f('uq_courses_public_id')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_courses_department'), 'courses', ['department'], unique=False)
     op.create_index(op.f('ix_courses_institution_id'), 'courses', ['institution_id'], unique=False)
@@ -66,15 +62,13 @@ def upgrade() -> None:
     sa.Column('delegate_user_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=True),
     sa.Column('away_until', sa.Date(), nullable=True),
     sa.Column('id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), autoincrement=True, nullable=False),
-    sa.Column('public_id', sa.String(length=36), nullable=False),
     sa.Column('created_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
     sa.ForeignKeyConstraint(['delegate_user_id'], ['users.id'], name=op.f('fk_users_delegate_user_id_users')),
     sa.ForeignKeyConstraint(['institution_id'], ['institutions.id'], name=op.f('fk_users_institution_id_institutions')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_users')),
     sa.UniqueConstraint('email', name=op.f('uq_users_email')),
-    sa.UniqueConstraint('public_id', name=op.f('uq_users_public_id')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_users_department'), 'users', ['department'], unique=False)
     op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False)
@@ -89,7 +83,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['actor_id'], ['users.id'], name=op.f('fk_audit_logs_actor_id_users')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_audit_logs')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_audit_logs_action'), 'audit_logs', ['action'], unique=False)
     op.create_index(op.f('ix_audit_logs_actor_id'), 'audit_logs', ['actor_id'], unique=False)
@@ -97,20 +91,19 @@ def upgrade() -> None:
     sa.Column('student_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=False),
     sa.Column('source_institution_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=False),
     sa.Column('target_institution_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=False),
+    sa.Column('major', sa.String(length=100), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('submitted_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=True),
     sa.Column('transcript_file_key', sa.String(length=255), nullable=True),
     sa.Column('transcript_masked_name', sa.String(length=100), nullable=True),
     sa.Column('id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), autoincrement=True, nullable=False),
-    sa.Column('public_id', sa.String(length=36), nullable=False),
     sa.Column('created_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
     sa.ForeignKeyConstraint(['source_institution_id'], ['institutions.id'], name=op.f('fk_transfer_requests_source_institution_id_institutions')),
     sa.ForeignKeyConstraint(['student_id'], ['users.id'], name=op.f('fk_transfer_requests_student_id_users')),
     sa.ForeignKeyConstraint(['target_institution_id'], ['institutions.id'], name=op.f('fk_transfer_requests_target_institution_id_institutions')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_transfer_requests')),
-    sa.UniqueConstraint('public_id', name=op.f('uq_transfer_requests_public_id')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_transfer_requests_status'), 'transfer_requests', ['status'], unique=False)
     op.create_index(op.f('ix_transfer_requests_student_id'), 'transfer_requests', ['student_id'], unique=False)
@@ -120,6 +113,7 @@ def upgrade() -> None:
     sa.Column('transfer_request_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=True),
     sa.Column('owner_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=True),
     sa.Column('source_file_key', sa.String(length=255), nullable=True),
+    sa.Column('content_hash', sa.String(length=64), nullable=False),
     sa.Column('original_filename', sa.String(length=255), nullable=False),
     sa.Column('language', sa.String(length=8), nullable=False),
     sa.Column('raw_text', sa.Text().with_variant(mysql.LONGTEXT(), 'mariadb').with_variant(mysql.LONGTEXT(), 'mysql'), nullable=False),
@@ -133,17 +127,17 @@ def upgrade() -> None:
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('error_message', sa.String(length=500), nullable=True),
     sa.Column('id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), autoincrement=True, nullable=False),
-    sa.Column('public_id', sa.String(length=36), nullable=False),
     sa.Column('created_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
     sa.CheckConstraint('extracted_json IS NULL OR JSON_VALID(extracted_json)', name=op.f('ck_syllabi_extracted_json_valid')),
     sa.ForeignKeyConstraint(['institution_id'], ['institutions.id'], name=op.f('fk_syllabi_institution_id_institutions')),
     sa.ForeignKeyConstraint(['owner_id'], ['users.id'], name=op.f('fk_syllabi_owner_id_users')),
     sa.ForeignKeyConstraint(['transfer_request_id'], ['transfer_requests.id'], name=op.f('fk_syllabi_transfer_request_id_transfer_requests')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_syllabi')),
-    sa.UniqueConstraint('public_id', name=op.f('uq_syllabi_public_id')),
+    sa.UniqueConstraint('transfer_request_id', 'content_hash', name='uq_syllabi_request_content'),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
+    op.create_index(op.f('ix_syllabi_content_hash'), 'syllabi', ['content_hash'], unique=False)
     op.create_index(op.f('ix_syllabi_course_code'), 'syllabi', ['course_code'], unique=False)
     op.create_index(op.f('ix_syllabi_institution_id'), 'syllabi', ['institution_id'], unique=False)
     op.create_index(op.f('ix_syllabi_transfer_request_id'), 'syllabi', ['transfer_request_id'], unique=False)
@@ -153,7 +147,7 @@ def upgrade() -> None:
     sa.Column('candidate_course_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('recommendation', sa.String(length=20), nullable=True),
-    sa.Column('probability', sa.Numeric(precision=5, scale=2, asdecimal=False), nullable=True),
+    sa.Column('coverage', sa.Numeric(precision=4, scale=3, asdecimal=False), nullable=True),
     sa.Column('confidence', sa.String(length=10), nullable=True),
     sa.Column('level_flag', sa.String(length=10), nullable=True),
     sa.Column('coverage_json', sa.JSON(), nullable=True),
@@ -164,15 +158,13 @@ def upgrade() -> None:
     sa.Column('error_message', sa.String(length=500), nullable=True),
     sa.Column('is_latest', sa.Boolean(), nullable=False),
     sa.Column('id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), autoincrement=True, nullable=False),
-    sa.Column('public_id', sa.String(length=36), nullable=False),
     sa.Column('created_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
     sa.ForeignKeyConstraint(['candidate_course_id'], ['courses.id'], name=op.f('fk_course_evaluations_candidate_course_id_courses')),
     sa.ForeignKeyConstraint(['syllabus_id'], ['syllabi.id'], name=op.f('fk_course_evaluations_syllabus_id_syllabi')),
     sa.ForeignKeyConstraint(['transfer_request_id'], ['transfer_requests.id'], name=op.f('fk_course_evaluations_transfer_request_id_transfer_requests')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_course_evaluations')),
-    sa.UniqueConstraint('public_id', name=op.f('uq_course_evaluations_public_id')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_course_evaluations_candidate_course_id'), 'course_evaluations', ['candidate_course_id'], unique=False)
     op.create_index(op.f('ix_course_evaluations_confidence'), 'course_evaluations', ['confidence'], unique=False)
@@ -193,13 +185,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['syllabus_id'], ['syllabi.id'], name=op.f('fk_syllabus_chunks_syllabus_id_syllabi'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_syllabus_chunks')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
-    )
-    # VECTOR 컬럼과 벡터 인덱스는 Alembic이 다루지 못해 직접 작성한다 (MariaDB 11.8)
-    op.execute(
-        "ALTER TABLE syllabus_chunks "
-        "ADD COLUMN embedding VECTOR(1024) NOT NULL, "
-        "ADD VECTOR INDEX ix_syllabus_chunks_embedding (embedding) M=16 DISTANCE=cosine"
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_syllabus_chunks_syllabus_id'), 'syllabus_chunks', ['syllabus_id'], unique=False)
     op.create_table('transcript_entries',
@@ -218,7 +204,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['transfer_request_id'], ['transfer_requests.id'], name=op.f('fk_transcript_entries_transfer_request_id_transfer_requests')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_transcript_entries')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_transcript_entries_transfer_request_id'), 'transcript_entries', ['transfer_request_id'], unique=False)
     op.create_table('assignments',
@@ -235,7 +221,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['reviewer_id'], ['users.id'], name=op.f('fk_assignments_reviewer_id_users')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_assignments')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_assignments_course_evaluation_id'), 'assignments', ['course_evaluation_id'], unique=False)
     op.create_index(op.f('ix_assignments_reviewer_id'), 'assignments', ['reviewer_id'], unique=False)
@@ -245,7 +231,8 @@ def upgrade() -> None:
     sa.Column('action', sa.String(length=10), nullable=False),
     sa.Column('result', sa.String(length=10), nullable=False),
     sa.Column('target_course_id', sa.BigInteger().with_variant(mysql.BIGINT(unsigned=True), 'mariadb').with_variant(mysql.BIGINT(unsigned=True), 'mysql'), nullable=True),
-    sa.Column('reason', sa.Text(), nullable=False),
+    sa.Column('reason_codes', sa.JSON(), nullable=False),
+    sa.Column('reason_memo', sa.Text(), nullable=False),
     sa.Column('ai_recommendation_snapshot', sa.JSON(), nullable=False),
     sa.Column('conflict_acknowledged', sa.Boolean(), nullable=False),
     sa.Column('decided_at', sa.DateTime().with_variant(mysql.DATETIME(fsp=6), 'mariadb').with_variant(mysql.DATETIME(fsp=6), 'mysql'), nullable=False),
@@ -255,7 +242,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['target_course_id'], ['courses.id'], name=op.f('fk_decisions_target_course_id_courses')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_decisions')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_decisions_course_evaluation_id'), 'decisions', ['course_evaluation_id'], unique=False)
     op.create_table('evidence_spans',
@@ -271,7 +258,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['syllabus_id'], ['syllabi.id'], name=op.f('fk_evidence_spans_syllabus_id_syllabi')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_evidence_spans')),
     mysql_charset='utf8mb4',
-    mysql_collate='utf8mb4_unicode_ci',
+    mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_evidence_spans_course_evaluation_id'), 'evidence_spans', ['course_evaluation_id'], unique=False)
     # ### end Alembic commands ###
@@ -302,6 +289,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_syllabi_transfer_request_id'), table_name='syllabi')
     op.drop_index(op.f('ix_syllabi_institution_id'), table_name='syllabi')
     op.drop_index(op.f('ix_syllabi_course_code'), table_name='syllabi')
+    op.drop_index(op.f('ix_syllabi_content_hash'), table_name='syllabi')
     op.drop_table('syllabi')
     op.drop_index(op.f('ix_transfer_requests_target_institution_id'), table_name='transfer_requests')
     op.drop_index(op.f('ix_transfer_requests_student_id'), table_name='transfer_requests')

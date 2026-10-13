@@ -1,35 +1,31 @@
-"""AI 분석 파이프라인: 문서 추출 → 구조화 → 임베딩 → 후보 검색 → 개념별 판단 → 근거 검증 → 추천.
+"""AI 분석 파이프라인: 문서 추출 → 구조화 → 학과 필터로 후보 선정 → Claude 개념별 비교 → 근거 검증 → 추천.
 
 Celery 작업(app/workers/tasks.py)이 호출한다. 웹 요청 안에서 직접 부르지 않는다.
+같은 원본(content_hash)은 이미 추출한 결과를, 같은 비교 입력은 이미 낸 판정을 재사용해 LLM을 다시 부르지 않는다.
 """
 
 import hashlib
-import json
 import logging
-from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from sqlalchemy.orm import Session
 
-from app.ai import injection
-from app.ai.embedding import Embedder
-from app.ai.evidence import verify_quotes
+from app.ai import candidates as candidate_filter
+from app.ai import injection, matching
 from app.ai.extraction import build_chunks, extract_syllabus
 from app.ai.llm_client import LLMClient
-from app.ai.matching import find_candidates
 from app.ai.prompts_loader import load_prompt
 from app.documents import text as doc_text
 from app.documents.storage import ObjectStorage
 from app.errors import LLMError
-from app.models import Course, CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry
-from app.models.enums import EvaluationStatus, EvidenceSide, Recommendation, SyllabusStatus
+from app.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry
+from app.models.enums import EvaluationStatus, Recommendation, SyllabusStatus
 from app.repositories import catalog as catalog_repo
 from app.repositories import evaluations as evaluation_repo
 from app.repositories import requests as request_repo
 from app.repositories import syllabi as syllabus_repo
-from app.schemas.evaluation import CandidateJudgment, EvaluationOutput
 from app.schemas.extraction import SyllabusExtraction
-from app.schemas.results import CandidateResult, ConceptResult, EvaluationResult, EvidenceView
+from app.schemas.results import CandidateResult, EvaluationResult
 from app.schemas.transcript import TranscriptExtraction
 from app.schemas.transcription import PageTranscription
 from app.security.masking import mask_pii
@@ -37,9 +33,16 @@ from app.services import scoring
 
 logger = logging.getLogger(__name__)
 
-MAX_CANDIDATES = 5
 AUTO_LINK_SCORE = 0.85
 DEFAULT_MISSING_MATERIALS = ["주차별 상세 강의 계획", "교재 목차(다룬 장 표시)", "시험지 또는 과제 샘플"]
+
+
+def content_hash(*parts: bytes) -> str:
+    """업로드 원본의 SHA-256. 보완 자료가 붙으면 이전 해시와 새 파일을 이어 다시 계산한다."""
+    digest = hashlib.sha256()
+    for part in parts:
+        digest.update(part)
+    return digest.hexdigest()
 
 
 # ---------- 문서 → 텍스트 ----------
@@ -65,57 +68,92 @@ def document_to_text(llm: LLMClient, data: bytes, filename: str) -> tuple[str, f
 # ---------- 강의계획서 처리 ----------
 
 
-def process_syllabus(
-    session: Session, syllabus_id: int, *, llm: LLMClient, embedder: Embedder, storage: ObjectStorage
-) -> None:
+def _reuse_extraction(session: Session, syllabus: Syllabus) -> bool:
+    """같은 원본을 이미 추출했으면 텍스트·추출 결과·청크를 복사한다 (LLM 호출 없음)."""
+    donor = syllabus_repo.analyzed_with_hash(session, syllabus.content_hash, exclude_id=syllabus.id)
+    if donor is None:
+        return False
+    for attr in (
+        "raw_text",
+        "quality_score",
+        "injection_flags",
+        "extracted_json",
+        "extraction_model",
+        "course_code",
+        "course_title",
+        "credits",
+    ):
+        setattr(syllabus, attr, getattr(donor, attr))
+    syllabus_repo.replace_chunks(
+        session,
+        syllabus.id,
+        [
+            SyllabusChunk(
+                syllabus_id=syllabus.id,
+                week_no=c.week_no,
+                concept=c.concept,
+                text=c.text,
+                char_start=c.char_start,
+                char_end=c.char_end,
+            )
+            for c in syllabus_repo.chunks_of(session, donor.id)
+        ],
+    )
+    return True
+
+
+def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: ObjectStorage) -> None:
+    if not syllabus.raw_text and syllabus.source_file_key:
+        text, quality = document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
+        syllabus.raw_text = text
+        syllabus.quality_score = quality
+    if len(syllabus.raw_text.strip()) < 40:
+        raise LLMError("document has no readable text")
+
+    flags = injection.detect(syllabus.raw_text)
+    syllabus.injection_flags = [f"{f.line_no}행: {f.text}" for f in flags]
+    result = extract_syllabus(llm, injection.sanitize(syllabus.raw_text, flags))
+    extraction = result.output
+    syllabus.extracted_json = extraction.model_dump()
+    syllabus.extraction_model = result.model
+    syllabus.course_title = extraction.course_title[:255] or syllabus.original_filename[:255]
+    syllabus.course_code = extraction.course_code[:50]
+    syllabus.credits = extraction.credits
+    syllabus_repo.replace_chunks(
+        session,
+        syllabus.id,
+        [
+            SyllabusChunk(
+                syllabus_id=syllabus.id,
+                week_no=d.week_no,
+                concept=d.concept,
+                text=d.text,
+                char_start=d.char_start,
+                char_end=d.char_end,
+            )
+            for d in build_chunks(syllabus.raw_text, extraction)
+        ],
+    )
+
+
+def process_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient, storage: ObjectStorage) -> None:
     syllabus = syllabus_repo.get(session, syllabus_id)
     if syllabus is None or syllabus.status == SyllabusStatus.DELETED:
         return
     syllabus.status = SyllabusStatus.PROCESSING
     session.commit()
     try:
-        if not syllabus.raw_text and syllabus.source_file_key:
-            text, quality = document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
-            syllabus.raw_text = text
-            syllabus.quality_score = quality
-        if len(syllabus.raw_text.strip()) < 40:
-            raise LLMError("document has no readable text")
-
-        flags = injection.detect(syllabus.raw_text)
-        syllabus.injection_flags = [f"{f.line_no}행: {f.text}" for f in flags]
-        result = extract_syllabus(llm, injection.sanitize(syllabus.raw_text, flags))
-        extraction = result.output
-        syllabus.extracted_json = extraction.model_dump()
-        syllabus.extraction_model = result.model
-        syllabus.course_title = extraction.course_title[:255] or syllabus.original_filename[:255]
-        syllabus.course_code = extraction.course_code[:50]
-        syllabus.credits = extraction.credits
-
-        drafts = build_chunks(syllabus.raw_text, extraction)
-        vectors = embedder.embed([d.text for d in drafts])
-        syllabus_repo.replace_chunks(
-            session,
-            syllabus.id,
-            [
-                SyllabusChunk(
-                    syllabus_id=syllabus.id,
-                    week_no=d.week_no,
-                    concept=d.concept,
-                    text=d.text,
-                    char_start=d.char_start,
-                    char_end=d.char_end,
-                    embedding=v,
-                )
-                for d, v in zip(drafts, vectors, strict=True)
-            ],
-        )
+        if syllabus.raw_text or not _reuse_extraction(session, syllabus):
+            _extract(session, syllabus, llm, storage)
         syllabus.status = SyllabusStatus.READY
         syllabus.error_message = None
         session.commit()
     except LLMError as exc:
         session.rollback()
         syllabus.status = SyllabusStatus.FAILED
-        syllabus.error_message = "문서를 분석하지 못했어요. 글자를 읽을 수 있는 파일인지 확인한 뒤 다시 올려 주세요."
+        syllabus.error_message = (
+            "문서를 분석하지 못했어요. 글자를 읽을 수 있는 PDF나 이미지인지 확인한 뒤 다시 올려 주세요."
+        )
         session.commit()
         logger.warning("syllabus processing failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
         return
@@ -126,7 +164,7 @@ def process_syllabus(
 
 
 def add_supplement(
-    session: Session, syllabus_id: int, file_key: str, *, llm: LLMClient, embedder: Embedder, storage: ObjectStorage
+    session: Session, syllabus_id: int, file_key: str, *, llm: LLMClient, storage: ObjectStorage
 ) -> None:
     """보완 자료를 원문 뒤에 덧붙이고 다시 분석한다. 앞부분 위치가 그대로라 이전 분석의 근거 구절도 유효하다."""
     syllabus = syllabus_repo.get(session, syllabus_id)
@@ -136,53 +174,38 @@ def add_supplement(
     text, _ = document_to_text(llm, storage.get(file_key), filename)
     syllabus.raw_text = f"{syllabus.raw_text}\n\n[보완 자료: {filename}]\n{text}"
     session.commit()
-    process_syllabus(session, syllabus_id, llm=llm, embedder=embedder, storage=storage)
+    process_syllabus(session, syllabus_id, llm=llm, storage=storage)
 
 
 # ---------- 과목 비교 ----------
 
 
-@dataclass
-class _Reference:
-    course: Course
-    syllabus: Syllabus
-    concepts: list[str]
-
-
-def _references(session: Session, course_ids: list[int]) -> list[_Reference]:
-    courses = catalog_repo.courses_by_ids(session, course_ids)
-    concepts = syllabus_repo.reference_concepts(session, course_ids)
+def _references(
+    session: Session, target_institution_id: int, extraction: SyllabusExtraction
+) -> list[matching.Reference]:
+    """학과 필터로 고른 후보 과목과 각 과목의 기준 강의계획서·필수 개념."""
+    courses = candidate_filter.select(catalog_repo.courses_of(session, target_institution_id), extraction.disciplines)
+    concepts = syllabus_repo.reference_concepts(session, [c.id for c in courses])
     refs = []
-    for cid in course_ids:
-        course = courses.get(cid)
-        if course is None or course.reference_syllabus_id is None:
-            continue
-        ref_syllabus = syllabus_repo.get(session, course.reference_syllabus_id)
+    for course in courses:
+        ref_syllabus = (
+            syllabus_repo.get(session, course.reference_syllabus_id) if course.reference_syllabus_id else None
+        )
         if ref_syllabus is None:
             continue
         refs.append(
-            _Reference(course=course, syllabus=ref_syllabus, concepts=[c.concept for c in concepts.get(cid, [])])
+            matching.Reference(
+                course_id=course.id,
+                code=course.code,
+                title=course.title,
+                credits=course.credits,
+                level=course.level,
+                syllabus_id=ref_syllabus.id,
+                text=ref_syllabus.raw_text,
+                concepts=[c.concept for c in concepts.get(course.id, [])],
+            )
         )
     return refs
-
-
-def _candidates_block(refs: list[_Reference]) -> str:
-    blocks = []
-    for ref in refs:
-        header = json.dumps(
-            {
-                "course_code": ref.course.code,
-                "title": ref.course.title,
-                "credits": ref.course.credits,
-                "level": ref.course.level,
-                "concepts": ref.concepts,
-            },
-            ensure_ascii=False,
-        )
-        blocks.append(
-            f"<candidate>\n{header}\n<reference_syllabus>\n{ref.syllabus.raw_text}\n</reference_syllabus>\n</candidate>"
-        )
-    return "\n".join(blocks)
 
 
 def _input_hash(prompt_version: str, model: str, prompt: str) -> str:
@@ -190,96 +213,27 @@ def _input_hash(prompt_version: str, model: str, prompt: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def _concept_results(
-    judgment: CandidateJudgment, ref: _Reference, student: Syllabus, spans: list[EvidenceSpan]
-) -> list[ConceptResult]:
-    by_name = {c.concept.strip().lower(): c for c in judgment.concepts}
-    results = []
-    for concept in ref.concepts:
-        j = by_name.get(concept.strip().lower())
-        if j is None:
-            results.append(
-                ConceptResult(
-                    concept=concept,
-                    status="unclear",
-                    coverage=0.0,
-                    reason="",
-                    verified=False,
-                    source_evidence=[],
-                    target_evidence=[],
-                )
-            )
-            continue
-        context = f"{ref.course.code}|{concept}"
-        src = verify_quotes(student.raw_text, j.source_quotes, context=context)
-        tgt = verify_quotes(ref.syllabus.raw_text, j.target_quotes, context=context)
-        verified = bool(src)
-        for side, syllabus_obj, found in (
-            (EvidenceSide.SOURCE, student, src),
-            (EvidenceSide.TARGET, ref.syllabus, tgt),
-        ):
-            spans.extend(
-                EvidenceSpan(
-                    side=side,
-                    syllabus_id=syllabus_obj.id,
-                    char_start=s.start,
-                    char_end=s.end,
-                    concept=context[:255],
-                    verified=True,
-                )
-                for s in found
-            )
-        results.append(
-            ConceptResult(
-                concept=concept,
-                status=j.status,
-                coverage=scoring.apply_verification(j.status, j.coverage, verified),
-                reason=j.reason,
-                verified=verified,
-                source_evidence=[
-                    EvidenceView(
-                        side="source", text=student.raw_text[s.start : s.end], char_start=s.start, char_end=s.end
-                    )
-                    for s in src
-                ],
-                target_evidence=[
-                    EvidenceView(
-                        side="target", text=ref.syllabus.raw_text[s.start : s.end], char_start=s.start, char_end=s.end
-                    )
-                    for s in tgt
-                ],
-            )
-        )
-    return results
-
-
 def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> CourseEvaluation | None:
     student = syllabus_repo.get(session, syllabus_id)
     if student is None or student.transfer_request_id is None or student.status != SyllabusStatus.READY:
         return None
     request = request_repo.get(session, student.transfer_request_id)
-    if request is None:
+    extraction = SyllabusExtraction.from_stored(student.extracted_json)
+    if request is None or extraction is None:
         return None
 
-    chunks = syllabus_repo.chunks_of(session, student.id)
-    hits = find_candidates(session, [c.embedding for c in chunks], request.target_institution_id, limit=MAX_CANDIDATES)
-    refs = _references(session, [h.course_id for h in hits])
-    flags = injection.detect(student.raw_text)
-    prompt_def = load_prompt("evaluation")
-    prompt = prompt_def.render(
-        target_institution=request.target_institution.name,
-        candidates=_candidates_block(refs),
-        credits=str(student.credits) if student.credits is not None else "not stated",
-        student_syllabus=injection.sanitize(student.raw_text, flags),
+    refs = _references(session, request.target_institution_id, extraction)
+    prompt, prompt_version = matching.build_prompt(
+        request.target_institution.name, refs, student.credits, student.raw_text
     )
-    input_hash = _input_hash(prompt_def.version, llm.model, prompt)
+    input_hash = _input_hash(prompt_version, llm.model, prompt)
 
     evaluation = CourseEvaluation(
         transfer_request_id=request.id,
         syllabus_id=student.id,
         status=EvaluationStatus.RUNNING,
         input_hash=input_hash,
-        prompt_version=prompt_def.version,
+        prompt_version=prompt_version,
     )
     evaluation_repo.add(session, evaluation)
     session.commit()
@@ -291,7 +245,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         return evaluation
 
     try:
-        result = llm.parse(prompt, EvaluationOutput, effort="medium")
+        result = matching.compare(llm, prompt)
     except LLMError as exc:
         evaluation.status = EvaluationStatus.FAILED
         evaluation.error_message = "AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요."
@@ -300,16 +254,18 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         return evaluation
 
     output = result.output
-    extraction = SyllabusExtraction.model_validate(student.extracted_json or {})
     sparse = scoring.is_sparse(len(extraction.weekly_topics), len(extraction.learning_outcomes))
-    refs_by_code = {r.course.code.lower(): r for r in refs}
-    spans: list[EvidenceSpan] = []
+    refs_by_code = {r.code.lower(): r for r in refs}
+    spans: list[matching.VerifiedSpan] = []
     scored: list[tuple[scoring.Score, CandidateResult]] = []
     for judgment in output.candidates[:3]:
         ref = refs_by_code.get(judgment.course_code.strip().lower())
         if ref is None:
             continue
-        concepts = _concept_results(judgment, ref, student, spans)
+        concepts, found = matching.concept_results(judgment, ref, student.raw_text, student.id)
+        for c in concepts:
+            c.coverage = scoring.apply_verification(c.status, c.coverage, c.verified)
+        spans += found
         score = scoring.score_candidate(
             concepts, judgment.level, sparse_document=sparse, elective_eligible=output.elective_eligible
         )
@@ -317,10 +273,10 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
             (
                 score,
                 CandidateResult(
-                    course_id=ref.course.id,
-                    course_code=ref.course.code,
-                    course_title=ref.course.title,
-                    credits=ref.course.credits,
+                    course_id=ref.course_id,
+                    course_code=ref.code,
+                    course_title=ref.title,
+                    credits=ref.credits,
                     level=judgment.level,
                     level_note=judgment.level_note,
                     summary=judgment.summary,
@@ -341,14 +297,13 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
                 f"전적 과목 {student.credits:g}학점이 {best.course_code}의 {best.credits:g}학점보다 적어요. "
                 "학점 차이만큼 부분 인정될 수 있어요."
             )
-        # 커버리지가 낮으면 특정 과목으로 억지 매핑하지 않는다 (선택 인정·불인정만 추천)
         # 커버리지가 낮으면 특정 과목으로 억지 매핑하지 않는다 (선택 인정·불인정만 추천).
         # 정보 부족이면 판단 대상 후보로 남겨 무엇을 보완할지 보여준다.
         keep = best_score.adjusted >= scoring.ELECTIVE_MIN or best_score.recommendation == Recommendation.INSUFFICIENT
         evaluation.candidate_course_id = best.course_id if keep else None
         evaluation.recommendation = best_score.recommendation
-        evaluation.probability = best_score.probability
         evaluation.confidence = best_score.confidence
+        evaluation.coverage = round(best_score.coverage, 3)
         evaluation.level_flag = best.level
         evaluation.summary = best.summary
         missing_concepts = best_score.missing_concepts
@@ -361,7 +316,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
             evaluation.confidence = "medium"
         evaluation.summary = output.no_match_reason
         missing_concepts = []
-    if flags:
+    if student.injection_flags:
         warnings.append("판정을 유도하는 의심 문구가 있어 해당 줄을 분석에서 제외했어요.")
 
     missing_materials = output.missing_materials or (
@@ -378,20 +333,32 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     ).model_dump()
     evaluation.model = result.model
     evaluation.status = EvaluationStatus.DONE
-    for span in spans:
-        span.course_evaluation_id = evaluation.id
-    evaluation_repo.add_spans(session, spans)
+    evaluation_repo.add_spans(
+        session,
+        [
+            EvidenceSpan(
+                course_evaluation_id=evaluation.id,
+                side=s.side,
+                syllabus_id=s.syllabus_id,
+                char_start=s.start,
+                char_end=s.end,
+                concept=s.concept,
+                verified=True,
+            )
+            for s in spans
+        ],
+    )
     session.commit()
     return evaluation
 
 
 def _copy_result(session: Session, source: CourseEvaluation, target: CourseEvaluation) -> None:
-    """같은 입력의 이전 결과를 그대로 재사용한다 (반복 실행 시 판정 동일)."""
+    """같은 입력의 이전 결과를 그대로 재사용한다 (반복 실행 시 판정 동일, LLM 호출 없음)."""
     for attr in (
         "candidate_course_id",
         "recommendation",
-        "probability",
         "confidence",
+        "coverage",
         "level_flag",
         "coverage_json",
         "summary",
@@ -405,7 +372,7 @@ def _copy_result(session: Session, source: CourseEvaluation, target: CourseEvalu
             EvidenceSpan(
                 course_evaluation_id=target.id,
                 side=s.side,
-                syllabus_id=s.syllabus_id,
+                syllabus_id=s.syllabus_id if s.syllabus_id != source.syllabus_id else target.syllabus_id,
                 char_start=s.char_start,
                 char_end=s.char_end,
                 concept=s.concept,

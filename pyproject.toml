@@ -27,13 +27,9 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
 ]
-# bge-m3 임베딩. PyTorch가 커서 그룹을 분리했지만 기본 설치에 포함된다.
-embedding = [
-    "sentence-transformers>=3.2,<6",
-]
 
 [tool.uv]
-default-groups = ["dev", "embedding"]
+default-groups = ["dev"]
 package = false
 
 [tool.ruff]
@@ -48,14 +44,18 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Form", "fastapi.File", "fastapi.Query"]
 
+# 기술스택 정의서: app 디렉터리 일반 모드 검사(app/workers 제외), 모든 함수에 타입 힌트
 [tool.mypy]
 python_version = "3.12"
-strict = true
 plugins = ["pydantic.mypy"]
 files = ["app"]
+exclude = ["^app/workers/"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "kombu.*", "boto3.*", "botocore.*", "fitz.*", "pymupdf.*", "sentence_transformers.*"]
+module = ["celery.*", "kombu.*", "boto3.*", "botocore.*", "fitz.*", "pymupdf.*"]
 ignore_missing_imports = true
 
 # PyMuPDF는 타입 힌트가 부분적이라 문서 추출 모듈에서만 미타입 호출을 허용한다

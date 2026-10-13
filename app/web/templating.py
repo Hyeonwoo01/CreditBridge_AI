@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from fastapi.templating import Jinja2Templates
 
 from app.security.csrf import csrf_token
+from app.services.decisions import REASON_LABELS
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -42,7 +43,9 @@ TEMPLATES.env.filters.update(
     action=lambda v: ACTION_LABEL.get(v, v),
     pct=pct,
     iso=iso,
+    reason=lambda v: REASON_LABELS.get(v, v),
 )
+TEMPLATES.env.globals["reason_labels"] = REASON_LABELS
 
 
 def render(request: Request, name: str, status_code: int = 200, **context: Any) -> Response:

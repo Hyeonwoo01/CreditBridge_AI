@@ -28,43 +28,57 @@ def index(request: Request, user: User = Professor, session: Session = Depends(g
     )
 
 
-@router.get("/evaluations/{public_id}")
+@router.get("/evaluations/{evaluation_id}")
 def evaluation_page(
-    request: Request, public_id: str, user: User = Professor, session: Session = Depends(get_db)
+    request: Request, evaluation_id: int, user: User = Professor, session: Session = Depends(get_db)
 ) -> Response:
-    view = views.evaluation_view(session, user, public_id)
+    view = views.evaluation_view(session, user, evaluation_id)
     return render(request, "professor/evaluation.html", user=user, v=view)
 
 
-@router.post("/evaluations/{public_id}/decision")
+@router.post("/evaluations/{evaluation_id}/decision")
 def decide(
     request: Request,
-    public_id: str,
+    evaluation_id: int,
     action: str = Form(...),
     result: str = Form(""),
     target_course_id: str = Form(""),
-    reason: str = Form(""),
+    reason_codes: list[str] = Form([]),
+    reason_memo: str = Form(""),
     acknowledge_conflict: bool = Form(False),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
 ) -> Response:
     check_csrf(request, csrf_token)
+    form = {
+        "action": action,
+        "result": result,
+        "target_course_id": target_course_id,
+        "reason_codes": reason_codes,
+        "reason_memo": reason_memo,
+    }
     try:
         decision_service.decide(
-            session, user, public_id, action, result or None, target_course_id or None, reason, acknowledge_conflict
+            session,
+            user,
+            evaluation_id,
+            action,
+            result or None,
+            int(target_course_id) if target_course_id.isdigit() else None,
+            reason_codes,
+            reason_memo,
+            acknowledge_conflict,
         )
     except decision_service.ConflictNeedsAcknowledgement as exc:
         session.rollback()
-        view = views.evaluation_view(session, user, public_id)
-        form = {"action": action, "result": result, "target_course_id": target_course_id, "reason": reason}
+        view = views.evaluation_view(session, user, evaluation_id)
         return render(
             request, "professor/evaluation.html", status_code=409, user=user, v=view, conflict=str(exc), form=form
         )
     except DecisionValidationError as exc:
         session.rollback()
-        view = views.evaluation_view(session, user, public_id)
-        form = {"action": action, "result": result, "target_course_id": target_course_id, "reason": reason}
+        view = views.evaluation_view(session, user, evaluation_id)
         return render(
             request, "professor/evaluation.html", status_code=422, user=user, v=view, error=str(exc), form=form
         )
@@ -82,7 +96,7 @@ def away(
     session: Session = Depends(get_db),
 ) -> Response:
     check_csrf(request, csrf_token)
-    moved = review_service.set_away(session, user, days, delegate_id or None)
+    moved = review_service.set_away(session, user, days, int(delegate_id) if delegate_id.isdigit() else None)
     flash(
         request,
         f"부재 기간을 저장했어요. 진행 중인 {moved}건을 대리 심사자에게 넘겼어요."

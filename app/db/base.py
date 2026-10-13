@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
-from uuid import uuid4
 
-from sqlalchemy import BigInteger, DateTime, MetaData, String
+from sqlalchemy import BigInteger, DateTime, MetaData
 from sqlalchemy.dialects.mysql import BIGINT, DATETIME
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -29,10 +28,6 @@ class Base(DeclarativeBase):
 
 class IdMixin:
     id: Mapped[int] = mapped_column(IdType, primary_key=True, autoincrement=True)
-
-
-class PublicIdMixin:
-    public_id: Mapped[str] = mapped_column(String(36), unique=True, default=lambda: str(uuid4()))
 
 
 class CreatedAtMixin:

@@ -7,7 +7,7 @@ def concept(status: str, coverage: int, verified: bool = True) -> ConceptResult:
     return ConceptResult(
         concept=f"c{coverage}{status}",
         status=status,
-        coverage=apply_verification(status, coverage, verified),
+        coverage=apply_verification(status, coverage / 100, verified),
         reason="",
         verified=verified,
         source_evidence=[],
@@ -19,7 +19,7 @@ def test_full_verified_coverage_is_direct_with_high_confidence() -> None:
     s = score_candidate([concept("taught", 95)] * 5, "same", sparse_document=False, elective_eligible=True)
     assert s.recommendation is Recommendation.DIRECT
     assert s.confidence is Confidence.HIGH
-    assert s.probability is not None and s.probability >= 90
+    assert s.coverage >= 0.9
 
 
 def test_lower_level_never_direct() -> None:
@@ -32,14 +32,13 @@ def test_unverified_claims_are_capped_and_lower_confidence() -> None:
     concepts = [concept("taught", 100, verified=False)] * 3 + [concept("taught", 100)]
     s = score_candidate(concepts, "same", sparse_document=False, elective_eligible=True)
     assert s.recommendation is Recommendation.INSUFFICIENT  # 근거 확인 25% → 신뢰도 하 → 정보 부족
-    assert s.probability is None
+    assert s.confidence is Confidence.LOW
 
 
-def test_many_unclear_concepts_means_insufficient_without_probability() -> None:
+def test_many_unclear_concepts_means_insufficient() -> None:
     concepts = [concept("unclear", 0)] * 2 + [concept("taught", 90)] * 2
     s = score_candidate(concepts, "same", sparse_document=False, elective_eligible=True)
     assert s.recommendation is Recommendation.INSUFFICIENT
-    assert s.probability is None
     assert len(s.missing_concepts) == 2
 
 
@@ -65,3 +64,9 @@ def test_same_input_same_output() -> None:
 def test_sparse_document_detection() -> None:
     assert is_sparse(0, 1)
     assert not is_sparse(12, 0)
+
+
+def test_score_has_no_probability() -> None:
+    """MVP는 판정 확률을 계산하지 않는다 (기능명세서 FR-07)."""
+    s = score_candidate([concept("taught", 90)] * 3, "same", sparse_document=False, elective_eligible=True)
+    assert not hasattr(s, "probability")

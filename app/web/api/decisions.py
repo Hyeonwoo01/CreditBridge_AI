@@ -15,11 +15,12 @@ router = APIRouter(tags=["decisions"])
 
 
 class DecisionIn(BaseModel):
-    evaluation_id: str
+    evaluation_id: int
     action: str
     result: str | None = None
-    target_course_id: str | None = None
-    reason: str = ""
+    target_course_id: int | None = None
+    reason_codes: list[str] = []
+    reason_memo: str = ""
     acknowledge_conflict: bool = False
 
 
@@ -37,11 +38,12 @@ def create_decision(
             body.action,
             body.result,
             body.target_course_id,
-            body.reason,
+            body.reason_codes,
+            body.reason_memo,
             body.acknowledge_conflict,
         )
     except decision_service.ConflictNeedsAcknowledgement as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except DecisionValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"id": decision.id, "result": decision.result, "decided_by": user.public_id}
+    return {"id": decision.id, "result": decision.result, "decided_by": user.id}

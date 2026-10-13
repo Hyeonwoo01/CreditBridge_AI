@@ -18,7 +18,7 @@ from app.repositories import decisions as decision_repo
 from app.repositories import evaluations as evaluation_repo
 from app.repositories import requests as request_repo
 from app.repositories import syllabi as syllabus_repo
-from app.services import audit
+from app.services import analysis, audit
 
 
 @dataclass(frozen=True)
@@ -27,8 +27,8 @@ class UploadedFile:
     data: bytes
 
 
-def get_own_request(session: Session, student: User, public_id: str) -> TransferRequest:
-    request = request_repo.get_by_public_id(session, public_id)
+def get_own_request(session: Session, student: User, request_id: int) -> TransferRequest:
+    request = request_repo.get(session, request_id)
     if request is None:
         raise NotFoundError("편입 요청을 찾을 수 없어요.")
     if request.student_id != student.id:
@@ -36,25 +36,36 @@ def get_own_request(session: Session, student: User, public_id: str) -> Transfer
     return request
 
 
-def create_request(
-    session: Session, student: User, source_institution_id: int, target_institution_id: int
-) -> TransferRequest:
-    target = catalog_repo.get_institution(session, target_institution_id)
+def create_request(session: Session, student: User, source_institution_id: int, major: str) -> TransferRequest:
+    """MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다. 대상 대학은 학생의 소속 대학으로 정해진다."""
+    target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
+    if target is None or not target.is_target:
+        raise CreditBridgeError("입학이 확정된 대학에 소속된 학생 계정만 편입 요청을 만들 수 있어요.")
     source = catalog_repo.get_institution(session, source_institution_id)
-    if target is None or not target.is_target or source is None:
-        raise CreditBridgeError("대학을 다시 선택해 주세요.")
+    if source is None or source.is_target:
+        raise CreditBridgeError("다니던 대학을 다시 선택해 주세요.")
+    if major not in catalog_repo.departments_of(session, target.id):
+        raise CreditBridgeError("편입 전공을 다시 선택해 주세요.")
     request = request_repo.add(
         session,
-        TransferRequest(student_id=student.id, source_institution_id=source.id, target_institution_id=target.id),
+        TransferRequest(
+            student_id=student.id, source_institution_id=source.id, target_institution_id=target.id, major=major
+        ),
     )
-    audit.record(session, student, "request.create", "transfer_request", request.public_id, target=target.public_id)
+    audit.record(session, student, "request.create", "transfer_request", str(request.id), target=target.id, major=major)
     session.commit()
     return request
 
 
+@dataclass(frozen=True)
+class UploadResult:
+    created: list[Syllabus]
+    duplicates: list[Syllabus]  # 이 요청에 이미 올린 같은 문서 (저장된 분석 결과를 그대로 쓴다)
+
+
 def add_syllabi(
     session: Session, storage: ObjectStorage, student: User, request: TransferRequest, files: list[UploadedFile]
-) -> list[Syllabus]:
+) -> UploadResult:
     """파일을 검증해 객체 스토리지에 저장하고 강의계획서 행을 만든다. 분석 작업 등록은 호출자가 한다."""
     settings = get_settings()
     if request.status != RequestStatus.DRAFT:
@@ -62,8 +73,14 @@ def add_syllabi(
     if syllabus_repo.count_of_request(session, request.id) + len(files) > settings.max_syllabi_per_request:
         raise UploadRejectedError(f"강의계획서는 요청당 최대 {settings.max_syllabi_per_request}건까지 올릴 수 있어요.")
     validated = [(f, doc_text.validate_upload(f.filename, f.data, settings.max_upload_mb)) for f in files]
-    created = []
+    created: list[Syllabus] = []
+    duplicates: list[Syllabus] = []
     for f, ext in validated:
+        digest = analysis.content_hash(f.data)
+        existing = syllabus_repo.in_request_with_hash(session, request.id, digest)
+        if existing is not None:
+            duplicates.append(existing)
+            continue
         key = storage.new_key("syllabi", f.filename)
         storage.put(key, f.data, doc_text.CONTENT_TYPES[ext])
         syllabus = syllabus_repo.add(
@@ -73,15 +90,16 @@ def add_syllabi(
                 transfer_request_id=request.id,
                 owner_id=student.id,
                 source_file_key=key,
+                content_hash=digest,
                 original_filename=f.filename[:255],
                 course_title=f.filename[:255],
                 status=SyllabusStatus.UPLOADED,
             ),
         )
         created.append(syllabus)
-        audit.record(session, student, "syllabus.upload", "syllabus", syllabus.public_id, request=request.public_id)
+        audit.record(session, student, "syllabus.upload", "syllabus", str(syllabus.id), request=request.id)
     session.commit()
-    return created
+    return UploadResult(created=created, duplicates=duplicates)
 
 
 def set_transcript(
@@ -93,25 +111,25 @@ def set_transcript(
     key = storage.new_key("transcripts", file.filename)
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
     request.transcript_file_key = key
-    audit.record(session, student, "transcript.upload", "transfer_request", request.public_id)
+    audit.record(session, student, "transcript.upload", "transfer_request", str(request.id))
     session.commit()
 
 
 def confirm_link(
-    session: Session, student: User, request: TransferRequest, entry_id: int, syllabus_public_id: str | None
+    session: Session, student: User, request: TransferRequest, entry_id: int, syllabus_id: int | None
 ) -> TranscriptEntry:
     entry = request_repo.get_entry(session, entry_id)
     if entry is None or entry.transfer_request_id != request.id:
         raise NotFoundError("성적표 항목을 찾을 수 없어요.")
-    if syllabus_public_id:
-        syllabus = syllabus_repo.get_by_public_id(session, syllabus_public_id)
+    if syllabus_id:
+        syllabus = syllabus_repo.get(session, syllabus_id)
         if syllabus is None or syllabus.transfer_request_id != request.id:
             raise NotFoundError("강의계획서를 찾을 수 없어요.")
         entry.syllabus_id = syllabus.id
     else:
         entry.syllabus_id = None
     entry.link_confirmed = True
-    audit.record(session, student, "transcript.link", "transfer_request", request.public_id, entry=entry.id)
+    audit.record(session, student, "transcript.link", "transfer_request", str(request.id), entry=entry.id)
     session.commit()
     return entry
 
@@ -127,8 +145,10 @@ def store_supplement(
     ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
     key = storage.new_key("supplements", file.filename)
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
+    # 원본이 바뀌었으므로 내용 해시도 새로 만든다 (이전 해시 + 보완 파일)
+    syllabus.content_hash = analysis.content_hash(syllabus.content_hash.encode(), file.data)
     syllabus.status = SyllabusStatus.UPLOADED
-    audit.record(session, student, "syllabus.supplement", "syllabus", syllabus.public_id)
+    audit.record(session, student, "syllabus.supplement", "syllabus", str(syllabus.id))
     session.commit()
     return key
 
@@ -143,7 +163,7 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
         raise CreditBridgeError("분석이 끝난 뒤에 제출할 수 있어요.")
     request.status = RequestStatus.SUBMITTED
     request.submitted_at = utcnow()
-    audit.record(session, student, "request.submit", "transfer_request", request.public_id, courses=len(syllabi))
+    audit.record(session, student, "request.submit", "transfer_request", str(request.id), courses=len(syllabi))
     session.commit()
 
 
@@ -156,13 +176,15 @@ def delete_documents(session: Session, storage: ObjectStorage, student: User, re
         syllabus.raw_text = ""
         syllabus.extracted_json = None
         syllabus.status = SyllabusStatus.DELETED
+        # 삭제한 문서는 재사용 출처가 되지 않게 하고, 같은 파일을 다시 올릴 수 있게 해시를 비운다
+        syllabus.content_hash = analysis.content_hash(f"deleted:{syllabus.id}".encode())
         syllabus_repo.replace_chunks(session, syllabus.id, [])
     if request.transcript_file_key:
         storage.delete(request.transcript_file_key)
         request.transcript_file_key = None
     request.transcript_masked_name = None
     request_repo.replace_transcript_entries(session, request.id, [])
-    audit.record(session, student, "privacy.delete_documents", "transfer_request", request.public_id)
+    audit.record(session, student, "privacy.delete_documents", "transfer_request", str(request.id))
     session.commit()
 
 

@@ -1,8 +1,6 @@
-"""테스트용 대역: Claude, bge-m3 임베딩, S3. 외부 API는 테스트에서 호출하지 않는다 (실제 호출은 tests/eval)."""
+"""테스트용 대역: Claude, S3. 외부 API는 테스트에서 호출하지 않는다 (실제 호출은 tests/eval)."""
 
-import hashlib
 import json
-import math
 import re
 from typing import Any
 from uuid import uuid4
@@ -54,22 +52,6 @@ def tokens(text: str) -> set[str]:
         if w not in STOP and len(w) > 2:
             out.add(w)
     return out
-
-
-class FakeEmbedder:
-    """단어 해싱 기반 1024차원 임베딩. 단어가 겹칠수록 코사인 유사도가 높다."""
-
-    dim = 1024
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        vectors = []
-        for text in texts:
-            v = [0.0] * self.dim
-            for t in tokens(text):
-                v[int(hashlib.md5(t.encode()).hexdigest(), 16) % self.dim] += 1.0
-            norm = math.sqrt(sum(x * x for x in v)) or 1.0
-            vectors.append([x / norm for x in v] if any(v) else [1.0 / math.sqrt(self.dim)] * self.dim)
-        return vectors
 
 
 class FakeStorage:
@@ -162,7 +144,20 @@ class FakeLLM:
             textbooks=_section(lines, "textbook")[:1],
             prerequisites=_section(lines, "prerequisite")[:1],
             assessment=_section(lines, "assessment") or _section(lines, "grading"),
+            disciplines=FakeLLM._disciplines(code.group(0) if code else ""),
         )
+
+    @staticmethod
+    def _disciplines(code: str) -> list[str]:
+        prefix = code.split(" ")[0] if code else ""
+        return {
+            "MATH": ["Mathematics"],
+            "CSE": ["Computer Science"],
+            "PHY": ["Physics"],
+            "CHEM": ["Chemistry"],
+            "HIS": ["History"],
+            "BUS": ["Business"],
+        }.get(prefix, [])
 
     @staticmethod
     def _evaluate(prompt: str) -> EvaluationOutput:
@@ -207,11 +202,12 @@ class FakeLLM:
                     )
                 )
             avg = sum(c.coverage for c in concepts) / max(len(concepts), 1)
+            title_overlap = len(tokens(header.get("title", "")) & tokens(student))
             if avg >= 15 or thin:
                 level = "lower" if header["course_code"] == "MATH 1050" else "same"
                 candidates.append(
                     (
-                        avg,
+                        (avg, title_overlap),
                         CandidateJudgment(
                             course_code=header["course_code"],
                             level=level,

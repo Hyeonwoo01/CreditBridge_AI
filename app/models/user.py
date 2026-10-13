@@ -3,11 +3,11 @@ from datetime import date
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, CreatedAtMixin, IdMixin, IdType, PublicIdMixin
+from app.db.base import Base, CreatedAtMixin, IdMixin, IdType
 from app.models.institution import Institution
 
 
-class User(IdMixin, PublicIdMixin, CreatedAtMixin, Base):
+class User(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(255), unique=True)

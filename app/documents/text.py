@@ -1,28 +1,17 @@
-"""업로드 문서 → 텍스트 (FR-01). PDF 텍스트 레이어는 PyMuPDF, 스캔본은 페이지 이미지로 넘겨 Claude가 전사한다."""
+"""업로드 문서 → 텍스트 (FR-01). PDF와 스캔 이미지(JPG·PNG)만 받는다.
+PDF 텍스트 레이어는 PyMuPDF로 읽고, 스캔 페이지와 이미지는 Claude가 전사한다."""
 
-import io
 import re
-import zipfile
 from dataclasses import dataclass, field
-from xml.etree import ElementTree
 
 import pymupdf
 
 from app.errors import UploadRejectedError
 
-ALLOWED = {".pdf", ".txt", ".md", ".docx", ".jpg", ".jpeg", ".png"}
-CONTENT_TYPES = {
-    ".pdf": "application/pdf",
-    ".txt": "text/plain",
-    ".md": "text/plain",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-}
+ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
+CONTENT_TYPES = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 # 텍스트 레이어가 이보다 짧은 PDF 페이지는 스캔본으로 보고 이미지로 전사한다
 MIN_PAGE_CHARS = 40
-_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 @dataclass
@@ -43,7 +32,8 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
     ext = extension(filename)
     if ext not in ALLOWED:
         raise UploadRejectedError(
-            f"지원하지 않는 형식이에요 ({ext or '확장자 없음'}). PDF, JPG·PNG, TXT, DOCX만 올릴 수 있어요."
+            f"지원하지 않는 형식이에요 ({ext or '확장자 없음'}). PDF 또는 JPG·PNG 이미지만 올릴 수 있어요. "
+            "DOCX 같은 문서는 PDF로 저장해서 올려 주세요."
         )
     if not data.strip():
         raise UploadRejectedError("빈 파일이에요. 내용이 있는 파일을 올려 주세요.")
@@ -57,36 +47,16 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
         with doc:
             if doc.needs_pass:
                 raise UploadRejectedError("암호가 걸린 PDF예요. 암호를 해제한 뒤 올려 주세요.")
-    return ext
-
-
-def _decode(data: bytes) -> str:
-    for enc in ("utf-8-sig", "cp949", "latin-1"):
+    else:
         try:
-            return data.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return data.decode("utf-8", errors="replace")
-
-
-def _docx_text(data: bytes) -> str:
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        root = ElementTree.fromstring(zf.read("word/document.xml"))
-    paragraphs = []
-    for p in root.iter(f"{_W}p"):
-        paragraphs.append("".join(t.text or "" for t in p.iter(f"{_W}t")))
-    return "\n".join(paragraphs)
+            pymupdf.Pixmap(data)
+        except Exception as exc:
+            raise UploadRejectedError("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.") from exc
+    return ext
 
 
 def extract(data: bytes, filename: str) -> ExtractedDocument:
     ext = extension(filename)
-    if ext in (".txt", ".md"):
-        return ExtractedDocument(text=_decode(data), quality=1.0)
-    if ext == ".docx":
-        try:
-            return ExtractedDocument(text=_docx_text(data), quality=1.0)
-        except (KeyError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
-            raise UploadRejectedError("DOCX 파일을 읽을 수 없어요.") from exc
     if ext in (".jpg", ".jpeg", ".png"):
         pix = pymupdf.Pixmap(data)
         return ExtractedDocument(text="", quality=0.0, scanned_pages=[pix.tobytes("png")])

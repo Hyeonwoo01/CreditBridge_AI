@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from tests.fakes import FakeEmbedder, FakeLLM, FakeStorage
+from tests.fakes import FakeLLM, FakeStorage
 
 DEMO = Path(__file__).parent.parent / "scripts" / "demo_data"
 
@@ -61,20 +61,15 @@ def fake_llm() -> FakeLLM:
 
 
 @pytest.fixture
-def fake_embedder() -> FakeEmbedder:
-    return FakeEmbedder()
-
-
-@pytest.fixture
 def fake_storage() -> FakeStorage:
     return FakeStorage()
 
 
 @pytest.fixture
-def seeded(db: Session, fake_embedder: FakeEmbedder) -> Session:
+def seeded(db: Session) -> Session:
     from scripts.seed_demo import seed
 
-    seed(db, fake_embedder)
+    seed(db)
     return db
 
 
@@ -82,7 +77,6 @@ def seeded(db: Session, fake_embedder: FakeEmbedder) -> Session:
 def client(
     seeded: Session,
     fake_llm: FakeLLM,
-    fake_embedder: FakeEmbedder,
     fake_storage: FakeStorage,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
@@ -91,7 +85,6 @@ def client(
     from app.workers import tasks
 
     monkeypatch.setattr(tasks, "get_llm", lambda: fake_llm)
-    monkeypatch.setattr(tasks, "get_embedder", lambda: fake_embedder)
     monkeypatch.setattr(tasks, "get_storage", lambda: fake_storage)
     monkeypatch.setattr(student_routes, "get_storage", lambda: fake_storage)
     with TestClient(app) as c:
@@ -114,5 +107,12 @@ def login(client: TestClient, email: str, password: str = "demo1234") -> str:
     return csrf_of(client, r.headers["location"])
 
 
-def demo_file(name: str) -> bytes:
-    return (DEMO / name).read_bytes()
+def demo_text(name: str) -> str:
+    return (DEMO / name).read_text(encoding="utf-8")
+
+
+def demo_pdf(name: str, extra: str = "") -> bytes:
+    """demo_data의 .txt 강의계획서를 업로드용 PDF로 (업로드는 PDF·JPG·PNG만 받는다)."""
+    from scripts.make_demo_pdfs import text_to_pdf
+
+    return text_to_pdf(demo_text(name) + extra)

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block nav %}{% include "professor/_nav.html" %}{% endblock %}
 {% block content %}
-<p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">← 배정된 심사</a> · <a class="underline" href="/evaluations/{{ v.evaluation.public_id }}/report">판정 근거 리포트</a>{% if not v.decision %} · <a class="font-semibold text-rausch underline" href="#decision">판정하기 ↓</a>{% endif %}</p>
+<p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">← 배정된 심사</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">판정 근거 리포트</a>{% if not v.decision %} · <a class="font-semibold text-rausch underline" href="#decision">판정하기 ↓</a>{% endif %}</p>
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
 
 {% if not v.decision %}
 {% set f = form or {} %}
-<form method="post" action="/professor/evaluations/{{ v.evaluation.public_id }}/decision" id="decision" class="card-float mt-10 grid scroll-mt-24 gap-4">
+<form method="post" action="/professor/evaluations/{{ v.evaluation.id }}/decision" id="decision" class="card-float mt-10 grid scroll-mt-24 gap-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <h2 class="text-xl font-semibold tracking-[-0.18px]">최종 판정</h2>
   {% if error %}<p class="text-sm text-error">{{ error }}</p>{% endif %}
@@ -26,10 +26,18 @@
       <select name="result" class="input h-11"><option value="">선택</option>{% for value in ['direct', 'elective', 'none'] %}<option value="{{ value }}" {% if f.get('result') == value %}selected{% endif %}>{{ value | rec }}</option>{% endfor %}</select>
     </label>
     <label class="field"><span>직접 인정 대상 과목</span>
-      <select name="target_course_id" class="input h-11"><option value="">선택</option>{% for c in v.target_courses %}<option value="{{ c.public_id }}" {% if f.get('target_course_id') == c.public_id or (not f.get('target_course_id') and v.candidate and c.id == v.candidate.id) %}selected{% endif %}>{{ c.code }} {{ c.title }}</option>{% endfor %}</select>
+      <select name="target_course_id" class="input h-11"><option value="">선택</option>{% for c in v.target_courses %}<option value="{{ c.id }}" {% if f.get('target_course_id') == c.id|string or (not f.get('target_course_id') and v.candidate and c.id == v.candidate.id) %}selected{% endif %}>{{ c.code }} {{ c.title }}</option>{% endfor %}</select>
     </label>
   </div>
-  <label class="field"><span>사유 (반려하거나 AI 추천과 다르게 판정하면 필수)</span><textarea class="textarea" name="reason" rows="3">{{ f.get('reason', '') }}</textarea></label>
+  <fieldset class="grid gap-2">
+    <legend class="text-sm font-medium text-muted">사유 (반려하거나 AI 추천과 다르게 판정하면 1개 이상)</legend>
+    <div class="flex flex-wrap gap-2">
+      {% for code, label in reason_labels.items() %}
+      <label class="chip cursor-pointer has-[:checked]:border-ink has-[:checked]:bg-ink has-[:checked]:text-white"><input class="sr-only" type="checkbox" name="reason_codes" value="{{ code }}" {% if code in f.get('reason_codes', []) %}checked{% endif %}>{{ label }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <label class="field"><span>메모 ('기타'를 고르면 필수)</span><textarea class="textarea" name="reason_memo" rows="2">{{ f.get('reason_memo', '') }}</textarea></label>
   <button class="btn-primary">판정 확정</button>
 </form>
 {% endif %}

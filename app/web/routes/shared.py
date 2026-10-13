@@ -11,10 +11,10 @@ from app.web.templating import render
 router = APIRouter()
 
 
-@router.get("/evaluations/{public_id}/report")
+@router.get("/evaluations/{evaluation_id}/report")
 def report(
-    request: Request, public_id: str, user: User = Depends(current_user), session: Session = Depends(get_db)
+    request: Request, evaluation_id: int, user: User = Depends(current_user), session: Session = Depends(get_db)
 ) -> Response:
     """판정 근거 리포트 (FR-23): 판정자·일시·AI 추천값·근거 구절·사람 판정 사유."""
-    view = views.evaluation_view(session, user, public_id, with_audit=True)
+    view = views.evaluation_view(session, user, evaluation_id, with_audit=True)
     return render(request, "report.html", user=user, v=view)

@@ -72,8 +72,8 @@ def queue(
                 bool(assignment and assignment.reassigned_from),
             )
         )
-    if sort == "probability":
-        rows.sort(key=lambda r: r.evaluation.probability or 0, reverse=True)
+    if sort == "coverage":
+        rows.sort(key=lambda r: r.evaluation.coverage or 0, reverse=True)
     elif sort == "department":
         rows.sort(key=lambda r: r.department)
     return rows, counts, sorted(departments)
@@ -93,12 +93,12 @@ def _pick_reviewer(session: Session, institution_id: int, department: str, today
     return chosen, None
 
 
-def auto_assign(session: Session, evaluator: User, evaluation_public_ids: list[str]) -> tuple[int, list[str]]:
+def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) -> tuple[int, list[str]]:
     institution_id = ensure_evaluator(evaluator)
     today = utcnow().date()
     assigned, problems = 0, []
-    for public_id in evaluation_public_ids:
-        evaluation = evaluation_repo.get_by_public_id(session, public_id)
+    for evaluation_id in evaluation_ids:
+        evaluation = evaluation_repo.get(session, evaluation_id)
         if evaluation is None:
             continue
         course = (
@@ -126,31 +126,31 @@ def auto_assign(session: Session, evaluator: User, evaluation_public_ids: list[s
             evaluator,
             "assignment.create",
             "course_evaluation",
-            evaluation.public_id,
-            reviewer=reviewer.public_id,
-            delegated_from=original.public_id if original else None,
+            str(evaluation.id),
+            reviewer=reviewer.id,
+            delegated_from=original.id if original else None,
         )
         assigned += 1
     session.commit()
     return assigned, sorted(set(problems))
 
 
-def set_away(session: Session, professor: User, days: int, delegate_public_id: str | None) -> int:
+def set_away(session: Session, professor: User, days: int, delegate_id: int | None) -> int:
     """부재 기간을 설정하고, 진행 중인 배정을 대리 심사자에게 넘긴다. 넘긴 건수를 돌려준다."""
     if professor.role != Role.PROFESSOR:
         raise PermissionDeniedError("교수 계정만 부재 기간을 설정할 수 있어요.")
     if days <= 0:
         professor.away_until = None
-        audit.record(session, professor, "professor.back", "user", professor.public_id)
+        audit.record(session, professor, "professor.back", "user", str(professor.id))
         session.commit()
         return 0
     delegate = None
-    if delegate_public_id:
+    if delegate_id:
         delegate = next(
             (
                 p
                 for p in user_repo.professors_in(session, professor.institution_id or 0, professor.department or "")
-                if p.public_id == delegate_public_id and p.id != professor.id
+                if p.id == delegate_id and p.id != professor.id
             ),
             None,
         )
@@ -174,6 +174,6 @@ def set_away(session: Session, professor: User, days: int, delegate_public_id: s
                 ),
             )
             moved += 1
-    audit.record(session, professor, "professor.away", "user", professor.public_id, days=days, moved=moved)
+    audit.record(session, professor, "professor.away", "user", str(professor.id), days=days, moved=moved)
     session.commit()
     return moved

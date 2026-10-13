@@ -41,7 +41,7 @@ def login(
     if user is None:
         return render(request, "login.html", status_code=401, error="이메일 또는 비밀번호가 맞지 않아요.", email=email)
     auth_session.login(request, user)
-    audit.record(session, user, "auth.login", "user", user.public_id)
+    audit.record(session, user, "auth.login", "user", str(user.id))
     session.commit()
     return RedirectResponse(HOME.get(user.role, "/"), status_code=303)
 

@@ -1,6 +1,7 @@
-"""AI 판단(개념별 커버리지) → 3단계 추천·확률·신뢰도 (FR-07, FR-08, FR-16).
+"""AI 판단(개념별 커버리지) → 3단계 추천·신뢰도 (FR-07, FR-08, FR-16).
 
-LLM은 개념별 판단만 하고, 추천 등급과 확률은 이 모듈의 고정 규칙으로 계산한다.
+LLM은 개념별 판단만 하고, 추천 등급과 신뢰도는 이 모듈의 고정 규칙으로 계산한다.
+MVP는 판정 확률(%)을 계산하지 않는다 (실제 판정 데이터로 보정할 수 있는 파일럿 이후 추가).
 같은 판단에는 언제나 같은 추천이 나온다.
 """
 
@@ -10,7 +11,7 @@ from app.models.enums import Confidence, Recommendation
 from app.schemas.results import ConceptResult
 
 # 아래 규칙을 바꾸면 버전을 올린다. 같은 입력의 이전 결과를 재사용할 때 이 버전도 비교한다.
-RULES_VERSION = "scoring-v2"
+RULES_VERSION = "scoring-v3"
 
 DIRECT_MIN = 0.75
 ELECTIVE_MIN = 0.40
@@ -18,7 +19,7 @@ ELECTIVE_MIN = 0.40
 UNVERIFIED_CAP = 0.40
 # 수준이 낮은 과목은 내용이 겹쳐도 직접 인정을 추천하지 않고 점수를 낮춘다
 LOWER_LEVEL_FACTOR = 0.75
-# 판단 불가 개념이 이 비율 이상이면 확률 대신 정보 부족으로 안내한다
+# 판단 불가 개념이 이 비율 이상이면 추천 대신 정보 부족으로 안내한다
 UNCLEAR_LIMIT = 0.40
 LOW_CONFIDENCE_UNCLEAR = 0.25
 LOW_CONFIDENCE_VERIFIED = 0.50
@@ -27,17 +28,16 @@ LOW_CONFIDENCE_VERIFIED = 0.50
 @dataclass(frozen=True)
 class Score:
     recommendation: Recommendation
-    probability: float | None  # 직접 인정 가능성(%), 정보 부족이면 None
     confidence: Confidence
     coverage: float  # 수준 보정 전 개념 평균 0~1
     adjusted: float  # 수준 보정 후
     missing_concepts: list[str]
 
 
-def apply_verification(status: str, judged_coverage: int, verified: bool) -> float:
+def apply_verification(status: str, coverage: float, verified: bool) -> float:
+    """Claude가 매긴 개념 커버리지(0~1)에 근거 검증 결과를 반영한다."""
     if status == "unclear":
         return 0.0
-    coverage = judged_coverage / 100
     if status in ("taught", "partial") and not verified:
         return min(coverage, UNVERIFIED_CAP)
     return coverage
@@ -64,7 +64,7 @@ def score_candidate(
         confidence = Confidence.MEDIUM
 
     if sparse_document or unclear_ratio >= UNCLEAR_LIMIT or confidence is Confidence.LOW:
-        return Score(Recommendation.INSUFFICIENT, None, Confidence.LOW, coverage, adjusted, missing)
+        return Score(Recommendation.INSUFFICIENT, Confidence.LOW, coverage, adjusted, missing)
 
     if adjusted >= DIRECT_MIN and level != "lower":
         recommendation = Recommendation.DIRECT
@@ -72,8 +72,7 @@ def score_candidate(
         recommendation = Recommendation.ELECTIVE
     else:
         recommendation = Recommendation.NONE
-    probability = round(min(0.98, max(0.02, adjusted * (0.6 + 0.4 * verified_ratio))) * 100, 1)
-    return Score(recommendation, probability, confidence, coverage, adjusted, missing)
+    return Score(recommendation, confidence, coverage, adjusted, missing)
 
 
 def is_sparse(weekly_topic_count: int, outcome_count: int) -> bool:

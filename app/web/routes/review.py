@@ -23,7 +23,7 @@ def queue(
     request: Request,
     tab: str = Query("high", pattern="^(high|low|insufficient)$"),
     department: str = Query(""),
-    sort: str = Query("submitted", pattern="^(submitted|probability|department)$"),
+    sort: str = Query("submitted", pattern="^(submitted|coverage|department)$"),
     user: User = Evaluator,
     session: Session = Depends(get_db),
 ) -> Response:
@@ -45,7 +45,7 @@ def queue(
 @router.post("/assign")
 def assign(
     request: Request,
-    evaluation_ids: list[str] = Form([]),
+    evaluation_ids: list[int] = Form([]),
     tab: str = Form("high"),
     csrf_token: str = Form(""),
     user: User = Evaluator,
@@ -62,11 +62,11 @@ def assign(
     return RedirectResponse(f"/review?tab={tab}", status_code=303)
 
 
-@router.get("/evaluations/{public_id}")
+@router.get("/evaluations/{evaluation_id}")
 def evaluation_page(
-    request: Request, public_id: str, user: User = Evaluator, session: Session = Depends(get_db)
+    request: Request, evaluation_id: int, user: User = Evaluator, session: Session = Depends(get_db)
 ) -> Response:
-    view = views.evaluation_view(session, user, public_id, with_audit=True)
+    view = views.evaluation_view(session, user, evaluation_id, with_audit=True)
     return render(request, "review/evaluation.html", user=user, v=view)
 
 
@@ -78,7 +78,7 @@ def export_csv(user: User = Evaluator, session: Session = Depends(get_db)) -> Re
         buffer,
         fieldnames=[
             "decision_id",
-            "student_public_id",
+            "student_id",
             "source_course",
             "result",
             "target_course",
