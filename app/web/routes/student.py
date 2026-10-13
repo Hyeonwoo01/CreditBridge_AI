@@ -9,8 +9,11 @@ from app.models import User
 from app.models.enums import Role
 from app.security.csrf import check_csrf
 from app.security.session import require
+from app.services import appeals as appeal_service
+from app.services import privacy as privacy_service
 from app.services import student as student_service
 from app.services import views
+from app.web.notify import send_emails
 from app.web.templating import flash, render
 from app.workers import tasks
 
@@ -142,17 +145,23 @@ def submit(
 
 
 @router.post("/requests/{request_id}/delete-documents")
-def delete_documents(
+def request_deletion(
     request: Request,
     request_id: int,
     csrf_token: str = Form(""),
     user: User = Student,
     session: Session = Depends(get_db),
 ) -> Response:
+    """개인정보 삭제 요청 (FR-13): 심사관 처리와 기관 관리자 승인을 거쳐 기한 안에 삭제된다."""
     check_csrf(request, csrf_token)
     transfer = student_service.get_own_request(session, user, request_id)
-    student_service.delete_documents(session, get_storage(), user, transfer)
-    flash(request, "올린 원본 파일과 추출한 텍스트를 삭제했어요.")
+    try:
+        privacy = privacy_service.request_deletion(session, user, transfer)
+    except CreditBridgeError as exc:
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+        flash(request, f"문서 삭제 요청을 접수했어요. {privacy.due_at:%Y-%m-%d}까지 처리돼요.")
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
 
 
@@ -195,5 +204,28 @@ def supplement(
         flash(request, str(exc), "error")
         return RedirectResponse(request.headers.get("referer") or "/student", status_code=303)
     tasks.add_supplement.delay(syllabus.id, key)
+    send_emails()
     flash(request, "보완 자료를 받았어요. 다시 분석한 뒤 결과를 갱신할게요. 이전 결과는 기록으로 남아요.")
     return RedirectResponse(f"/student/requests/{views.request_id_of(session, syllabus)}", status_code=303)
+
+
+@router.post("/evaluations/{evaluation_id}/appeal")
+def appeal(
+    request: Request,
+    evaluation_id: int,
+    reason: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Student,
+    session: Session = Depends(get_db),
+) -> Response:
+    """이의 신청 (FR-23)."""
+    check_csrf(request, csrf_token)
+    try:
+        appeal_service.file_appeal(session, user, evaluation_id, reason)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+        flash(request, "이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요.")
+    return RedirectResponse(f"/student/evaluations/{evaluation_id}", status_code=303)

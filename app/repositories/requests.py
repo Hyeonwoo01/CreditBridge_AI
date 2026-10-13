@@ -38,3 +38,10 @@ def replace_transcript_entries(session: Session, request_id: int, entries: list[
 
 def get_entry(session: Session, entry_id: int) -> TranscriptEntry | None:
     return session.get(TranscriptEntry, entry_id)
+
+
+def submitted_of_institution(session: Session, target_institution_id: int) -> list[TransferRequest]:
+    stmt = select(TransferRequest).where(
+        TransferRequest.target_institution_id == target_institution_id, TransferRequest.status != "draft"
+    )
+    return list(session.scalars(stmt))

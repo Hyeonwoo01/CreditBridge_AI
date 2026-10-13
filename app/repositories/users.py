@@ -25,3 +25,8 @@ def add(session: Session, user: User) -> User:
     session.add(user)
     session.flush()
     return user
+
+
+def staff_of(session: Session, institution_id: int, role: str) -> list[User]:
+    stmt = select(User).where(User.institution_id == institution_id, User.role == role).order_by(User.id)
+    return list(session.scalars(stmt))

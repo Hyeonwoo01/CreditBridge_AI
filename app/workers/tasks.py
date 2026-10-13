@@ -6,7 +6,7 @@ from app.ai.llm_client import get_llm
 from app.db.session import SessionLocal
 from app.documents.storage import get_storage
 from app.errors import LLMError
-from app.services import analysis
+from app.services import analysis, notifications
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -39,3 +39,9 @@ def process_transcript(request_id: int) -> None:
             logger.warning(
                 "transcript processing failed", extra={"request_id": request_id, "error": type(exc).__name__}
             )
+
+
+@celery_app.task(name="notifications.deliver")
+def deliver_notifications() -> None:
+    with SessionLocal() as session:
+        notifications.deliver_pending(session)

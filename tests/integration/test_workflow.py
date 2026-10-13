@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.models import Assignment, AuditLog, CourseEvaluation, Decision, Syllabus, TransferRequest, User
+from app.models import Assignment, AuditLog, CourseEvaluation, Decision, TransferRequest, User
 from app.services.decisions import SIMILARITY_MIN, similarity
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import demo_text, login
@@ -281,16 +281,14 @@ def test_csrf_required(client: TestClient, seeded: Session) -> None:
     assert r.status_code == 403
 
 
-def test_privacy_delete_removes_files_and_text(client: TestClient, seeded: Session, fake_storage) -> None:  # type: ignore[no-untyped-def]
+def test_privacy_delete_needs_approval_before_files_go(client: TestClient, seeded: Session, fake_storage) -> None:  # type: ignore[no-untyped-def]
+    """학생의 삭제 요청만으로는 지워지지 않는다. 전체 흐름은 test_review_extras 참고."""
     token = login(client, "jiwon@student.example")
     rid = new_request(client, seeded, token)
     upload(client, rid, token, "calculus.txt")
-    assert fake_storage.objects
-    client.post(f"/student/requests/{rid}/delete-documents", data={"csrf_token": token})
-    assert not fake_storage.objects
-    seeded.expire_all()
-    syllabus = seeded.scalars(select(Syllabus).where(Syllabus.original_filename == "calculus.pdf")).one()
-    assert syllabus.raw_text == "" and syllabus.status == "deleted"
+    page = client.post(f"/student/requests/{rid}/delete-documents", data={"csrf_token": token}).text
+    assert "삭제 요청을 접수했어요" in page and "요청됨" in page
+    assert fake_storage.objects  # 승인 전에는 그대로
 
 
 def test_decisions_table_has_no_update_path(seeded: Session) -> None:

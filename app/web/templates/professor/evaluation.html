@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 {% block nav %}{% include "professor/_nav.html" %}{% endblock %}
 {% block content %}
-<p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">← 배정된 심사</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">판정 근거 리포트</a>{% if not v.decision %} · <a class="font-semibold text-rausch underline" href="#decision">판정하기 ↓</a>{% endif %}</p>
+<p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">← 배정된 심사</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">판정 근거 리포트</a>{% if not v.decision or v.awaiting_redecision %} · <a class="font-semibold text-rausch underline" href="#decision">{{ '재판정하기' if v.decision else '판정하기' }} ↓</a>{% endif %}</p>
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
 
-{% if not v.decision %}
+{% if not v.decision %}{% include "partials/material_request_form.html" %}{% endif %}
+
+{% if not v.decision or v.awaiting_redecision %}
 {% set f = form or {} %}
 <form method="post" action="/professor/evaluations/{{ v.evaluation.id }}/decision" id="decision" class="card-float mt-10 grid scroll-mt-24 gap-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <h2 class="text-xl font-semibold tracking-[-0.18px]">최종 판정</h2>
+  <h2 class="text-xl font-semibold tracking-[-0.18px]">{{ '이의 신청 재판정' if v.decision else '최종 판정' }}</h2>
+  {% if v.decision %}<p class="text-sm text-muted">학생의 이의 사유와 원 판정을 확인하고 다시 판정해 주세요. 원 판정은 지워지지 않고 기록으로 남아요.</p>{% endif %}
   {% if error %}<p class="text-sm text-error">{{ error }}</p>{% endif %}
   {% if conflict %}
   <div class="rounded-sm bg-[#fff8ec] p-3 text-sm"><p class="font-semibold">{{ conflict }}</p>

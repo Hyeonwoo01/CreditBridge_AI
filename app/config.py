@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     max_syllabi_per_request: int = 30
     # 교수 배정 후 판정까지 예상 소요일 (학생 포털의 예상 완료일 계산용)
     review_sla_days: int = 5
+    # 개인정보 삭제 요청 처리 기한 (FR-13)
+    privacy_deletion_days: int = 30
+
+    # 알림 메일 (비우면 화면 알림만). 메일 본문에는 개인정보를 넣지 않는다
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "no-reply@creditbridge.local"
+    smtp_starttls: bool = True
+    # 메일 속 링크의 기준 주소
+    app_base_url: str = "http://localhost:8000"
 
     @property
     def is_production(self) -> bool:

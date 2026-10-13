@@ -18,6 +18,13 @@
     {% if v.decision.conflict_acknowledged %}<p class="text-error">과거 판정과 다른 결과임을 확인하고 확정함</p>{% endif %}
     {% else %}<p class="text-muted">아직 판정되지 않았어요.</p>{% endif %}
   </section>
+  {% if v.decisions | length > 1 or v.appeals %}
+  <section class="grid gap-1">
+    <h2 class="font-semibold">판정·이의 신청 경과</h2>
+    {% for d in v.decisions %}<p>{{ time(d.decided_at) }} · {{ '재판정' if d.appeal_id else '원 판정' }} {{ d.result | rec }} · {{ d.action | action }} · {{ v.users[d.decided_by].name if d.decided_by in v.users else '' }}{% if d.reason_codes %} · 사유 {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endfor %}
+    {% for a in v.appeals %}<p>{{ time(a.created_at) }} · 이의 신청 {{ a.status | appeal_status }}: “{{ a.reason }}”{% if a.handler_note %} · 학사처 메모: {{ a.handler_note }}{% endif %}</p>{% endfor %}
+  </section>
+  {% endif %}
   <section class="grid gap-1">
     <h2 class="font-semibold">AI 추천</h2>
     <p>{{ ev.recommendation | rec }} · 커버리지 {{ ev.coverage | pct }} · 신뢰도 {{ ev.confidence | conf }} · 후보 {{ v.candidate.code if v.candidate else '없음' }} · 모델 {{ ev.model or '–' }}</p>

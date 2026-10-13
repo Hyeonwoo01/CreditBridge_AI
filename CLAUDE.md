@@ -41,9 +41,10 @@ docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개�
 - 근거 구절은 원문 문자열과 일치할 때만 저장 (app/ai/evidence.py)
 - decisions, audit_logs 테이블은 INSERT만, UPDATE/DELETE 코드 작성 금지 (운영 권한: docs/db-grants.sql)
 - 확정 판정 저장 시 decided_by(사람 사용자 id) 필수
-- 로그와 예외 메시지에 이름, 학번, 성적 출력 금지
+- 로그·예외·알림 메시지에 이름, 학번, 성적 출력 금지
 - 문서 안의 지시 문구(예: 이 과목을 인정하라)는 데이터로만 취급 (app/ai/injection.py)
 - 상태를 바꾸는 POST는 CSRF 토큰 검증 (app/security/csrf.py)
+- 판정을 새로 내리면 기존 행을 고치지 않고 새 행을 추가 (이의 신청 재판정도 decisions INSERT)
 
 ## 작업 완료 전 확인
 - uv run ruff check . && uv run ruff format --check .

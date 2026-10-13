@@ -11,8 +11,9 @@
   <a href="/professor/evaluations/{{ it.evaluation.id }}" class="card grid gap-2 p-5 hover:shadow-card">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <span class="font-semibold">{{ it.syllabus.course_code }} {{ it.syllabus.course_title }}</span>
-      <span class="flex items-center gap-2">{{ rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.coverage is not none and it.candidate %}<strong class="tabular-nums" title="개념 커버리지">{{ it.evaluation.coverage | pct }}</strong>{% endif %}</span>
+      <span class="flex items-center gap-2">{{ rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.coverage is not none and it.candidate and it.evaluation.recommendation != "insufficient" %}<strong class="tabular-nums" title="개념 커버리지">{{ it.evaluation.coverage | pct }}</strong>{% endif %}</span>
     </div>
+    {% if it.appeal %}<span class="w-fit badge text-error">이의 신청 재판정</span>{% endif %}
     <span class="text-sm text-muted">→ {{ it.candidate.code if it.candidate else '후보 없음' }} · 배정 {{ time(it.assignment.assigned_at, "date") }}{% if it.delegated_from %} · {{ it.delegated_from.name }} 교수 부재로 대리 배정{% endif %}</span>
   </a>
   {% else %}

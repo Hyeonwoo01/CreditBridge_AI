@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block nav %}{% include "partials/role_nav.html" %}{% endblock %}
+{% block content %}
+<header class="grid gap-2">
+  <h1 class="text-[28px] font-bold">운영 통계</h1>
+  <p class="text-muted">{{ user.institution.name if user.institution else '' }}의 기관 단위 집계예요. 개인별 성과 평가에 쓰지 않아요.</p>
+</header>
+
+<section class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+  {% for label, value, hint in [
+    ('심사 요청', s.requests_submitted, '완료 ' ~ s.requests_decided ~ '건'),
+    ('판정한 과목', s.courses_decided, '현재 유효한 판정 기준'),
+    ('평균 소요일', (s.avg_days_to_decision ~ '일') if s.avg_days_to_decision is not none else '–', '제출부터 첫 판정까지'),
+    ('AI-교수 불일치율', (s.disagreement_rate | pct) if s.disagreement_rate is not none else '–', '정보 부족 제외 ' ~ s.disagreement_base ~ '건 중'),
+  ] %}
+  <div class="card grid gap-1 p-4">
+    <span class="text-sm text-muted">{{ label }}</span>
+    <span class="text-[28px] font-bold tabular-nums">{{ value }}</span>
+    <span class="text-xs text-muted">{{ hint }}</span>
+  </div>
+  {% endfor %}
+</section>
+
+<section class="mt-8 grid gap-6 md:grid-cols-2">
+  <div class="grid gap-3">
+    <h2 class="font-semibold">월별 판정 건수 (최근 6개월)</h2>
+    {% set peak = (s.monthly | map(attribute=1) | max) or 1 %}
+    <ul class="grid gap-2 text-sm">
+      {% for month, count in s.monthly %}
+      <li class="grid grid-cols-[64px_1fr_40px] items-center gap-3"><span class="text-muted tabular-nums">{{ month }}</span><span class="meter"><span style="width: {{ (count / peak * 100) | round | int }}%"></span></span><span class="text-right tabular-nums">{{ count }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="grid content-start gap-3 text-sm">
+    <h2 class="font-semibold">판정 구성</h2>
+    <p>교수 처리: 승인 {{ s.actions.get('approve', 0) }} · 수정 {{ s.actions.get('modify', 0) }} · 반려 {{ s.actions.get('reject', 0) }}</p>
+    <p>현재 결과: 직접 인정 {{ s.results.get('direct', 0) }} · 선택 인정 {{ s.results.get('elective', 0) }} · 불인정 {{ s.results.get('none', 0) }}</p>
+    <p>과거 판정과 다르게 확정(경보 확인): {{ s.conflict_acknowledged }}건</p>
+    <h2 class="mt-3 font-semibold">이의 신청</h2>
+    <p>전체 {{ s.appeals_total }} · 처리 중 {{ s.appeals_open }} · 기각 {{ s.appeals_dismissed }} · 재판정으로 결과 변경 {{ s.appeals_changed }}</p>
+    <h2 class="mt-3 font-semibold">개인정보 삭제 요청</h2>
+    <p>처리 중 {{ s.privacy_open }}{% if s.privacy_overdue %} · <span class="font-semibold text-error">기한 초과 {{ s.privacy_overdue }}</span>{% endif %}</p>
+  </div>
+</section>
+{% endblock %}

@@ -21,6 +21,7 @@ from app.errors import LLMError
 from app.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry
 from app.models.enums import EvaluationStatus, Recommendation, SyllabusStatus
 from app.repositories import catalog as catalog_repo
+from app.repositories import decisions as decision_repo
 from app.repositories import evaluations as evaluation_repo
 from app.repositories import requests as request_repo
 from app.repositories import syllabi as syllabus_repo
@@ -228,6 +229,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     )
     input_hash = _input_hash(prompt_version, llm.model, prompt)
 
+    before = evaluation_repo.latest_for_syllabus(session, student.id)
     evaluation = CourseEvaluation(
         transfer_request_id=request.id,
         syllabus_id=student.id,
@@ -236,6 +238,9 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         prompt_version=prompt_version,
     )
     evaluation_repo.add(session, evaluation)
+    # 심사 중 보완 자료로 다시 분석하면 담당 교수 배정을 새 결과로 이어 준다 (FR-22)
+    if before is not None and decision_repo.for_evaluation(session, before.id) is None:
+        evaluation_repo.carry_assignment(session, before.id, evaluation.id)
     session.commit()
 
     previous = evaluation_repo.find_by_input_hash(session, input_hash)

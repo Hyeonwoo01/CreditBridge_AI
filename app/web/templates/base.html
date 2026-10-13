@@ -17,10 +17,14 @@
         creditbridge
       </a>
       {% if user %}
-      <nav class="hidden items-center gap-8 md:flex" aria-label="메인">
+      <nav class="hidden items-center gap-5 md:flex lg:gap-8" aria-label="메인">
         {% block nav %}{% endblock %}
       </nav>
       <div class="flex items-center gap-3">
+        <a href="/notifications" class="relative flex size-10 items-center justify-center rounded-full hover:bg-surface-soft" aria-label="알림">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span hx-get="/notifications/count" hx-trigger="load, every 60s" hx-swap="innerHTML"></span>
+        </a>
         <span class="hidden text-sm text-muted sm:inline">{{ user.name }} · {{ {"student": "학생", "evaluator": "심사관", "professor": "학과 교수", "admin": "관리자"}[user.role] }}</span>
         <form method="post" action="/logout">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -30,6 +34,9 @@
       {% endif %}
     </div>
   </header>
+  {% if user %}
+  <nav class="flex gap-5 overflow-x-auto border-b border-hairline-soft px-4 text-sm md:hidden [&>a]:flex [&>a]:h-12 [&>a]:shrink-0 [&>a]:items-center" aria-label="메인(모바일)">{{ self.nav() }}</nav>
+  {% endif %}
   <main class="mx-auto max-w-[1080px] px-4 pt-6 pb-16 md:px-10 md:pt-12">
     {% for f in flashes %}
     <div role="status" class="mb-4 rounded-md px-4 py-3 text-sm {{ 'bg-rausch-soft text-error' if f.kind == 'error' else 'bg-surface-soft text-body' }}">{{ f.message }}</div>

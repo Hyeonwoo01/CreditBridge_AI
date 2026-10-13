@@ -7,12 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.errors import NotFoundError
 from app.models import (
+    Appeal,
     Assignment,
     AuditLog,
     Course,
     CourseEvaluation,
     Decision,
     Institution,
+    MaterialRequest,
+    PrivacyRequest,
     Syllabus,
     TranscriptEntry,
     TransferRequest,
@@ -28,6 +31,10 @@ from app.repositories import users as user_repo
 from app.schemas.extraction import SyllabusExtraction
 from app.schemas.results import CandidateResult, EvaluationResult
 from app.security.permissions import ensure_can_view_evaluation
+from app.services import appeals as appeal_service
+from app.services import materials as material_service
+from app.services import privacy as privacy_service
+from app.services import sis as sis_service
 from app.services import student as student_service
 from app.services.decisions import HistoryItem, history
 
@@ -49,10 +56,43 @@ class EvaluationView:
     previous: list[CourseEvaluation] = field(default_factory=list)
     audit: list[AuditLog] = field(default_factory=list)
     target_courses: list[Course] = field(default_factory=list)
+    decisions: list[Decision] = field(default_factory=list)  # 원 판정과 이의 신청 재판정, 오래된 순
+    appeals: list[Appeal] = field(default_factory=list)
+    material_requests: list[MaterialRequest] = field(default_factory=list)
+    suggested_materials: list[str] = field(default_factory=list)
+    target_text: str = ""  # 1순위 후보의 기준 강의계획서 원문 (근거 위치 이동, FR-25)
+    users: dict[int, User] = field(default_factory=dict)  # 판정자·요청자 이름 표시용
 
     @property
     def primary(self) -> CandidateResult | None:
         return self.result.candidates[0] if self.result and self.result.candidates else None
+
+    @property
+    def open_appeal(self) -> Appeal | None:
+        return next((a for a in self.appeals if a.status in ("submitted", "accepted")), None)
+
+    @property
+    def awaiting_redecision(self) -> bool:
+        return any(a.status == "accepted" for a in self.appeals)
+
+    @property
+    def open_materials(self) -> list[MaterialRequest]:
+        return [m for m in self.material_requests if m.status == "open"]
+
+    @property
+    def source_marks(self) -> list[tuple[int, int]]:
+        if not self.result:
+            return []
+        return [
+            (e.char_start, e.char_end) for c in self.result.candidates for k in c.concepts for e in k.source_evidence
+        ]
+
+    @property
+    def target_marks(self) -> list[tuple[int, int]]:
+        primary = self.primary
+        if primary is None:
+            return []
+        return [(e.char_start, e.char_end) for k in primary.concepts for e in k.target_evidence]
 
 
 def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_audit: bool = False) -> EvaluationView:
@@ -89,6 +129,17 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.audit = audit_repo.for_target(session, "course_evaluation", str(evaluation.id))
     if user.role == "professor":
         view.target_courses = catalog_repo.courses_of(session, request.target_institution_id)
+    view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
+    view.appeals = appeal_service.for_evaluation(session, evaluation.id)
+    view.material_requests = material_service.for_syllabi(session, [syllabus.id])
+    suggested = view.result.missing_materials if view.result else []
+    view.suggested_materials = list(dict.fromkeys([*suggested, *material_service.STANDARD_ITEMS]))
+    if view.candidate is not None and view.candidate.reference_syllabus_id:
+        reference = syllabus_repo.get(session, view.candidate.reference_syllabus_id)
+        view.target_text = reference.raw_text if reference else ""
+    user_ids = {d.decided_by for d in view.decisions} | {m.requested_by for m in view.material_requests}
+    user_ids |= {a.handled_by for a in view.appeals if a.handled_by}
+    view.users = {uid: u for uid in user_ids if (u := user_repo.get_by_id(session, uid)) is not None}
     return view
 
 
@@ -110,6 +161,11 @@ class RequestView:
     entries: list[TranscriptEntry]
     simulation: student_service.Simulation
     processing: bool
+    privacy: PrivacyRequest | None = None
+
+    @property
+    def open_materials(self) -> int:
+        return sum(len(r.open_materials) for r in self.rows)
 
 
 def request_view(
@@ -128,7 +184,14 @@ def request_view(
         or (r.evaluation and r.evaluation.status in ("queued", "running"))
         for r in rows
     )
-    return RequestView(request, rows, request_repo.transcript_entries(session, request.id), simulation, processing)
+    return RequestView(
+        request,
+        rows,
+        request_repo.transcript_entries(session, request.id),
+        simulation,
+        processing,
+        privacy_service.latest_for_request(session, request),
+    )
 
 
 @dataclass
@@ -165,13 +228,17 @@ class ProfessorItem:
     candidate: Course | None
     assignment: Assignment
     delegated_from: User | None
+    appeal: Appeal | None = None  # 이의 신청 재판정 건
 
 
 def professor_items(session: Session, professor: User) -> list[ProfessorItem]:
     items = []
     for a in evaluation_repo.active_assignments_for(session, professor.id):
         ev = evaluation_repo.get(session, a.course_evaluation_id)
-        if ev is None or decision_repo.for_evaluation(session, ev.id) is not None:
+        if ev is None or not ev.is_latest:
+            continue
+        appeal = appeal_service.accepted_for(session, ev.id)
+        if decision_repo.for_evaluation(session, ev.id) is not None and appeal is None:
             continue
         syllabus = syllabus_repo.get(session, ev.syllabus_id)
         if syllabus is None:
@@ -183,6 +250,7 @@ def professor_items(session: Session, professor: User) -> list[ProfessorItem]:
                 candidate=catalog_repo.get_course(session, ev.candidate_course_id) if ev.candidate_course_id else None,
                 assignment=a,
                 delegated_from=user_repo.get_by_id(session, a.reassigned_from) if a.reassigned_from else None,
+                appeal=appeal,
             )
         )
     return items
@@ -202,24 +270,7 @@ def recent_audit(session: Session) -> list[AuditLog]:
 
 def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:
     """확정 판정 CSV 내보내기 (FR-24, 모의 SIS 연동)."""
-    rows = decision_repo.all_for_institution(session, evaluator.institution_id or 0)
-    courses = catalog_repo.courses_by_ids(session, [d.target_course_id for d, _, _ in rows if d.target_course_id])
-    out = []
-    for d, e, s in rows:
-        request = request_repo.get(session, e.transfer_request_id) if e.transfer_request_id else None
-        student = user_repo.get_by_id(session, request.student_id) if request else None
-        out.append(
-            {
-                "student_id": student.id if student else "",
-                "source_course": s.course_code or s.course_title,
-                "result": d.result,
-                "target_course": courses[d.target_course_id].code if d.target_course_id in courses else "",
-                "credits": s.credits if s.credits is not None else "",
-                "decided_at": d.decided_at.isoformat(timespec="seconds"),
-                "decision_id": d.id,
-            }
-        )
-    return out
+    return sis_service.export_rows(session, evaluator.institution_id or 0)
 
 
 def request_id_of(session: Session, syllabus: Syllabus) -> int:

@@ -44,11 +44,31 @@
   </div>
 </section>
 
-{% if v.decision %}
-<section class="mt-4 rounded-md border border-ink p-4">
-  <p class="text-sm font-semibold">교수 최종 판정: {{ v.decision.result | rec }}{% if v.decided_target %} · {{ v.decided_target.code }}{% endif %}</p>
-  <p class="mt-1 text-sm text-muted">{{ v.decided_by.name if v.decided_by else '' }} · {{ time(v.decision.decided_at) }} · {{ v.decision.action | action }}</p>
-  {% if v.decision.reason_codes %}<p class="mt-2 text-sm">사유: {% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}</p>{% endif %}
+{% for d in v.decisions | reverse %}
+<section class="mt-4 rounded-md border p-4 {{ 'border-ink' if loop.first else 'border-hairline text-muted' }}">
+  <p class="text-sm font-semibold">{% if not loop.first %}이전 판정(이의 신청으로 대체됨): {% elif d.appeal_id %}이의 신청 재판정: {% else %}교수 최종 판정: {% endif %}{{ d.result | rec }}{% if loop.first and v.decided_target %} · {{ v.decided_target.code }}{% endif %}</p>
+  <p class="mt-1 text-sm text-muted">{{ v.users[d.decided_by].name if d.decided_by in v.users else '' }} · {{ time(d.decided_at) }} · {{ d.action | action }}</p>
+  {% if d.reason_codes %}<p class="mt-2 text-sm">사유: {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endif %}
+</section>
+{% endfor %}
+
+{% for a in v.appeals | reverse %}
+<section class="mt-3 rounded-md bg-surface-soft p-4 text-sm">
+  <p class="font-semibold">이의 신청 · {{ a.status | appeal_status }} <span class="font-normal text-muted">· {{ time(a.created_at) }}</span></p>
+  <p class="mt-1 whitespace-pre-line text-body">{{ a.reason }}</p>
+  {% if a.handler_note %}<p class="mt-1"><span class="text-muted">학사처 메모:</span> {{ a.handler_note }}</p>{% endif %}
+</section>
+{% endfor %}
+
+{% if v.material_requests %}
+<section class="mt-3 grid gap-2">
+  {% for m in v.material_requests | reverse %}
+  <div class="rounded-md border p-4 text-sm {{ 'border-amber bg-[#fff8ec]' if m.status == 'open' else 'border-hairline-soft text-muted' }}">
+    <p class="font-semibold">보완 자료 요청 · {{ '학생 제출 대기' if m.status == 'open' else '제출됨' }} <span class="font-normal text-muted">· {{ v.users[m.requested_by].name if m.requested_by in v.users else '' }} · {{ time(m.created_at) }}</span></p>
+    {% if m.items %}<ul class="mt-1 list-disc pl-5">{% for i in m.items %}<li>{{ i }}</li>{% endfor %}</ul>{% endif %}
+    {% if m.note %}<p class="mt-1">{{ m.note }}</p>{% endif %}
+  </div>
+  {% endfor %}
 </section>
 {% endif %}
 
@@ -103,11 +123,11 @@
         <div class="evidence grid gap-3 text-sm md:grid-cols-2">
           <div class="grid gap-1.5 rounded-sm bg-surface-soft p-3">
             <span class="text-xs font-bold text-muted">학생 강의계획서</span>
-            {% for e in k.source_evidence %}<p><mark>{{ e.text }}</mark></p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
+            {% for e in k.source_evidence %}<p><a href="#src-{{ e.char_start }}-{{ e.char_end }}" data-jump="source-text" title="원문 위치로 이동"><mark>{{ e.text }}</mark></a></p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
           </div>
           <div class="grid gap-1.5 rounded-sm bg-surface-soft p-3">
             <span class="text-xs font-bold text-muted">{{ c.course_code }} 기준 강의계획서</span>
-            {% for e in k.target_evidence %}<p><mark>{{ e.text }}</mark></p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
+            {% for e in k.target_evidence %}<p>{% if c.course_id == v.primary.course_id %}<a href="#tgt-{{ e.char_start }}-{{ e.char_end }}" data-jump="target-text" title="원문 위치로 이동"><mark>{{ e.text }}</mark></a>{% else %}<mark>{{ e.text }}</mark>{% endif %}</p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
           </div>
         </div>
         {% endif %}
@@ -120,6 +140,20 @@
 {% elif r and r.no_match_reason %}
 <p class="mt-8 rounded-md bg-surface-soft p-4 text-sm text-body">{{ r.no_match_reason }}</p>
 {% endif %}
+{% endif %}
+
+{# ---- 원문 (근거 구절 위치 이동, FR-25) ---- #}
+{% if v.syllabus.raw_text %}
+<details id="source-text" class="mt-10 border-t border-hairline pt-6">
+  <summary class="cursor-pointer list-none text-xl font-semibold tracking-[-0.18px]">학생 강의계획서 원문 <span class="text-sm font-normal text-muted">근거 구절을 누르면 여기로 이동해요</span></summary>
+  <pre class="source-text mt-4 max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-sm bg-surface-soft p-4 font-sans text-sm leading-relaxed">{{ v.syllabus.raw_text | highlight(v.source_marks, "src") }}</pre>
+</details>
+{% endif %}
+{% if v.target_text and v.primary %}
+<details id="target-text" class="mt-6 border-t border-hairline pt-6">
+  <summary class="cursor-pointer list-none text-xl font-semibold tracking-[-0.18px]">{{ v.primary.course_code }} 기준 강의계획서 원문</summary>
+  <pre class="source-text mt-4 max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-sm bg-surface-soft p-4 font-sans text-sm leading-relaxed">{{ v.target_text | highlight(v.target_marks, "tgt") }}</pre>
+</details>
 {% endif %}
 
 {# ---- 추출된 강의계획서 (FR-03, FR-04) ---- #}

@@ -13,13 +13,16 @@ from sqlalchemy.orm import Session
 
 from app.errors import DecisionValidationError, NotFoundError, PermissionDeniedError
 from app.models import Course, CourseEvaluation, Decision, Syllabus, User
-from app.models.enums import DecisionAction, DecisionResult, ReasonCode, RequestStatus, Role
+from app.models.enums import AppealStatus, DecisionAction, DecisionResult, ReasonCode, RequestStatus, Role
 from app.repositories import catalog as catalog_repo
 from app.repositories import decisions as decision_repo
+from app.repositories import equivalencies as equivalency_repo
 from app.repositories import evaluations as evaluation_repo
 from app.repositories import requests as request_repo
 from app.repositories import syllabi as syllabus_repo
-from app.services import audit
+from app.repositories import users as user_repo
+from app.services import appeals as appeal_service
+from app.services import audit, notifications
 
 # 강의계획서 내용이 이 비율 이상 같으면 '같은 강의계획서'로 본다. 첫 측정 후 확정한다 (기능명세서 FR-11).
 SIMILARITY_MIN = 0.80
@@ -46,10 +49,12 @@ class HistoryItem:
     evaluation_id: int
     similarity: float  # 현재 강의계획서와의 내용 유사도 0~1
     same_target: bool  # 같은 대상 과목을 두고 내린 판정인지
+    # 기존 동등 과목표에서 가져온 이력 (FR-26). 강의계획서가 없어 유사도를 비교할 수 없으므로 경보 대상이 아니다
+    imported: bool = False
 
     @property
     def same_syllabus(self) -> bool:
-        return self.similarity >= SIMILARITY_MIN
+        return not self.imported and self.similarity >= SIMILARITY_MIN
 
 
 def course_key(syllabus: Syllabus) -> str:
@@ -67,14 +72,22 @@ def similarity(a: str, b: str) -> float:
 
 
 def history(session: Session, evaluation: CourseEvaluation) -> list[HistoryItem]:
-    """같은 출신 대학·같은 과목의 과거 판정. 화면에는 모두 보여주고, 경보는 conflicts()가 고른다."""
+    """같은 대상 대학에서 내린 같은 출신 대학·같은 과목의 과거 판정과 기존 동등 과목표.
+    화면에는 모두 보여주고, 경보는 conflicts()가 고른다."""
     syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
-    if syllabus is None:
+    request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
+    if syllabus is None or request is None:
         return []
+    key = course_key(syllabus)
     rows = decision_repo.history_for_course(
-        session, syllabus.institution_id, course_key(syllabus), exclude_evaluation_id=evaluation.id
+        session, request.target_institution_id, syllabus.institution_id, key, exclude_evaluation_id=evaluation.id
     )
-    courses = catalog_repo.courses_by_ids(session, [d.target_course_id for d, _, _ in rows if d.target_course_id])
+    imported = equivalency_repo.for_course(session, request.target_institution_id, syllabus.institution_id, key)
+    courses = catalog_repo.courses_by_ids(
+        session,
+        [d.target_course_id for d, _, _ in rows if d.target_course_id]
+        + [e.target_course_id for e in imported if e.target_course_id],
+    )
     items = []
     for d, past_eval, past_syllabus in rows:
         past_target = d.target_course_id or past_eval.candidate_course_id
@@ -90,6 +103,21 @@ def history(session: Session, evaluation: CourseEvaluation) -> list[HistoryItem]
                 same_target=past_target is not None and past_target == evaluation.candidate_course_id,
             )
         )
+    for e in imported:
+        items.append(
+            HistoryItem(
+                decided_at=datetime.combine(e.decided_on, datetime.min.time()) if e.decided_on else e.created_at,
+                result=e.result,
+                target_code=courses[e.target_course_id].code if e.target_course_id in courses else None,
+                reason_codes=[],
+                reason_memo=e.note,
+                evaluation_id=0,
+                similarity=0.0,
+                same_target=e.target_course_id is not None and e.target_course_id == evaluation.candidate_course_id,
+                imported=True,
+            )
+        )
+    items.sort(key=lambda h: h.decided_at, reverse=True)
     return items
 
 
@@ -151,7 +179,9 @@ def decide(
     if evaluation is None:
         raise NotFoundError("심사 건을 찾을 수 없어요.")
     ensure_assigned(session, professor, evaluation)
-    if decision_repo.for_evaluation(session, evaluation.id) is not None:
+    current = decision_repo.for_evaluation(session, evaluation.id)
+    appeal = appeal_service.accepted_for(session, evaluation.id) if current is not None else None
+    if current is not None and (appeal is None or appeal.decision_id != current.id):
         raise DecisionValidationError("이미 판정된 건이에요. 이의 신청으로 재심사를 진행해 주세요.")
     if action not in DecisionAction.__members__.values():
         raise DecisionValidationError("승인·수정·반려 중 하나를 선택해 주세요.")
@@ -201,8 +231,11 @@ def decide(
             reason_memo=memo,
             ai_recommendation_snapshot=snapshot(evaluation, ai_course),
             conflict_acknowledged=bool(found),
+            appeal_id=appeal.id if appeal else None,
         ),
     )
+    if appeal is not None:
+        appeal.status = AppealStatus.REDECIDED
     audit.record(
         session,
         professor,
@@ -215,10 +248,29 @@ def decide(
         differs_from_ai=differs,
         reason_codes=codes,
         conflicts=len(found),
+        appeal=appeal.id if appeal else None,
     )
+    _notify_student(session, evaluation, final, redecided=appeal is not None)
     _close_request_if_done(session, evaluation)
     session.commit()
     return decision
+
+
+def _notify_student(session: Session, evaluation: CourseEvaluation, result: str, *, redecided: bool) -> None:
+    request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
+    syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
+    student = user_repo.get_by_id(session, request.student_id) if request else None
+    if student is None or syllabus is None:
+        return
+    label = {"direct": "직접 인정", "elective": "선택 인정", "none": "불인정"}.get(result, result)
+    course = (syllabus.course_code or syllabus.course_title).strip()
+    notifications.notify(
+        session,
+        [student],
+        "decision.redecided" if redecided else "decision.created",
+        f"{course} {'재판정' if redecided else '판정'} 결과가 확정됐어요: {label}",
+        f"/student/evaluations/{evaluation.id}",
+    )
 
 
 def _close_request_if_done(session: Session, evaluation: CourseEvaluation) -> None:

@@ -10,6 +10,7 @@ from app.models import User
 from app.security.csrf import check_csrf
 from app.security.session import current_user
 from app.services import decisions as decision_service
+from app.web.notify import send_emails
 
 router = APIRouter(tags=["decisions"])
 
@@ -46,4 +47,5 @@ def create_decision(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except DecisionValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    send_emails()
     return {"id": decision.id, "result": decision.result, "decided_by": user.id}

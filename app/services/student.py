@@ -1,7 +1,7 @@
 """학생 서비스: 편입 요청, 문서 업로드, 성적표 연결, 보완 자료, 심사 제출, 진행 상황 (FR-01, 02, 08, 15, 21)."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
@@ -11,14 +11,26 @@ from app.db.base import utcnow
 from app.documents import text as doc_text
 from app.documents.storage import ObjectStorage
 from app.errors import CreditBridgeError, NotFoundError, PermissionDeniedError, UploadRejectedError
-from app.models import CourseEvaluation, Decision, Syllabus, TranscriptEntry, TransferRequest, User
+from app.models import (
+    Appeal,
+    CourseEvaluation,
+    Decision,
+    MaterialRequest,
+    SupplementFile,
+    Syllabus,
+    TranscriptEntry,
+    TransferRequest,
+    User,
+)
 from app.models.enums import RequestStatus, Role, SyllabusStatus
+from app.repositories import appeals as appeal_repo
 from app.repositories import catalog as catalog_repo
 from app.repositories import decisions as decision_repo
 from app.repositories import evaluations as evaluation_repo
+from app.repositories import materials as material_repo
 from app.repositories import requests as request_repo
 from app.repositories import syllabi as syllabus_repo
-from app.services import analysis, audit
+from app.services import analysis, audit, materials
 
 
 @dataclass(frozen=True)
@@ -137,17 +149,36 @@ def confirm_link(
 def store_supplement(
     session: Session, storage: ObjectStorage, student: User, syllabus: Syllabus, file: UploadedFile
 ) -> str:
-    """보완 자료 파일을 저장한다. 텍스트 추출과 재분석은 작업 큐(syllabus.supplement)가 맡는다 (FR-08)."""
+    """보완 자료 파일을 저장한다. 텍스트 추출과 재분석은 작업 큐(syllabus.supplement)가 맡는다 (FR-08, FR-22).
+
+    제출 전에는 언제든, 제출 뒤에는 심사관·교수의 보완 자료 요청이 열려 있을 때만 올릴 수 있다.
+    """
     if syllabus.owner_id != student.id:
         raise PermissionDeniedError("본인의 강의계획서만 보완할 수 있어요.")
     if syllabus.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING, SyllabusStatus.DELETED):
         raise CreditBridgeError("분석이 끝난 강의계획서에만 보완 자료를 올릴 수 있어요.")
+    request = request_repo.get(session, syllabus.transfer_request_id) if syllabus.transfer_request_id else None
+    if request is None:
+        raise NotFoundError("편입 요청을 찾을 수 없어요.")
+    latest = evaluation_repo.latest_for_syllabus(session, syllabus.id)
+    if latest is not None and decision_repo.for_evaluation(session, latest.id) is not None:
+        raise CreditBridgeError("판정이 끝난 과목이에요. 결과에 이의가 있으면 이의 신청을 해 주세요.")
+    open_requests = materials.open_for_syllabus(session, syllabus.id)
+    if request.status != RequestStatus.DRAFT and not open_requests:
+        raise CreditBridgeError("심사 중인 과목은 학사처나 교수의 보완 자료 요청이 있을 때만 자료를 올릴 수 있어요.")
     ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
     key = storage.new_key("supplements", file.filename)
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
+    material_repo.add_file(
+        session,
+        SupplementFile(
+            syllabus_id=syllabus.id, file_key=key, material_request_id=open_requests[0].id if open_requests else None
+        ),
+    )
     # 원본이 바뀌었으므로 내용 해시도 새로 만든다 (이전 해시 + 보완 파일)
     syllabus.content_hash = analysis.content_hash(syllabus.content_hash.encode(), file.data)
     syllabus.status = SyllabusStatus.UPLOADED
+    materials.mark_fulfilled(session, student, syllabus)
     audit.record(session, student, "syllabus.supplement", "syllabus", str(syllabus.id))
     session.commit()
     return key
@@ -167,27 +198,6 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
     session.commit()
 
 
-def delete_documents(session: Session, storage: ObjectStorage, student: User, request: TransferRequest) -> None:
-    """개인정보 삭제 요청 (FR-13): 원본 파일과 추출 텍스트를 지운다. 판정 기록(개인정보 없음)은 감사용으로 남는다."""
-    for syllabus in syllabus_repo.of_request(session, request.id):
-        if syllabus.source_file_key:
-            storage.delete(syllabus.source_file_key)
-        syllabus.source_file_key = None
-        syllabus.raw_text = ""
-        syllabus.extracted_json = None
-        syllabus.status = SyllabusStatus.DELETED
-        # 삭제한 문서는 재사용 출처가 되지 않게 하고, 같은 파일을 다시 올릴 수 있게 해시를 비운다
-        syllabus.content_hash = analysis.content_hash(f"deleted:{syllabus.id}".encode())
-        syllabus_repo.replace_chunks(session, syllabus.id, [])
-    if request.transcript_file_key:
-        storage.delete(request.transcript_file_key)
-        request.transcript_file_key = None
-    request.transcript_masked_name = None
-    request_repo.replace_transcript_entries(session, request.id, [])
-    audit.record(session, student, "privacy.delete_documents", "transfer_request", str(request.id))
-    session.commit()
-
-
 # ---------- 진행 상황 포털 (FR-21) ----------
 
 STAGES = ["접수", "AI 분석", "교수 검토", "확정"]
@@ -203,6 +213,8 @@ class CourseRow:
     candidate_code: str | None
     candidate_credits: float | None
     transcript_grade: str | None
+    appeal: Appeal | None = None
+    open_materials: list[MaterialRequest] = field(default_factory=list)
 
 
 def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
@@ -214,13 +226,21 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
     courses = catalog_repo.courses_by_ids(
         session, [e.candidate_course_id for e in evaluations.values() if e and e.candidate_course_id]
     )
+    appeals = appeal_repo.latest_for_evaluations(session, [e.id for e in evaluations.values() if e])
+    open_materials: dict[int, list[MaterialRequest]] = {}
+    for m in material_repo.for_syllabi(session, [s.id for s in syllabi]):
+        if m.status == "open":
+            open_materials.setdefault(m.syllabus_id, []).append(m)
     rows = []
     for s in syllabi:
         ev = evaluations[s.id]
         decision = decisions.get(ev.id) if ev else None
         assigned = evaluation_repo.assigned_at(session, ev.id) if ev else None
         expected: datetime | None
-        if decision:
+        appeal = appeals.get(ev.id) if ev else None
+        if decision and appeal is not None and appeal.status == "accepted":
+            stage, expected = 2, (assigned or appeal.created_at) + sla  # 이의 신청 재판정 대기
+        elif decision:
             stage, expected = 3, decision.decided_at
         elif assigned:
             stage, expected = 2, assigned + sla
@@ -240,6 +260,8 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
                 candidate_code=course.code if course else None,
                 candidate_credits=course.credits if course else None,
                 transcript_grade=grades.get(s.id),
+                appeal=appeals.get(ev.id) if ev else None,
+                open_materials=open_materials.get(s.id, []),
             )
         )
     return rows

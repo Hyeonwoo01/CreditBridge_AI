@@ -40,3 +40,13 @@ def departments_of(session: Session, institution_id: int) -> list[str]:
         select(Course.department).where(Course.institution_id == institution_id).distinct().order_by(Course.department)
     )
     return list(session.scalars(stmt))
+
+
+def source_institution_by_name(session: Session, name: str) -> Institution | None:
+    stmt = select(Institution).where(Institution.is_target.is_(False), Institution.name == name.strip())
+    return session.scalars(stmt).first()
+
+
+def institution_by_token_hash(session: Session, token_hash: str) -> Institution | None:
+    stmt = select(Institution).where(Institution.is_target.is_(True), Institution.sis_token_hash == token_hash)
+    return session.scalars(stmt).first()

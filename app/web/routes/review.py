@@ -1,17 +1,25 @@
 import csv
 import io
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.errors import CreditBridgeError
 from app.models import User
 from app.models.enums import Role
 from app.security.csrf import check_csrf
 from app.security.session import require
+from app.services import appeals as appeal_service
+from app.services import equivalencies as equivalency_service
+from app.services import materials as material_service
+from app.services import privacy as privacy_service
 from app.services import review as review_service
+from app.services import sis as sis_service
+from app.services import stats as stats_service
 from app.services import views
+from app.web.notify import send_emails
 from app.web.templating import flash, render
 
 router = APIRouter(prefix="/review")
@@ -56,6 +64,7 @@ def assign(
         flash(request, "배정할 건을 선택해 주세요.", "error")
     else:
         count, problems = review_service.auto_assign(session, user, evaluation_ids)
+        send_emails()
         flash(request, f"{count}건을 학과 담당 교수에게 배정했어요. 근거 요약이 함께 전달돼요.")
         for p in problems:
             flash(request, p, "error")
@@ -74,18 +83,7 @@ def evaluation_page(
 def export_csv(user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
     rows = views.export_rows(session, user)
     buffer = io.StringIO()
-    writer = csv.DictWriter(
-        buffer,
-        fieldnames=[
-            "decision_id",
-            "student_id",
-            "source_course",
-            "result",
-            "target_course",
-            "credits",
-            "decided_at",
-        ],
-    )
+    writer = csv.DictWriter(buffer, fieldnames=sis_service.FIELDS)
     writer.writeheader()
     writer.writerows(rows)
     return Response(
@@ -93,3 +91,131 @@ def export_csv(user: User = Evaluator, session: Session = Depends(get_db)) -> Re
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=decisions.csv"},
     )
+
+
+@router.post("/evaluations/{evaluation_id}/materials")
+def request_materials(
+    request: Request,
+    evaluation_id: int,
+    items: list[str] = Form([]),
+    note: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    """보완 자료 요청 (FR-22)."""
+    check_csrf(request, csrf_token)
+    try:
+        material_service.request_materials(session, user, evaluation_id, items, note)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+        flash(request, "학생에게 보완 자료를 요청했어요. 자료가 오면 알림으로 알려 드려요.")
+    return RedirectResponse(f"/review/evaluations/{evaluation_id}", status_code=303)
+
+
+@router.get("/appeals")
+def appeals(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
+    return render(request, "review/appeals.html", user=user, rows=appeal_service.rows(session, user))
+
+
+@router.post("/appeals/{appeal_id}")
+def handle_appeal(
+    request: Request,
+    appeal_id: int,
+    action: str = Form(...),
+    reviewer_id: str = Form(""),
+    note: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        if action == "accept":
+            appeal_service.accept(session, user, appeal_id, int(reviewer_id) if reviewer_id.isdigit() else None, note)
+            flash(request, "이의 신청을 받아들여 학과 교수에게 재판정을 배정했어요.")
+        elif action == "dismiss":
+            appeal_service.dismiss(session, user, appeal_id, note)
+            flash(request, "이의 신청을 기각하고 학생에게 사유를 알렸어요.")
+        else:
+            raise CreditBridgeError("처리 방법을 선택해 주세요.")
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+    return RedirectResponse("/review/appeals", status_code=303)
+
+
+@router.get("/privacy")
+def privacy_requests(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
+    return render(request, "privacy.html", user=user, rows=privacy_service.rows(session, user))
+
+
+@router.post("/privacy/{privacy_id}")
+def review_privacy(
+    request: Request,
+    privacy_id: int,
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        privacy_service.review(session, user, privacy_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+        flash(request, "처리 완료로 표시했어요. 기관 관리자가 승인하면 삭제돼요.")
+    return RedirectResponse("/review/privacy", status_code=303)
+
+
+@router.get("/equivalencies")
+def equivalencies(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
+    return render(
+        request,
+        "review/equivalencies.html",
+        user=user,
+        rows=equivalency_service.recent(session, user),
+        columns=equivalency_service.COLUMNS,
+    )
+
+
+@router.post("/equivalencies")
+def import_equivalencies(
+    request: Request,
+    file: UploadFile = File(...),
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    """기존 동등 과목표 CSV 가져오기 (FR-26)."""
+    check_csrf(request, csrf_token)
+    try:
+        result = equivalency_service.import_csv(session, user, file.filename or "", file.file.read())
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse("/review/equivalencies", status_code=303)
+    if result.errors:
+        return render(
+            request,
+            "review/equivalencies.html",
+            status_code=422,
+            user=user,
+            rows=equivalency_service.recent(session, user),
+            columns=equivalency_service.COLUMNS,
+            errors=result.errors,
+        )
+    flash(request, f"동등 과목표 {result.imported}건을 가져왔어요. 과거 판정 이력에 함께 표시돼요.")
+    return RedirectResponse("/review/equivalencies", status_code=303)
+
+
+@router.get("/stats")
+def stats(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
+    return render(request, "stats.html", user=user, s=stats_service.institution_stats(session, user))

@@ -11,8 +11,9 @@ from app.models import Assignment, Course, CourseEvaluation, Syllabus, TransferR
 from app.models.enums import Role
 from app.repositories import catalog as catalog_repo
 from app.repositories import evaluations as evaluation_repo
+from app.repositories import syllabi as syllabus_repo
 from app.repositories import users as user_repo
-from app.services import audit
+from app.services import audit, notifications
 
 TABS = {"high": "고신뢰", "low": "저신뢰", "insufficient": "정보 부족"}
 
@@ -121,6 +122,14 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
                 reassigned_from=original.id if original else None,
             ),
         )
+        notifications.notify(
+            session,
+            [reviewer],
+            "assignment.created",
+            f"새 심사가 배정됐어요: {_course(session, evaluation)} → {course.code}"
+            + (" (부재 교수 대리)" if original else ""),
+            f"/professor/evaluations/{evaluation.id}",
+        )
         audit.record(
             session,
             evaluator,
@@ -174,6 +183,27 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
                 ),
             )
             moved += 1
+        if moved:
+            # 대리 재배정 알림: 대리 심사자와 소속 기관 심사관 (FR-19, TC-15)
+            notifications.notify(
+                session,
+                [target],
+                "assignment.delegated",
+                f"부재 중인 교수의 심사 {moved}건이 대리 배정됐어요.",
+                "/professor",
+            )
+            notifications.notify(
+                session,
+                notifications.staff(session, professor.institution_id or 0, Role.EVALUATOR),
+                "assignment.delegated",
+                f"{professor.department or ''} 교수 부재로 진행 중인 심사 {moved}건이 대리 재배정됐어요.",
+                "/review",
+            )
     audit.record(session, professor, "professor.away", "user", str(professor.id), days=days, moved=moved)
     session.commit()
     return moved
+
+
+def _course(session: Session, evaluation: CourseEvaluation) -> str:
+    syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
+    return (syllabus.course_code or syllabus.course_title).strip() if syllabus else "과목"

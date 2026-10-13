@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import time %}
-{% block nav %}<a href="/admin/audit" class="font-semibold text-ink">감사 로그</a>{% endblock %}
+{% block nav %}{% include "admin/_nav.html" %}{% endblock %}
 {% block content %}
 <h1 class="text-[28px] font-bold">감사 로그</h1>
 <p class="mt-2 text-muted">추가 전용 기록이에요. 수정하거나 삭제할 수 없어요.</p>

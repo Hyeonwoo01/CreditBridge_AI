@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import Response
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
 from app.security.csrf import csrf_token
 from app.services.decisions import REASON_LABELS
@@ -24,6 +25,39 @@ FIELD_LABEL = {
     "credits": "학점·시수",
 }
 ACTION_LABEL = {"approve": "승인", "modify": "수정", "reject": "반려"}
+APPEAL_LABEL = {"submitted": "접수됨", "accepted": "재판정 중", "dismissed": "기각", "redecided": "재판정 완료"}
+PRIVACY_LABEL = {"requested": "요청됨", "reviewed": "심사관 처리 완료 · 승인 대기", "completed": "삭제 완료"}
+
+
+def highlight(text: str, marks: list[tuple[int, int]], prefix: str) -> Markup:
+    """원문에 근거 구절을 표시한다. 구절마다 시작 위치에 이동용 앵커(#prefix-시작-끝)를 둔다 (FR-25)."""
+    valid = sorted({(s, e) for s, e in marks if 0 <= s < e <= len(text)})
+    merged: list[list[int]] = []
+    for s, e in valid:
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    anchors: dict[int, list[str]] = {}
+    for s, e in valid:
+        anchors.setdefault(s, []).append(f'<span id="{prefix}-{s}-{e}" class="scroll-mt-28"></span>')
+    out: list[str] = []
+    pos = 0
+    points = sorted({0, len(text), *anchors, *(m[0] for m in merged), *(m[1] for m in merged)})
+    open_until = -1
+    for point in points:
+        if point > pos:
+            out.append(str(escape(text[pos:point])))
+            pos = point
+        if point == open_until:
+            out.append("</mark>")
+            open_until = -1
+        out.extend(anchors.get(point, []))
+        start = next((m for m in merged if m[0] == point), None)
+        if start is not None:
+            out.append("<mark>")
+            open_until = start[1]
+    return Markup("".join(out))
 
 
 def pct(value: float | None) -> str:
@@ -44,6 +78,9 @@ TEMPLATES.env.filters.update(
     pct=pct,
     iso=iso,
     reason=lambda v: REASON_LABELS.get(v, v),
+    highlight=highlight,
+    appeal_status=lambda v: APPEAL_LABEL.get(v, v),
+    privacy_status=lambda v: PRIVACY_LABEL.get(v, v),
 )
 TEMPLATES.env.globals["reason_labels"] = REASON_LABELS
 

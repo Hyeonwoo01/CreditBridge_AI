@@ -12,7 +12,8 @@ from app.logging_setup import configure_logging
 from app.security.session import LoginRequired
 from app.web.api import decisions as api_decisions
 from app.web.api import evaluations as api_evaluations
-from app.web.routes import admin, auth, professor, review, shared, student
+from app.web.api import sis as api_sis
+from app.web.routes import admin, auth, notifications, professor, review, shared, student
 from app.web.templating import render
 
 configure_logging()
@@ -30,10 +31,19 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "web" / "static"), name="static")
 
-for router in (auth.router, student.router, review.router, professor.router, shared.router, admin.router):
+for router in (
+    auth.router,
+    student.router,
+    review.router,
+    professor.router,
+    shared.router,
+    admin.router,
+    notifications.router,
+):
     app.include_router(router)
 app.include_router(api_evaluations.router, prefix="/api")
 app.include_router(api_decisions.router, prefix="/api")
+app.include_router(api_sis.router, prefix="/api")
 
 
 @app.get("/healthz", include_in_schema=False)

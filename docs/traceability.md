@@ -20,27 +20,32 @@
 | FR-10 판정 이력·감사 로그 | ✅ | `decisions`, `audit_logs` 추가 전용 + `docs/db-grants.sql` | `test_decisions_table_has_no_update_path` |
 | FR-11 일관성 경보 | ✅ | 같은 출신 대학·과목의 과거 판정은 모두 표시(유사도 포함). 같은 대상 과목·강의계획서 유사도 0.80 이상·결과 다름일 때만 확정 전 경보(기준값은 첫 측정 후 확정) | `test_consistency_alert_for_conflicting_past_decision`, `test_same_result_raises_no_alert`, `test_revised_syllabus_raises_no_alert` (TC-18) |
 | FR-12 역할 기반 접근 제어 | ✅ | `security/permissions.py`, `security/session.py` | `test_role_based_access`, `test_no_decision_without_assigned_professor` |
-| FR-13 개인정보 보호 | 🟡 | 성적표 마스킹 후 LLM 전달, S3 SSE 설정, 문서 삭제 요청, [privacy.md](privacy.md) | `test_injection_and_masking.py`, `test_privacy_delete_removes_files_and_text` — 기관별 학습 제외 설정 UI 없음(Anthropic API는 기본적으로 API 데이터를 학습에 쓰지 않음), 삭제 기한 관리 없음 |
+| FR-13 개인정보 보호 | ✅ | 성적표 마스킹 후 LLM 전달, S3 SSE 설정, 삭제 요청 흐름(학생 요청 → 심사관 처리 → 관리자 승인 시 삭제, 처리 기한·기한 초과 표시, 보완 자료 원본까지 삭제) `services/privacy.py`, [privacy.md](privacy.md) | `test_injection_and_masking.py`, `test_privacy_request_review_and_admin_approval` |
 | FR-14 숨은 지시 문구 탐지 | ✅ | `ai/injection.py` (영·한 패턴, LLM 입력에서 제외, 경고) | `test_hidden_instruction_is_flagged_and_removed_from_prompt` |
 
 ## P2 중요 (파일럿)
 
-| 기능 | 상태 | 비고 |
-| --- | --- | --- |
-| FR-15 사전 시뮬레이션 | ✅ | 입학 확정(대상 대학 소속) 학생, 요청마다 전공 선택. 예상 인정 학점·남은 학기·추가 비용 범위 (`services/student.py::simulate`) |
-| FR-16 수준 차이 판별 | ✅ | level=lower면 직접 인정 추천 안 함, ×0.75 |
-| FR-17 심사 큐 대시보드 | ✅ | 고신뢰/저신뢰/정보 부족 탭, 학과 필터, 정렬 |
-| FR-18 교수 자동 배정 | ✅ | 후보 과목 학과의 배정이 가장 적은 교수 |
-| FR-19 부재 시 대리 재배정 | 🟡 | 대리 재배정·큐 표시. 이메일 알림 없음 |
-| FR-20 모바일 승인 | 🟡 | 근거 우선 모바일 화면. 푸시 알림 없음 |
-| FR-21 진행 상황 포털 | ✅ | 접수→AI 분석→교수 검토→확정, 예상 완료일 |
-| FR-22 보완 자료 요청 | ⬜ | 학생 쪽 보완 업로드는 있음, 심사관의 요청 발송은 없음 |
-| FR-23 이의 신청·근거 리포트 | 🟡 | 판정 근거 리포트 있음, 이의 신청 접수 흐름 없음 |
-| FR-24 학사정보시스템 내보내기 | 🟡 | 확정 판정 CSV(모의 SIS). API 연동 없음 |
+| 기능 | 상태 | 구현 위치 | 테스트 |
+| --- | --- | --- | --- |
+| FR-15 사전 시뮬레이션 | ✅ | 입학 확정(대상 대학 소속) 학생, 요청마다 전공 선택. 예상 인정 학점·남은 학기·추가 비용 범위 (`services/student.py::simulate`) | `test_request_page_shows_simulation_and_stage`, `unit/test_simulation_and_links.py` |
+| FR-16 수준 차이 판별 | ✅ | level=lower면 직접 인정 추천 안 함, ×0.75 | `unit/test_scoring.py` |
+| FR-17 심사 큐 대시보드 | ✅ | 고신뢰/저신뢰/정보 부족 탭, 학과 필터, 정렬 | `test_queue_tabs_and_department_assignment` |
+| FR-18 교수 자동 배정 | ✅ | 후보 과목 학과의 배정이 가장 적은 교수, 배정 알림 | 같은 테스트, `test_notifications_for_assignment_and_delegation` |
+| FR-19 부재 시 대리 재배정 | ✅ | 대리 재배정, 대리 심사자·심사관 알림(화면 + SMTP 설정 시 메일) `services/notifications.py` | `test_away_professor_is_replaced_by_delegate`, `test_notifications_for_assignment_and_delegation` (TC-15) |
+| FR-20 모바일 승인 | 🟡 | 근거 우선 모바일 화면, 모바일 메뉴, 화면·메일 알림. 웹 푸시는 없음(서비스 워커·추가 라이브러리 필요) | 수동 확인 |
+| FR-21 진행 상황 포털 | ✅ | 접수→AI 분석→교수 검토→확정, 예상 완료일, 보완 요청·이의 신청 상태 | `test_professor_decision_rules_and_portal` |
+| FR-22 보완 자료 요청 | ✅ | 심사관·배정 교수가 항목·메모 지정해 요청 → 학생 알림 → 제출 시 처리됨·요청자 알림, 재분석 결과에 교수 배정 이어짐 `services/materials.py` | `test_material_request_flow_keeps_assignment`, `test_evaluator_can_request_materials_but_not_after_decision` |
+| FR-23 이의 신청·근거 리포트 | ✅ | 학생 신청 → 심사관 받아들임(재판정 교수 배정)·기각(사유 필수) → 교수 재판정(새 판정 행, 원 판정 보존). 리포트에 경과 표시 `services/appeals.py` | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_dismiss_requires_note` |
+| FR-24 학사정보시스템 내보내기 | ✅ | CSV + 토큰 인증 JSON API `GET /api/sis/decisions` (관리자 발급·폐기, 재판정은 최신만 + 대체 판정 번호) `services/sis.py` | `test_sis_api_requires_admin_issued_token`, 이의 신청 테스트의 CSV 확인 |
 
 ## P3 선택
 
-FR-25(근거 원문 위치 이동: 위치는 저장, 화면 이동 없음), FR-26, FR-27, FR-28 ⬜
+| 기능 | 상태 | 비고 |
+| --- | --- | --- |
+| FR-25 근거 원문 위치 이동 | 🟡 | 근거 구절을 누르면 학생·기준 강의계획서 원문의 해당 위치로 이동하고 표시(`templating.highlight`). 원본 PDF의 페이지 번호로 이동은 아직 없음 (`test_evidence_links_jump_to_source_positions`) |
+| FR-26 기존 동등 과목표 가져오기 | ✅ | CSV(엑셀 'CSV UTF-8', cp949도 읽음) 일괄 가져오기, 한 줄이라도 틀리면 저장 안 함. 과거 판정 이력에 "기존 동등 과목표"로 표시하되 강의계획서가 없어 경보 대상은 아님 (`test_equivalency_import_shows_in_history_without_blocking`) |
+| FR-27 운영 통계 | ✅ | 처리량, 평균 소요일, AI-교수 불일치율, 승인·수정·반려 구성, 이의 신청·삭제 요청 현황, 월별 판정 (`services/stats.py`, `test_stats_page_counts_decisions_and_disagreement`) |
+| FR-28 복수 대학 비교 | ⬜ | 기능 명세상 합격 전 학생 대상이라 사업 모델 확정 후 정의 |
 
 ## 테스트 명세 대비 아직 측정하지 않은 것
 

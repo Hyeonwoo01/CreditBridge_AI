@@ -3,14 +3,16 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.errors import DecisionValidationError
+from app.errors import CreditBridgeError, DecisionValidationError
 from app.models import User
 from app.models.enums import Role
 from app.security.csrf import check_csrf
 from app.security.session import require
 from app.services import decisions as decision_service
+from app.services import materials as material_service
 from app.services import review as review_service
 from app.services import views
+from app.web.notify import send_emails
 from app.web.templating import flash, render
 
 router = APIRouter(prefix="/professor")
@@ -82,6 +84,7 @@ def decide(
         return render(
             request, "professor/evaluation.html", status_code=422, user=user, v=view, error=str(exc), form=form
         )
+    send_emails()
     flash(request, "판정을 확정했어요. 학생 포털과 내보내기에 바로 반영돼요.")
     return RedirectResponse("/professor", status_code=303)
 
@@ -97,6 +100,7 @@ def away(
 ) -> Response:
     check_csrf(request, csrf_token)
     moved = review_service.set_away(session, user, days, int(delegate_id) if delegate_id.isdigit() else None)
+    send_emails()
     flash(
         request,
         f"부재 기간을 저장했어요. 진행 중인 {moved}건을 대리 심사자에게 넘겼어요."
@@ -104,3 +108,26 @@ def away(
         else "복귀로 표시했어요.",
     )
     return RedirectResponse("/professor", status_code=303)
+
+
+@router.post("/evaluations/{evaluation_id}/materials")
+def request_materials(
+    request: Request,
+    evaluation_id: int,
+    items: list[str] = Form([]),
+    note: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Professor,
+    session: Session = Depends(get_db),
+) -> Response:
+    """보완 자료 요청 (FR-22)."""
+    check_csrf(request, csrf_token)
+    try:
+        material_service.request_materials(session, user, evaluation_id, items, note)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+        flash(request, "학생에게 보완 자료를 요청했어요. 자료가 오면 다시 분석한 결과로 이어서 판정할 수 있어요.")
+    return RedirectResponse(f"/professor/evaluations/{evaluation_id}", status_code=303)

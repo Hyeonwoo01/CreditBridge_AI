@@ -67,3 +67,21 @@ class ReasonCode(StrEnum):
     NO_LAB = "no_lab"  # 실험·실습 미포함
     PREREQUISITE_DIFFERENCE = "prerequisite_difference"  # 선수과목 차이
     OTHER = "other"  # 기타 (메모 필수)
+
+
+class MaterialRequestStatus(StrEnum):
+    OPEN = "open"  # 학생이 보완 자료를 올리기 전
+    FULFILLED = "fulfilled"
+
+
+class AppealStatus(StrEnum):
+    SUBMITTED = "submitted"  # 학생 접수, 심사관 처리 대기
+    ACCEPTED = "accepted"  # 심사관이 받아들여 교수 재판정 대기
+    DISMISSED = "dismissed"  # 심사관이 기각 (사유 필수)
+    REDECIDED = "redecided"  # 교수 재판정 완료
+
+
+class PrivacyStatus(StrEnum):
+    REQUESTED = "requested"  # 학생 요청
+    REVIEWED = "reviewed"  # 심사관 처리 완료, 관리자 승인 대기
+    COMPLETED = "completed"  # 관리자 승인, 삭제 완료

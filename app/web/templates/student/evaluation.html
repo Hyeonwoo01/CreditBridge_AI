@@ -5,14 +5,26 @@
 <p class="mb-4 text-sm text-muted"><a class="underline" href="/student/requests/{{ v.request.id }}">← 과목 목록</a></p>
 {% include "partials/evaluation.html" %}
 
-{% if v.evaluation.recommendation in ('insufficient', 'elective', 'none') and v.request.status == 'draft' and not v.decision %}
-<form method="post" action="/student/syllabi/{{ v.syllabus.id }}/supplement" enctype="multipart/form-data" class="mt-8 grid gap-3 rounded-md border-[1.5px] border-dashed border-border-strong p-5">
+{% if not v.decision and v.syllabus.status == 'ready' and (v.open_materials or (v.request.status == 'draft' and v.evaluation.recommendation in ('insufficient', 'elective', 'none'))) %}
+<form method="post" action="/student/syllabi/{{ v.syllabus.id }}/supplement" enctype="multipart/form-data" class="mt-8 grid gap-3 rounded-md border-[1.5px] border-dashed p-5 {{ 'border-amber' if v.open_materials else 'border-border-strong' }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <span class="font-semibold">보완 자료 올리고 다시 분석</span>
-  <span class="text-sm text-muted">주차별 상세 계획, 교재 목차, 시험지 등을 올리면 원문에 덧붙여 다시 분석해요. 이전 결과는 기록으로 남아요.</span>
+  <span class="font-semibold">{{ '요청받은 보완 자료 제출' if v.open_materials else '보완 자료 올리고 다시 분석' }}</span>
+  <span class="text-sm text-muted">{% if v.open_materials %}학사처·교수가 요청한 자료를 올리면 원문에 덧붙여 다시 분석하고, 심사는 같은 교수에게 이어져요.{% else %}주차별 상세 계획, 교재 목차, 시험지 등을 올리면 원문에 덧붙여 다시 분석해요.{% endif %} 이전 결과는 기록으로 남아요.</span>
   <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
   <button class="btn-secondary w-fit">보완 자료 제출</button>
 </form>
+{% endif %}
+
+{% if v.decision and not v.open_appeal %}
+<details class="mt-8 rounded-md border border-hairline p-5">
+  <summary class="cursor-pointer list-none font-semibold">판정 결과에 이의가 있나요?</summary>
+  <form method="post" action="/student/evaluations/{{ v.evaluation.id }}/appeal" class="mt-3 grid gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p class="text-sm text-muted">어떤 개념을 실제로 배웠는지, 근거가 되는 자료가 무엇인지 구체적으로 적어 주세요 (20자 이상). 학사처가 검토한 뒤 받아들이면 학과 교수가 다시 판정해요.</p>
+    <textarea class="textarea" name="reason" rows="4" minlength="20" maxlength="3000" required></textarea>
+    <button class="btn-secondary w-fit">이의 신청</button>
+  </form>
+</details>
 {% endif %}
 
 {% if v.previous %}

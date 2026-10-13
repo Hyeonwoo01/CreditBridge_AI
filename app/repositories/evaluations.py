@@ -109,3 +109,20 @@ def add_assignment(session: Session, assignment: Assignment) -> Assignment:
 def assigned_at(session: Session, evaluation_id: int) -> datetime | None:
     a = active_assignment(session, evaluation_id)
     return a.assigned_at if a else None
+
+
+def carry_assignment(session: Session, from_evaluation_id: int, to_evaluation_id: int) -> None:
+    """재분석으로 새 결과가 생기면 진행 중인 교수 배정을 새 결과로 옮긴다 (배정 기록은 남는다)."""
+    current = active_assignment(session, from_evaluation_id)
+    if current is None:
+        return
+    current.is_active = False
+    session.add(
+        Assignment(
+            course_evaluation_id=to_evaluation_id,
+            reviewer_id=current.reviewer_id,
+            assigned_by=current.assigned_by,
+            reassigned_from=current.reassigned_from,
+        )
+    )
+    session.flush()

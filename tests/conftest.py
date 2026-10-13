@@ -81,12 +81,14 @@ def client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
     from app.main import app
+    from app.web.routes import admin as admin_routes
     from app.web.routes import student as student_routes
     from app.workers import tasks
 
     monkeypatch.setattr(tasks, "get_llm", lambda: fake_llm)
     monkeypatch.setattr(tasks, "get_storage", lambda: fake_storage)
     monkeypatch.setattr(student_routes, "get_storage", lambda: fake_storage)
+    monkeypatch.setattr(admin_routes, "get_storage", lambda: fake_storage)
     with TestClient(app) as c:
         yield c
 

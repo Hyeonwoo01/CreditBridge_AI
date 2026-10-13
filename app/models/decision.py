@@ -22,4 +22,6 @@ class Decision(IdMixin, Base):
     reason_memo: Mapped[str] = mapped_column(Text, default="")
     ai_recommendation_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
     conflict_acknowledged: Mapped[bool] = mapped_column(default=False)
+    # 이의 신청으로 다시 내린 판정이면 그 이의 신청 (FR-23). 이전 판정은 지우지 않고 그대로 남는다
+    appeal_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("appeals.id", use_alter=True))
     decided_at: Mapped[datetime] = mapped_column(default=utcnow)

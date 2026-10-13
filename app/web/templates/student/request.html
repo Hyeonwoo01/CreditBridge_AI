@@ -10,6 +10,10 @@
   <p class="text-muted">{{ {"draft": "자료를 올리고 예상 결과를 확인하는 단계예요. 준비가 되면 학사처에 심사를 요청하세요.", "submitted": "학사처 심사 중이에요. 과목별 진행 단계와 예상 완료일을 확인하세요.", "decided": "모든 과목의 판정이 끝났어요."}[req.status] }}</p>
 </header>
 
+{% if view.open_materials %}
+<p class="mt-6 rounded-md border border-amber bg-[#fff8ec] px-4 py-3 text-sm">학사처·교수가 보완 자료를 요청한 과목이 {{ view.open_materials }}개 있어요. 과목을 눌러 요청 내용을 확인하고 자료를 올려 주세요.</p>
+{% endif %}
+
 <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
   <div class="grid gap-8">
     {% if req.status == 'draft' %}
@@ -89,10 +93,16 @@
       <button class="btn-primary w-full" {% if view.processing or not view.rows %}disabled{% endif %}>학사처에 심사 요청</button>
     </form>
     {% endif %}
-    <form method="post" action="/student/requests/{{ req.id }}/delete-documents" onsubmit="return confirm('올린 원본 파일과 추출 텍스트를 모두 삭제할까요? 되돌릴 수 없어요.')">
+    {% set pr = view.privacy %}
+    {% if pr and pr.status != 'completed' %}
+    <p class="text-sm text-muted">문서 삭제 요청: {{ pr.status | privacy_status }} · {{ time(pr.due_at, "date") }}까지 처리돼요.</p>
+    {% else %}
+    {% if pr %}<p class="text-sm text-muted">문서 삭제 완료 · {{ time(pr.completed_at, "date") }}</p>{% endif %}
+    <form method="post" action="/student/requests/{{ req.id }}/delete-documents" onsubmit="return confirm('올린 원본 파일·추출 텍스트·성적표 정보 삭제를 요청할까요? 학사처 확인과 기관 승인을 거쳐 기한 안에 삭제되고, 되돌릴 수 없어요.')">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn-text text-sm text-muted">내 문서 삭제 요청</button>
     </form>
+    {% endif %}
   </aside>
 </div>
 {% endblock %}

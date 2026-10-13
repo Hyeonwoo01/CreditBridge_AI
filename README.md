@@ -4,7 +4,10 @@
 
 - 학생(이지원): 수강 신청 전에 과목별 예상 결과, 부족한 자료, 예상 인정 학점·남은 학기·추가 비용을 확인
 - 심사관(레이첼): 신뢰도별 심사 큐, 학과 교수 자동 배정, 부재 시 대리 재배정, 판정 내보내기
-- 학과 교수: 근거 구절 비교 화면에서 승인·수정·반려, 과거 판정과 다르면 확정 전 경보
+- 학과 교수: 근거 구절 비교 화면에서 승인·수정·반려, 과거 판정과 다르면 확정 전 경보, 보완 자료 요청, 이의 신청 재판정
+- 기관 관리자: 운영 통계, 문서 삭제 승인, 학사정보시스템 연동 토큰, 감사 로그
+
+심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`).
 
 기준 문서: [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [구현 현황](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
 
@@ -42,6 +45,7 @@ uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미
 | 수학과 교수 | dkim@msu.example, lchen@msu.example |
 | CS 교수 | oali@msu.example, spark@msu.example |
 | 관리자 | admin@msu.example |
+| 물리·화학·영어·역사 교수 | mbrown@msu.example, ewong@msu.example, alopez@msu.example, jreed@msu.example, twhite@msu.example |
 
 `scripts/demo_data/`에 페르소나의 강의계획서 PDF(미적분학, 선형대수 상세형·부실형, C프로그래밍, 자료구조, 일반물리, 일반화학, 한국사)가 있습니다. 작년에 같은 선형대수가 직접 인정된 이력도 시드되어 있어 일관성 경보를 시연할 수 있습니다.
 
@@ -79,4 +83,5 @@ tests/           unit · integration(MariaDB) · eval(골든셋)
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.
+- 알림 메일을 보내려면 `SMTP_HOST` 등을 설정하세요. 비워 두면 화면 알림만 써요.
 - 일관성 경보의 유사도 기준(`SIMILARITY_MIN = 0.80`)은 첫 측정 후 확정하는 임시값입니다.

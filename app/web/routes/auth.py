@@ -11,7 +11,7 @@ from app.web.templating import render
 
 router = APIRouter()
 
-HOME = {"student": "/student", "evaluator": "/review", "professor": "/professor", "admin": "/admin/audit"}
+HOME = {"student": "/student", "evaluator": "/review", "professor": "/professor", "admin": "/admin/stats"}
 
 
 @router.get("/")

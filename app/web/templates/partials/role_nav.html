@@ -1,0 +1,1 @@
+{% if user.role == 'student' %}{% include "student/_nav.html" %}{% elif user.role == 'evaluator' %}{% include "review/_nav.html" %}{% elif user.role == 'professor' %}{% include "professor/_nav.html" %}{% elif user.role == 'admin' %}{% include "admin/_nav.html" %}{% endif %}

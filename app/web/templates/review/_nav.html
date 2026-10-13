@@ -1,2 +1,7 @@
-<a href="/review" class="relative flex h-20 items-center font-semibold text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-ink">심사 큐</a>
-<a href="/review/export.csv" class="font-semibold text-muted">판정 내보내기(CSV)</a>
+{% from "partials/macros.html" import nav_link with context %}
+{{ nav_link("/review", "심사 큐", exact=True) }}
+{{ nav_link("/review/appeals", "이의 신청") }}
+{{ nav_link("/review/privacy", "삭제 요청") }}
+{{ nav_link("/review/equivalencies", "동등 과목표") }}
+{{ nav_link("/review/stats", "통계") }}
+<a href="/review/export.csv" class="flex h-20 items-center font-semibold text-muted hover:text-ink">내보내기(CSV)</a>

@@ -11,3 +11,19 @@ function localizeTimes(root) {
 }
 document.addEventListener("DOMContentLoaded", () => localizeTimes(document));
 document.addEventListener("htmx:afterSwap", (e) => localizeTimes(e.target));
+
+// 근거 구절을 누르면 접혀 있는 원문을 펼치고 해당 위치로 이동한다 (FR-25).
+document.addEventListener("click", (e) => {
+  const link = e.target.closest("a[data-jump]");
+  if (!link) return;
+  const panel = document.getElementById(link.dataset.jump);
+  const anchor = document.getElementById(link.getAttribute("href").slice(1));
+  if (!panel || !anchor) return;
+  e.preventDefault();
+  panel.open = true;
+  document.querySelectorAll(".source-text mark.is-target").forEach((m) => m.classList.remove("is-target"));
+  const mark = anchor.closest("mark") || anchor.nextElementSibling;
+  if (mark && mark.tagName === "MARK") mark.classList.add("is-target");
+  anchor.scrollIntoView({ behavior: "smooth", block: "center" });
+  history.replaceState(null, "", link.getAttribute("href"));
+});

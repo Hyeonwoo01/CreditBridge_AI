@@ -12,13 +12,16 @@
         <span class="badge text-error">분석 실패</span>
       {% elif row.syllabus.status in ('uploaded', 'processing') or (ev and ev.status in ('queued', 'running')) %}
         <span class="badge"><span class="size-3 animate-spin rounded-full border-2 border-rausch-disabled border-t-rausch"></span>AI 분석 중</span>
+      {% elif row.decision and row.appeal and row.appeal.status in ('submitted', 'accepted') %}
+        <span class="badge">이의 신청 {{ row.appeal.status | appeal_status }}</span>
       {% elif row.decision %}
         <span class="badge border-ink">확정 · {{ row.decision.result | rec }}</span>
       {% elif ev %}
-        <span class="flex items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.coverage is not none and row.candidate_code %}<strong class="tabular-nums" title="개념 커버리지">{{ ev.coverage | pct }}</strong>{% endif %}</span>
+        <span class="flex items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.coverage is not none and row.candidate_code and ev.recommendation != "insufficient" %}<strong class="tabular-nums" title="개념 커버리지">{{ ev.coverage | pct }}</strong>{% endif %}</span>
       {% endif %}
     </div>
     {% if row.syllabus.status == 'failed' %}<p class="text-sm text-error">{{ row.syllabus.error_message }}</p>{% endif %}
+    {% if row.open_materials %}<p class="text-sm font-semibold text-error">보완 자료 요청 {{ row.open_materials | length }}건 · 눌러서 확인하고 자료를 올려 주세요</p>{% endif %}
     {% if row.candidate_code %}<p class="text-sm">→ <strong>{{ row.candidate_code }}</strong>{% if ev and ev.recommendation == 'insufficient' %} 후보 · 자료 보완이 필요해요{% endif %}</p>{% endif %}
     <div class="flex flex-wrap items-center justify-between gap-2">
       {{ stage_bar(stages, row.stage) }}
