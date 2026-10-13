@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}로그인 · CreditBridge AI{% endblock %}
+{% block content %}
+<div class="mx-auto grid max-w-[420px] gap-6 pt-6">
+  <div class="grid gap-2">
+    <h1 class="text-[28px] font-bold leading-snug">수강 신청 전에, 근거 있는 학점 인정 결과를</h1>
+    <p class="text-muted">강의계획서를 올리면 편입 대학의 어떤 과목으로 인정될지 원문 근거와 함께 보여드려요. 최종 판정은 학과 교수가 합니다.</p>
+  </div>
+  <form method="post" action="/login" class="card-float grid gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if error %}<p class="text-sm text-error">{{ error }}</p>{% endif %}
+    <label class="field"><span>이메일</span><input class="input" type="email" name="email" value="{{ email or '' }}" required autocomplete="username"></label>
+    <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn-primary w-full">로그인</button>
+  </form>
+</div>
+{% endblock %}

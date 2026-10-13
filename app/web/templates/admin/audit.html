@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import time %}
+{% block nav %}<a href="/admin/audit" class="font-semibold text-ink">감사 로그</a>{% endblock %}
+{% block content %}
+<h1 class="text-[28px] font-bold">감사 로그</h1>
+<p class="mt-2 text-muted">추가 전용 기록이에요. 수정하거나 삭제할 수 없어요.</p>
+<div class="mt-6 overflow-x-auto">
+  <table class="w-full min-w-[640px] text-sm">
+    <thead class="text-left text-muted"><tr><th class="py-2 pr-3 font-medium">시각</th><th class="py-2 pr-3 font-medium">행위</th><th class="py-2 pr-3 font-medium">대상</th><th class="py-2 font-medium">내용</th></tr></thead>
+    <tbody>{% for a in logs %}<tr class="border-t border-hairline-soft"><td class="py-2 pr-3 whitespace-nowrap">{{ time(a.created_at) }}</td><td class="py-2 pr-3">{{ a.action }}</td><td class="py-2 pr-3">{{ a.target_type }}</td><td class="py-2 text-muted">{{ a.payload_json }}</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

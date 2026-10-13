@@ -1,0 +1,9 @@
+Hankuk University
+MATH 201 Linear Algebra
+3 credits
+
+Course Overview
+An introduction to linear algebra covering matrices and linear systems, with applications.
+
+Grading
+Midterm 40%, Final 60%

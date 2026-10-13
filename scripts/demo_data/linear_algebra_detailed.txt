@@ -1,0 +1,36 @@
+Hankuk University
+MATH 201 Linear Algebra
+Credits: 3
+
+Course Description
+Systems of linear equations, matrices, determinants, vector spaces, linear transformations, eigenvalues and eigenvectors, and orthogonality.
+
+Learning Outcomes
+1. Solve systems of linear equations by Gaussian elimination and row reduction.
+2. Compute matrix inverses and determinants.
+3. Determine bases and dimension of vector spaces and subspaces.
+4. Compute eigenvalues and eigenvectors and diagonalize matrices.
+5. Apply the Gram-Schmidt process and least squares.
+
+Textbook
+David C. Lay, Linear Algebra and Its Applications, 6th edition
+
+Weekly Schedule
+Week 1: Systems of linear equations, row reduction and echelon forms
+Week 2: Vector equations, the matrix equation Ax = b, solution sets
+Week 3: Linear independence, introduction to linear transformations
+Week 4: Matrix operations, the inverse of a matrix
+Week 5: Determinants and their properties, Cramer's rule
+Week 6: Vector spaces and subspaces, null space and column space
+Week 7: Bases, dimension and rank
+Week 8: Midterm exam
+Week 9: Eigenvalues and eigenvectors, the characteristic equation
+Week 10: Diagonalization
+Week 11: Inner product, orthogonal sets and orthogonal projections
+Week 12: The Gram-Schmidt process, least squares problems
+Week 13: Symmetric matrices
+Week 14: Review
+Week 15: Final exam
+
+Assessment
+Homework 25%, Midterm 35%, Final exam 40%

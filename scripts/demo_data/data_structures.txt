@@ -1,0 +1,38 @@
+Hankuk University
+CSE 204 Data Structures
+Credits: 3
+
+Course Description
+Fundamental data structures and their algorithms, with analysis of running time.
+
+Learning Outcomes
+1. Analyze algorithms with asymptotic notation.
+2. Implement linked lists, stacks and queues.
+3. Implement binary search trees, heaps and hash tables.
+4. Implement and compare sorting algorithms and basic graph traversal.
+
+Textbook
+Goodrich, Tamassia and Mount, Data Structures and Algorithms in C++
+
+Prerequisites
+CSE 103 C Programming
+
+Weekly Schedule
+Week 1: Algorithm analysis and Big-O notation
+Week 2: Arrays and linked lists
+Week 3: Stacks and queues
+Week 4: Recursion
+Week 5: Trees and binary trees
+Week 6: Binary search trees
+Week 7: Balanced search trees
+Week 8: Midterm exam
+Week 9: Priority queues and heaps
+Week 10: Hash tables
+Week 11: Sorting: merge sort and quick sort
+Week 12: Graphs: representation, breadth-first and depth-first search
+Week 13: Shortest paths
+Week 14: Review
+Week 15: Final exam
+
+Assessment
+Assignments 30%, Midterm 30%, Final exam 40%

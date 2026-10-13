@@ -1,0 +1,13 @@
+{
+  "_comment": "D1 골든셋의 시작점. 지금 라벨은 개발용 예시이며, 전문가 2인 독립 라벨(불일치 시 3인째)로 교체·확장해야 한다. label: direct, elective, none, insufficient",
+  "cases": [
+    {"file": "calculus.txt", "label": "direct", "target": "MATH 1151"},
+    {"file": "linear_algebra_detailed.txt", "label": "direct", "target": "MATH 2568"},
+    {"file": "linear_algebra_sparse.txt", "label": "insufficient", "target": null},
+    {"file": "c_programming.txt", "label": "direct", "target": "CSE 1222"},
+    {"file": "data_structures.txt", "label": "direct", "target": "CSE 2231"},
+    {"file": "general_physics.txt", "label": "direct", "target": "PHYSICS 1250"},
+    {"file": "general_chemistry.txt", "label": "elective", "target": null},
+    {"file": "korean_history.txt", "label": "elective", "target": null}
+  ]
+}

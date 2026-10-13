@@ -1,0 +1,35 @@
+Hankuk University
+PHY 101 General Physics I
+Credits: 3 (lecture) + 1 (laboratory)
+
+Course Description
+Calculus-based introduction to classical mechanics for science and engineering students.
+
+Learning Outcomes
+1. Describe motion in one and two dimensions using vectors and calculus.
+2. Apply Newton's laws of motion with free-body diagrams.
+3. Use work-energy and conservation of momentum to solve problems.
+4. Analyze rotational motion and simple harmonic motion.
+
+Textbook
+Halliday, Resnick and Walker, Fundamentals of Physics, 11th edition
+
+Weekly Schedule
+Week 1: Measurement, vectors
+Week 2: Motion along a straight line
+Week 3: Motion in two and three dimensions, projectile motion
+Week 4: Newton's laws of motion
+Week 5: Friction, circular motion
+Week 6: Kinetic energy and work
+Week 7: Potential energy and conservation of energy
+Week 8: Midterm exam
+Week 9: Center of mass and linear momentum, collisions
+Week 10: Rotation, torque and moment of inertia
+Week 11: Rolling, angular momentum
+Week 12: Equilibrium and elasticity
+Week 13: Gravitation
+Week 14: Oscillations and simple harmonic motion
+Week 15: Final exam
+
+Assessment
+Homework 20%, Laboratory 15%, Midterm 30%, Final exam 35%

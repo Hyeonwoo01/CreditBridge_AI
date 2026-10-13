@@ -1,0 +1,145 @@
+{% from "partials/macros.html" import rec_badge, time %}
+{# 공용 분석 결과. v: EvaluationView, evidence_first: 교수 모바일 화면처럼 근거를 먼저 보여줄지 #}
+{% set ev = v.evaluation %}
+{% set r = v.result %}
+
+<section class="flex flex-col gap-1">
+  <p class="text-sm text-muted">{{ v.request.source_institution.name }} · {{ v.syllabus.original_filename }}</p>
+  <h1 class="text-[22px] font-medium tracking-[-0.44px]">{{ v.syllabus.course_code }} {{ v.syllabus.course_title }}</h1>
+  <p class="text-sm text-muted">{{ v.syllabus.credits|string + '학점' if v.syllabus.credits is not none else '학점 기재 없음' }} · 분석 {{ time(ev.created_at) }}{% if ev.model %} · {{ ev.prompt_version }}{% endif %}</p>
+</section>
+
+{% if ev.status in ('queued', 'running') %}
+<div class="mt-6 flex items-center gap-3 rounded-md bg-surface-soft p-4 text-sm"><span class="size-4 animate-spin rounded-full border-2 border-rausch-disabled border-t-rausch"></span>AI가 강의계획서를 대상 과목과 비교하고 있어요.</div>
+{% elif ev.status == 'failed' %}
+<div class="mt-6 rounded-md bg-rausch-soft p-4 text-sm text-error">{{ ev.error_message }}</div>
+{% else %}
+
+{# ---- 추천 요약 ---- #}
+<section class="card-float mt-6 grid gap-4 md:grid-cols-[auto_1fr] md:items-center md:gap-8">
+  <div class="flex flex-col items-center gap-2 text-center">
+    {% if ev.recommendation == 'insufficient' %}
+      <span class="text-[40px] font-bold leading-tight">정보 부족</span>
+      <span class="text-sm text-muted">확률을 계산하지 않았어요</span>
+    {% elif ev.probability is not none %}
+      <span class="rating">{{ ev.probability | round | int }}%</span>
+      <span class="text-sm text-muted">직접 인정 가능성 (예상치)</span>
+    {% else %}
+      <span class="text-[40px] font-bold leading-tight">{{ ev.recommendation | rec }}</span>
+    {% endif %}
+  </div>
+  <div class="grid gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      {{ rec_badge(ev.recommendation) }}
+      <span class="badge">신뢰도 {{ ev.confidence | conf }}</span>
+      {% if ev.level_flag and ev.level_flag != 'same' %}<span class="badge text-error">{{ ev.level_flag | level }}</span>{% endif %}
+    </div>
+    {% if v.candidate %}
+      <p class="text-base">{% if ev.recommendation == 'insufficient' %}<span class="text-muted">판단 대상 후보</span> {% endif %}<strong>{{ v.request.target_institution.name }} {{ v.candidate.code }}</strong> {{ v.candidate.title }} · {{ v.candidate.credits | round(1) }}학점</p>
+    {% else %}
+      <p class="text-base font-semibold">대응하는 과목을 찾지 못했어요</p>
+    {% endif %}
+    {% if ev.summary %}<p class="text-sm text-body">{{ ev.summary }}</p>{% endif %}
+    <p class="text-xs text-muted">AI 추천이며 확정이 아니에요. 최종 판정은 학과 교수가 합니다.</p>
+  </div>
+</section>
+
+{% if v.decision %}
+<section class="mt-4 rounded-md border border-ink p-4">
+  <p class="text-sm font-semibold">교수 최종 판정: {{ v.decision.result | rec }}{% if v.decided_target %} · {{ v.decided_target.code }}{% endif %}</p>
+  <p class="mt-1 text-sm text-muted">{{ v.decided_by.name if v.decided_by else '' }} · {{ time(v.decision.decided_at) }} · {{ v.decision.action | action }}</p>
+  {% if v.decision.reason %}<p class="mt-2 text-sm">{{ v.decision.reason }}</p>{% endif %}
+</section>
+{% endif %}
+
+{% if r and (r.warnings or r.injection_flags) %}
+<ul class="mt-4 grid gap-2 rounded-md bg-surface-soft p-4 text-sm text-body">
+  {% for w in r.warnings %}<li class="flex gap-2"><span class="text-error">⚠</span>{{ w }}</li>{% endfor %}
+  {% for f in r.injection_flags %}<li class="flex gap-2 text-error"><span>⚠</span>분석에서 제외한 의심 문구 — {{ f }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{# ---- 정보 부족 진단 (FR-08) ---- #}
+{% if ev.recommendation == 'insufficient' and r %}
+<section class="mt-6 rounded-md border border-hairline p-5">
+  <h2 class="text-xl font-semibold tracking-[-0.18px]">무엇을 보완하면 되나요</h2>
+  {% if r.missing_concepts %}
+  <p class="mt-3 text-sm font-semibold">근거가 부족한 개념</p>
+  <ul class="mt-1 flex flex-wrap gap-2">{% for c in r.missing_concepts %}<li class="chip">{{ c }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if r.missing_fields %}
+  <p class="mt-3 text-sm font-semibold">강의계획서에 기재되지 않은 항목</p>
+  <p class="text-sm text-body">{{ r.missing_fields | map('field') | join(', ') }}</p>
+  {% endif %}
+  <p class="mt-3 text-sm font-semibold">함께 제출하면 좋은 자료</p>
+  <ul class="mt-1 list-disc pl-5 text-sm text-body">{% for m in r.missing_materials %}<li>{{ m }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{# ---- 후보 과목과 개념별 근거 ---- #}
+{% if r and r.candidates %}
+<section class="mt-10 grid gap-6">
+  <div>
+    <h2 class="text-xl font-semibold tracking-[-0.18px]">개념별 커버리지와 근거</h2>
+    <p class="mt-1 text-sm text-muted">왼쪽은 학생 강의계획서, 오른쪽은 대상 대학 기준 강의계획서의 원문 그대로의 구절이에요. 원문에서 확인되지 않은 구절은 표시하지 않아요.</p>
+  </div>
+  {% for c in r.candidates %}
+  <details class="rounded-md border border-hairline" {% if loop.first and ev.recommendation != 'insufficient' %}open{% endif %}>
+    <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 p-5">
+      <span class="text-base font-semibold">{{ loop.index }}순위 · {{ c.course_code }} {{ c.course_title }}</span>
+      <span class="flex items-center gap-2 text-sm"><span class="badge">{{ c.level | level }}</span><strong>{{ c.coverage | pct }}</strong></span>
+    </summary>
+    <div class="grid gap-1 border-t border-hairline-soft px-5 pb-5">
+      {% if c.summary %}<p class="pt-4 text-sm text-body">{{ c.summary }}</p>{% endif %}
+      {% for k in c.concepts %}
+      <div class="grid gap-2 border-b border-hairline-soft py-4 last:border-0">
+        <div class="flex items-center justify-between gap-3">
+          <span class="font-medium">{{ k.concept }} <span class="ml-1 text-xs font-semibold {{ 'text-error' if k.status in ('not_taught', 'unclear') else 'text-muted' }}">{{ k.status | concept_status }}{% if not k.verified and k.status in ('taught', 'partial') %} · 근거 미확인{% endif %}</span></span>
+          <span class="font-semibold tabular-nums">{{ k.coverage | pct }}</span>
+        </div>
+        <div class="meter"><span style="width: {{ (k.coverage * 100) | round | int }}%"></span></div>
+        {% if k.reason %}<p class="text-sm text-body">{{ k.reason }}</p>{% endif %}
+        {% if k.source_evidence or k.target_evidence %}
+        <div class="evidence grid gap-3 text-sm md:grid-cols-2">
+          <div class="grid gap-1.5 rounded-sm bg-surface-soft p-3">
+            <span class="text-xs font-bold text-muted">학생 강의계획서</span>
+            {% for e in k.source_evidence %}<p><mark>{{ e.text }}</mark></p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
+          </div>
+          <div class="grid gap-1.5 rounded-sm bg-surface-soft p-3">
+            <span class="text-xs font-bold text-muted">{{ c.course_code }} 기준 강의계획서</span>
+            {% for e in k.target_evidence %}<p><mark>{{ e.text }}</mark></p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+</section>
+{% elif r and r.no_match_reason %}
+<p class="mt-8 rounded-md bg-surface-soft p-4 text-sm text-body">{{ r.no_match_reason }}</p>
+{% endif %}
+{% endif %}
+
+{# ---- 추출된 강의계획서 (FR-03, FR-04) ---- #}
+{% if v.extraction %}
+{% set x = v.extraction %}
+<details class="mt-10 border-t border-hairline pt-6">
+  <summary class="cursor-pointer list-none text-xl font-semibold tracking-[-0.18px]">추출된 강의계획서 정보</summary>
+  <dl class="mt-4 grid gap-4 text-sm md:grid-cols-[160px_1fr]">
+    <dt class="font-semibold">학점·시수</dt>
+    <dd>{{ (x.credits|string + '학점') if x.credits is not none else '기재 없음' }}{% if x.contact_hours %} · {{ x.contact_hours }}{% endif %}</dd>
+    <dt class="font-semibold">학습 목표</dt>
+    <dd>{% if x.learning_outcomes %}<ul class="list-disc pl-5">{% for o in x.learning_outcomes %}<li>{{ o }}</li>{% endfor %}</ul>{% else %}<span class="text-muted">기재 없음</span>{% endif %}</dd>
+    <dt class="font-semibold">주차별 주제</dt>
+    <dd>{% if x.weekly_topics %}<ul class="grid gap-1">{% for w in x.weekly_topics %}<li><span class="text-muted">{{ w.label }}</span> {{ w.topic }}</li>{% endfor %}</ul>{% else %}<span class="text-muted">기재 없음</span>{% endif %}</dd>
+    <dt class="font-semibold">교재</dt>
+    <dd>{{ x.textbooks | join(' / ') if x.textbooks else '기재 없음' }}</dd>
+    <dt class="font-semibold">선수과목</dt>
+    <dd>{{ x.prerequisites | join(' / ') if x.prerequisites else '기재 없음' }}</dd>
+    <dt class="font-semibold">평가 방식</dt>
+    <dd>{{ x.assessment | join(' · ') if x.assessment else '기재 없음' }}</dd>
+  </dl>
+</details>
+{% endif %}

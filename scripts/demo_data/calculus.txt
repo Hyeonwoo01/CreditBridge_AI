@@ -1,0 +1,39 @@
+Hankuk University
+Department of Mathematics
+MATH 101 Calculus I
+Credits: 3 (3 hours lecture per week)
+
+Course Description
+Differential and integral calculus of functions of one variable for science and engineering majors: limits, continuity, derivatives, applications of the derivative, and the definite integral.
+
+Learning Outcomes
+1. Evaluate limits algebraically and graphically, including one-sided limits and limits at infinity.
+2. Compute derivatives using the product rule, quotient rule and chain rule, and apply implicit differentiation.
+3. Solve related rates and optimization problems.
+4. Evaluate definite integrals using the Fundamental Theorem of Calculus and substitution.
+
+Textbook
+James Stewart, Calculus: Early Transcendentals, 9th edition
+
+Prerequisites
+High school calculus or placement exam
+
+Weekly Schedule
+Week 1: Functions and models, review of trigonometric functions
+Week 2: The limit of a function, one-sided limits
+Week 3: Continuity, intermediate value theorem, limits at infinity
+Week 4: Derivatives and rates of change, the derivative as a function
+Week 5: Differentiation rules: product rule and quotient rule
+Week 6: The chain rule, implicit differentiation
+Week 7: Related rates, linear approximation
+Week 8: Midterm exam
+Week 9: Maximum and minimum values, the mean value theorem
+Week 10: Curve sketching, L'Hopital's rule
+Week 11: Optimization problems
+Week 12: Antiderivatives, Riemann sums and the definite integral
+Week 13: The fundamental theorem of calculus
+Week 14: The substitution rule
+Week 15: Final exam
+
+Assessment
+Homework 20%, Quizzes 10%, Midterm 30%, Final exam 40%

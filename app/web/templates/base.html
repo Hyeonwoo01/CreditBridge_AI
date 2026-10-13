@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}CreditBridge AI{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js" defer></script>
+  <script src="/static/js/app.js" defer></script>
+</head>
+<body class="min-h-screen bg-white font-sans text-ink antialiased" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+  <header class="sticky top-0 z-20 border-b border-hairline-soft bg-white">
+    <div class="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 md:h-20 md:px-10">
+      <a href="/" class="flex items-center gap-1.5 text-xl font-bold tracking-tight text-rausch">
+        <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 22h26M6 22v-6M26 22v-6M3 16c5-8 21-8 26 0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M11 22v-7.5M16 22v-9M21 22v-7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        creditbridge
+      </a>
+      {% if user %}
+      <nav class="hidden items-center gap-8 md:flex" aria-label="메인">
+        {% block nav %}{% endblock %}
+      </nav>
+      <div class="flex items-center gap-3">
+        <span class="hidden text-sm text-muted sm:inline">{{ user.name }} · {{ {"student": "학생", "evaluator": "심사관", "professor": "학과 교수", "admin": "관리자"}[user.role] }}</span>
+        <form method="post" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="chip">로그아웃</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+  <main class="mx-auto max-w-[1080px] px-4 pt-6 pb-16 md:px-10 md:pt-12">
+    {% for f in flashes %}
+    <div role="status" class="mb-4 rounded-md px-4 py-3 text-sm {{ 'bg-rausch-soft text-error' if f.kind == 'error' else 'bg-surface-soft text-body' }}">{{ f.message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

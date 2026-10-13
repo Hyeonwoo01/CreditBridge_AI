@@ -1,0 +1,69 @@
+[project]
+name = "creditbridge"
+version = "0.1.0"
+description = "AI transfer-credit articulation platform: syllabus mapping, verified evidence, faculty decisions"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi[standard]>=0.115,<1",
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.5,<3",
+    "sqlalchemy>=2.0,<2.1",
+    "pymysql>=1.1,<2",
+    "alembic>=1.13,<2",
+    "celery[redis]>=5.4,<6",
+    "anthropic>=0.100,<1",
+    "pymupdf>=1.24,<2",
+    "jinja2>=3.1,<4",
+    "itsdangerous>=2.2,<3",
+    "argon2-cffi>=23.1",
+    "boto3>=1.35,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-cov>=5",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+# bge-m3 임베딩. PyTorch가 커서 그룹을 분리했지만 기본 설치에 포함된다.
+embedding = [
+    "sentence-transformers>=3.2,<6",
+]
+
+[tool.uv]
+default-groups = ["dev", "embedding"]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Form", "fastapi.File", "fastapi.Query"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app"]
+
+[[tool.mypy.overrides]]
+module = ["celery.*", "kombu.*", "boto3.*", "botocore.*", "fitz.*", "pymupdf.*", "sentence_transformers.*"]
+ignore_missing_imports = true
+
+# PyMuPDF는 타입 힌트가 부분적이라 문서 추출 모듈에서만 미타입 호출을 허용한다
+[[tool.mypy.overrides]]
+module = ["app.documents.text"]
+disallow_untyped_calls = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["eval: golden-set AI quality evaluation (real API calls, costs money)"]
+addopts = "-m 'not eval'"

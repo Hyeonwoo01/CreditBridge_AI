@@ -1,0 +1,92 @@
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import RedirectResponse, Response
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.errors import DecisionValidationError
+from app.models import User
+from app.models.enums import Role
+from app.security.csrf import check_csrf
+from app.security.session import require
+from app.services import decisions as decision_service
+from app.services import review as review_service
+from app.services import views
+from app.web.templating import flash, render
+
+router = APIRouter(prefix="/professor")
+Professor = Depends(require(Role.PROFESSOR))
+
+
+@router.get("")
+def index(request: Request, user: User = Professor, session: Session = Depends(get_db)) -> Response:
+    return render(
+        request,
+        "professor/index.html",
+        user=user,
+        items=views.professor_items(session, user),
+        colleagues=views.colleagues(session, user),
+    )
+
+
+@router.get("/evaluations/{public_id}")
+def evaluation_page(
+    request: Request, public_id: str, user: User = Professor, session: Session = Depends(get_db)
+) -> Response:
+    view = views.evaluation_view(session, user, public_id)
+    return render(request, "professor/evaluation.html", user=user, v=view)
+
+
+@router.post("/evaluations/{public_id}/decision")
+def decide(
+    request: Request,
+    public_id: str,
+    action: str = Form(...),
+    result: str = Form(""),
+    target_course_id: str = Form(""),
+    reason: str = Form(""),
+    acknowledge_conflict: bool = Form(False),
+    csrf_token: str = Form(""),
+    user: User = Professor,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        decision_service.decide(
+            session, user, public_id, action, result or None, target_course_id or None, reason, acknowledge_conflict
+        )
+    except decision_service.ConflictNeedsAcknowledgement as exc:
+        session.rollback()
+        view = views.evaluation_view(session, user, public_id)
+        form = {"action": action, "result": result, "target_course_id": target_course_id, "reason": reason}
+        return render(
+            request, "professor/evaluation.html", status_code=409, user=user, v=view, conflict=str(exc), form=form
+        )
+    except DecisionValidationError as exc:
+        session.rollback()
+        view = views.evaluation_view(session, user, public_id)
+        form = {"action": action, "result": result, "target_course_id": target_course_id, "reason": reason}
+        return render(
+            request, "professor/evaluation.html", status_code=422, user=user, v=view, error=str(exc), form=form
+        )
+    flash(request, "판정을 확정했어요. 학생 포털과 내보내기에 바로 반영돼요.")
+    return RedirectResponse("/professor", status_code=303)
+
+
+@router.post("/away")
+def away(
+    request: Request,
+    days: int = Form(0),
+    delegate_id: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Professor,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    moved = review_service.set_away(session, user, days, delegate_id or None)
+    flash(
+        request,
+        f"부재 기간을 저장했어요. 진행 중인 {moved}건을 대리 심사자에게 넘겼어요."
+        if days > 0
+        else "복귀로 표시했어요.",
+    )
+    return RedirectResponse("/professor", status_code=303)

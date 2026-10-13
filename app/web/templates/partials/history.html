@@ -1,0 +1,9 @@
+{% from "partials/macros.html" import time %}
+{% if v.history %}
+<section class="mt-8 rounded-md border border-amber bg-[#fff8ec] p-5">
+  <h2 class="font-semibold">같은 과목의 과거 판정 {{ v.history | length }}건</h2>
+  <ul class="mt-2 grid gap-1 text-sm">
+    {% for h in v.history %}<li>{{ time(h.decided_at, "date") }} · <strong>{{ h.result | rec }}</strong>{% if h.target_code %} ({{ h.target_code }}){% endif %}{% if h.reason %} — {{ h.reason }}{% endif %}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}

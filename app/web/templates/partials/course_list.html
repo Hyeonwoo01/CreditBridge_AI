@@ -1,0 +1,31 @@
+{% from "partials/macros.html" import rec_badge, stage_bar, time %}
+<div id="course-list" class="grid gap-3" {% if view.processing %}hx-get="/student/requests/{{ view.request.public_id }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+  {% for row in view.rows %}
+  {% set ev = row.evaluation %}
+  <a href="/student/syllabi/{{ row.syllabus.public_id }}" class="card grid gap-3 p-5 hover:shadow-card">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="grid min-w-0 gap-0.5">
+        <span class="truncate font-semibold">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</span>
+        <span class="text-sm text-muted">{{ row.syllabus.original_filename }}{% if row.transcript_grade %} · 성적 {{ row.transcript_grade }}{% endif %}</span>
+      </div>
+      {% if row.syllabus.status == 'failed' %}
+        <span class="badge text-error">분석 실패</span>
+      {% elif row.syllabus.status in ('uploaded', 'processing') or (ev and ev.status in ('queued', 'running')) %}
+        <span class="badge"><span class="size-3 animate-spin rounded-full border-2 border-rausch-disabled border-t-rausch"></span>AI 분석 중</span>
+      {% elif row.decision %}
+        <span class="badge border-ink">확정 · {{ row.decision.result | rec }}</span>
+      {% elif ev %}
+        <span class="flex items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.probability is not none and ev.recommendation == 'direct' %}<strong class="tabular-nums">{{ ev.probability | round | int }}%</strong>{% endif %}</span>
+      {% endif %}
+    </div>
+    {% if row.syllabus.status == 'failed' %}<p class="text-sm text-error">{{ row.syllabus.error_message }}</p>{% endif %}
+    {% if row.candidate_code %}<p class="text-sm">→ <strong>{{ row.candidate_code }}</strong>{% if ev and ev.recommendation == 'insufficient' %} 후보 · 자료 보완이 필요해요{% endif %}</p>{% endif %}
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      {{ stage_bar(stages, row.stage) }}
+      {% if row.expected_done %}<span class="text-xs text-muted">예상 완료 {{ time(row.expected_done, "date") }}</span>{% endif %}
+    </div>
+  </a>
+  {% else %}
+  <p class="rounded-md bg-surface-soft p-6 text-center text-muted">강의계획서를 올리면 과목별 결과가 여기에 나와요.</p>
+  {% endfor %}
+</div>

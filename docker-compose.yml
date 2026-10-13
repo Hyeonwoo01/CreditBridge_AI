@@ -1,0 +1,59 @@
+# 로컬 인프라: docker compose up -d db redis minio
+# 앱까지 컨테이너로: docker compose --profile app up -d --build
+services:
+  db:
+    image: mariadb:11.8
+    environment:
+      MARIADB_ROOT_PASSWORD: change-me-root
+      MARIADB_DATABASE: creditbridge
+      MARIADB_USER: creditbridge
+      MARIADB_PASSWORD: change-me
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports: ["3306:3306"]
+    volumes: ["db-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: change-me
+      MINIO_ROOT_PASSWORD: change-me-please
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio-data:/data"]
+
+  web:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql+pymysql://creditbridge:change-me@db:3306/creditbridge?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      minio: {condition: service_started}
+
+  worker:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql+pymysql://creditbridge:change-me@db:3306/creditbridge?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+    command: ["uv", "run", "--no-group", "dev", "celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    depends_on: [db, redis, minio]
+
+volumes:
+  db-data:
+  minio-data:

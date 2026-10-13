@@ -1,0 +1,35 @@
+Hankuk University
+CSE 103 C Programming
+Credits: 3
+
+Course Description
+Introduction to programming in the C language: data types, control flow, functions, arrays, pointers, structures and file input/output.
+
+Learning Outcomes
+1. Write, compile and debug C programs using variables, data types and operators.
+2. Use conditional statements and loops to control program flow.
+3. Decompose programs into functions and use arrays and strings.
+4. Use pointers, dynamic memory allocation and structures.
+
+Textbook
+K. N. King, C Programming: A Modern Approach, 2nd edition
+
+Weekly Schedule
+Week 1: Introduction to C, compiling and running programs
+Week 2: Variables, data types and operators
+Week 3: Input and output with printf and scanf
+Week 4: Conditional statements: if and switch
+Week 5: Loops: while, do-while and for
+Week 6: Functions and scope
+Week 7: Arrays and strings
+Week 8: Midterm exam
+Week 9: Pointers and pointer arithmetic
+Week 10: Pointers and arrays, dynamic memory allocation with malloc and free
+Week 11: Structures and unions
+Week 12: File input and output
+Week 13: Preprocessor and multi-file programs
+Week 14: Team project
+Week 15: Final exam
+
+Assessment
+Programming assignments 40%, Midterm 25%, Final exam 35%

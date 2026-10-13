@@ -1,0 +1,35 @@
+Hankuk University
+CHEM 101 General Chemistry I
+Credits: 3
+
+Course Description
+Fundamental principles of chemistry: atoms, stoichiometry, chemical bonding, gases and thermochemistry.
+
+Learning Outcomes
+1. Perform stoichiometric calculations using the mole concept.
+2. Describe electron configurations and periodic trends.
+3. Draw Lewis structures and predict molecular geometry using VSEPR.
+4. Apply the ideal gas law and calculate enthalpy changes.
+
+Textbook
+Brown, LeMay and Bursten, Chemistry: The Central Science, 15th edition
+
+Weekly Schedule
+Week 1: Matter, measurement and significant figures
+Week 2: Atoms, molecules and ions
+Week 3: Chemical equations and stoichiometry
+Week 4: Reactions in aqueous solution
+Week 5: Thermochemistry: enthalpy and calorimetry
+Week 6: Electronic structure of atoms
+Week 7: Periodic properties of the elements
+Week 8: Midterm exam
+Week 9: Chemical bonding: ionic and covalent bonds, Lewis structures
+Week 10: Molecular geometry and bonding theories, VSEPR
+Week 11: Gases: the ideal gas equation
+Week 12: Intermolecular forces
+Week 13: Properties of solutions
+Week 14: Review
+Week 15: Final exam
+
+Assessment
+Quizzes 15%, Midterm 35%, Final exam 50%
