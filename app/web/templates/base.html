@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}CreditBridge AI{% endblock %}</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/img/favicon-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
   {# 한·영 혼용 본문용 Pretendard (불러오지 못하면 시스템 글꼴로 대체) #}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="/static/css/app.css">
@@ -16,7 +17,7 @@
   <header class="sticky top-0 z-30 bg-black text-white">
     <div class="mx-auto flex h-11 max-w-[1280px] items-center justify-between gap-4 px-4 md:px-10">
       <a href="/" class="flex items-center gap-1.5 font-display text-[15px] font-semibold tracking-[-0.2px]">
-        <svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 22h26M6 22v-6M26 22v-6M3 16c5-8 21-8 26 0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M11 22v-7.5M16 22v-9M21 22v-7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span class="flex h-8 items-center rounded-sm bg-white px-1"><img src="/static/img/logo-mark.png" alt="" width="36" height="26" class="h-[26px] w-auto"></span>
         CreditBridge AI
       </a>
       {% if user %}

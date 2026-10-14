@@ -5,6 +5,7 @@
 {% set ev = v.evaluation %}
 <article class="grid gap-6 text-sm">
   <header class="grid gap-1">
+    <img src="/static/img/logo.png" alt="CreditBridge AI" width="120" height="66" class="h-auto w-[120px]">
     <h1 class="page-title">Transfer Credit Evaluation Report</h1>
     <p class="text-muted">{{ v.request.source_institution.name }} {{ v.syllabus.course_code }} {{ v.syllabus.course_title }} → {{ v.request.target_institution.name }} · 생성 {{ time(ev.created_at) }}</p>
   </header>
