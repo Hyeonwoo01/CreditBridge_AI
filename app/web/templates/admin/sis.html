@@ -2,20 +2,20 @@
 {% block nav %}{% include "admin/_nav.html" %}{% endblock %}
 {% block content %}
 <header class="grid gap-2">
-  <h1 class="text-[28px] font-bold">학사정보시스템 연동</h1>
+  <h1 class="page-title">학사정보시스템 연동</h1>
   <p class="text-muted">확정 판정을 학사정보시스템이 직접 가져가도록 연동 토큰을 발급해요. 이의 신청으로 재판정된 건은 최신 판정만 나가고, 대체한 이전 판정 번호가 함께 전달돼요.</p>
 </header>
 
 {% if token %}
 <section class="mt-6 grid gap-2 rounded-md border border-ink p-5" role="status">
   <p class="font-semibold">새 연동 토큰 — 지금 한 번만 보여드려요. 안전한 곳에 저장하세요.</p>
-  <code class="break-all rounded-sm bg-surface-strong p-3 text-sm">{{ token }}</code>
+  <code class="break-all rounded-sm bg-parchment p-3 text-sm">{{ token }}</code>
 </section>
 {% endif %}
 
 <section class="card mt-6 grid gap-3 p-5 text-sm">
   <p>상태: <strong>{{ '토큰 발급됨' if has_token else '토큰 없음' }}</strong></p>
-  <pre class="overflow-x-auto rounded-sm bg-surface-soft p-3 text-xs">GET /api/sis/decisions?since=2026-01-01T00:00:00Z
+  <pre class="overflow-x-auto rounded-sm bg-parchment p-3 text-xs">GET /api/sis/decisions?since=2026-01-01T00:00:00Z
 Authorization: Bearer cbsis_...</pre>
   <p class="text-muted">응답 필드: decision_id, replaces_decision_id, student_id, source_institution, source_course, result, target_course, credits, decided_at. 같은 내용은 심사관 화면의 CSV 내보내기로도 받을 수 있어요.</p>
   <div class="flex flex-wrap gap-2">

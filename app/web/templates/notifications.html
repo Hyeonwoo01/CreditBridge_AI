@@ -2,18 +2,18 @@
 {% from "partials/macros.html" import time %}
 {% block nav %}{% include "partials/role_nav.html" %}{% endblock %}
 {% block content %}
-<h1 class="text-[28px] font-bold">알림</h1>
+<h1 class="page-title">알림</h1>
 <p class="mt-2 text-muted">배정, 보완 자료 요청, 이의 신청, 판정 결과 소식을 모아 보여줘요.</p>
 <ul class="mt-6 grid gap-2">
   {% for n in items %}
   <li>
-    <a href="{{ n.link or '#' }}" class="flex flex-wrap items-start justify-between gap-2 rounded-md border border-hairline-soft p-4 hover:shadow-card {{ 'bg-rausch-soft' if not n.read_at else '' }}">
-      <span class="text-sm">{% if not n.read_at %}<span class="dot mr-1.5 inline-block bg-rausch align-middle"></span>{% endif %}{{ n.message }}</span>
+    <a href="{{ n.link or '#' }}" class="flex flex-wrap items-start justify-between gap-2 rounded-md border border-divider p-4 hover:border-primary/40 {{ 'bg-pearl' if not n.read_at else '' }}">
+      <span class="text-sm">{% if not n.read_at %}<span class="dot mr-1.5 inline-block bg-primary align-middle"></span>{% endif %}{{ n.message }}</span>
       <span class="text-xs text-muted">{{ time(n.created_at) }}</span>
     </a>
   </li>
   {% else %}
-  <li class="rounded-md bg-surface-soft p-6 text-center text-muted">새 알림이 없어요.</li>
+  <li class="rounded-md bg-parchment p-6 text-center text-muted">새 알림이 없어요.</li>
   {% endfor %}
 </ul>
 {% endblock %}

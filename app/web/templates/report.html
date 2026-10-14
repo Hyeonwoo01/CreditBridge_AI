@@ -5,7 +5,7 @@
 {% set ev = v.evaluation %}
 <article class="grid gap-6 text-sm">
   <header class="grid gap-1">
-    <h1 class="text-[22px] font-medium">Transfer Credit Evaluation Report</h1>
+    <h1 class="page-title">Transfer Credit Evaluation Report</h1>
     <p class="text-muted">{{ v.request.source_institution.name }} {{ v.syllabus.course_code }} {{ v.syllabus.course_title }} → {{ v.request.target_institution.name }} · 생성 {{ time(ev.created_at) }}</p>
   </header>
   <section class="grid gap-1">
@@ -15,7 +15,7 @@
     <p>사유: {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}없음 (AI 추천과 동일){% endif %}</p>
     {% set snap = v.decision.ai_recommendation_snapshot %}
     <p class="text-muted">판정 당시 AI 추천: {{ snap.recommendation | rec }} · 커버리지 {{ snap.coverage | pct }} · 신뢰도 {{ snap.confidence | conf }} · {{ snap.prompt_version }}</p>
-    {% if v.decision.conflict_acknowledged %}<p class="text-error">과거 판정과 다른 결과임을 확인하고 확정함</p>{% endif %}
+    {% if v.decision.conflict_acknowledged %}<p class="text-reject">과거 판정과 다른 결과임을 확인하고 확정함</p>{% endif %}
     {% else %}<p class="text-muted">아직 판정되지 않았어요.</p>{% endif %}
   </section>
   {% if v.decisions | length > 1 or v.appeals %}
@@ -33,7 +33,7 @@
   <section class="grid gap-2">
     <h2 class="font-semibold">개념별 근거 (원문 검증 완료 구절)</h2>
     {% for k in v.primary.concepts %}
-    <div class="border-t border-hairline-soft pt-2">
+    <div class="border-t border-divider pt-2">
       <p><strong>{{ k.concept }}</strong> {{ k.coverage | pct }} · {{ k.status | concept_status }}</p>
       {% for e in k.source_evidence %}<p>학생: “{{ e.text }}” <span class="text-muted">[{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
       {% for e in k.target_evidence %}<p>기준: “{{ e.text }}” <span class="text-muted">[{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}

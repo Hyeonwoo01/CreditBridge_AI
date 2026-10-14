@@ -3,21 +3,21 @@
 {% block nav %}{% include "partials/role_nav.html" %}{% endblock %}
 {% block content %}
 <header class="grid gap-2">
-  <h1 class="text-[28px] font-bold">{{ '문서 삭제 승인' if user.role == 'admin' else '문서 삭제 요청' }}</h1>
+  <h1 class="page-title">{{ '문서 삭제 승인' if user.role == 'admin' else '문서 삭제 요청' }}</h1>
   <p class="text-muted">학생이 요청한 원본 파일·추출 텍스트·성적표 정보 삭제예요. 심사관이 진행 중인 심사와 보관 의무를 확인해 처리하고, 기관 관리자가 승인하면 즉시 삭제돼요. 판정 기록과 감사 로그는 학사 기록으로 남아요.</p>
 </header>
 {% set overdue = rows | selectattr("overdue") | list %}
-{% if overdue %}<p class="mt-4 rounded-md bg-rausch-soft px-4 py-3 text-sm text-error">처리 기한이 지난 요청이 {{ overdue | length }}건 있어요.</p>{% endif %}
+{% if overdue %}<p class="mt-4 rounded-md bg-pearl px-4 py-3 text-sm text-reject">처리 기한이 지난 요청이 {{ overdue | length }}건 있어요.</p>{% endif %}
 <div class="mt-6 overflow-x-auto">
   <table class="w-full min-w-[680px] text-sm">
-    <thead class="text-left text-muted"><tr><th class="py-2 pr-3 font-medium">요청</th><th class="py-2 pr-3 font-medium">학생</th><th class="py-2 pr-3 font-medium">접수</th><th class="py-2 pr-3 font-medium">기한</th><th class="py-2 pr-3 font-medium">상태</th><th class="py-2 font-medium"></th></tr></thead>
+    <thead class="text-left text-muted"><tr><th class="py-2 pr-3 font-normal">요청</th><th class="py-2 pr-3 font-normal">학생</th><th class="py-2 pr-3 font-normal">접수</th><th class="py-2 pr-3 font-normal">기한</th><th class="py-2 pr-3 font-normal">상태</th><th class="py-2 font-normal"></th></tr></thead>
     <tbody>
     {% for r in rows %}
-      <tr class="border-t border-hairline-soft align-middle">
+      <tr class="border-t border-divider align-middle">
         <td class="py-3 pr-3">#{{ r.request.id }} · {{ r.request.source_institution.name }}</td>
         <td class="py-3 pr-3">{{ r.student.email if r.student else '–' }}</td>
         <td class="py-3 pr-3 whitespace-nowrap">{{ time(r.privacy.created_at, "date") }}</td>
-        <td class="py-3 pr-3 whitespace-nowrap {{ 'font-semibold text-error' if r.overdue else '' }}">{{ time(r.privacy.due_at, "date") }}{% if r.overdue %} · 기한 초과{% endif %}</td>
+        <td class="py-3 pr-3 whitespace-nowrap {{ 'font-semibold text-reject' if r.overdue else '' }}">{{ time(r.privacy.due_at, "date") }}{% if r.overdue %} · 기한 초과{% endif %}</td>
         <td class="py-3 pr-3">{{ r.privacy.status | privacy_status }}</td>
         <td class="py-3 text-right">
           {% if user.role == 'evaluator' and r.privacy.status == 'requested' %}

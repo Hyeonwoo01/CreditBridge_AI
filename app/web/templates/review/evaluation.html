@@ -7,7 +7,7 @@
 {% include "partials/history.html" %}
 {% if not v.decision %}{% include "partials/material_request_form.html" %}{% endif %}
 <section class="mt-10 grid gap-2 text-sm">
-  <h2 class="text-xl font-semibold tracking-[-0.18px]">처리 기록</h2>
+  <h2 class="section-title">처리 기록</h2>
   <p>담당 교수: {{ v.reviewer.name if v.reviewer else '미배정' }}{% if v.assignment %} · 배정 {{ time(v.assignment.assigned_at) }}{% endif %}</p>
   <ul class="grid gap-1 text-muted">{% for a in v.audit %}<li>{{ time(a.created_at) }} · {{ a.action }}</li>{% endfor %}</ul>
 </section>

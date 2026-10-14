@@ -1,12 +1,17 @@
+{# 판정·추천 배지: 읽기 전용 의미 색 (인정=초록, 선택 인정·정보 부족=앰버, 불인정=빨강) #}
 {% macro rec_badge(rec) -%}
-<span class="badge"><span class="dot {{ {'direct': 'bg-rausch', 'elective': 'bg-amber', 'none': 'bg-border-strong', 'insufficient': 'bg-ink'}.get(rec, 'bg-muted-soft') }}"></span>{{ rec | rec }}</span>
+<span class="{{ {'direct': 'badge-approve', 'elective': 'badge-elective', 'insufficient': 'badge-elective', 'none': 'badge-reject'}.get(rec, 'badge') }}">{{ rec | rec }}</span>
+{%- endmacro %}
+
+{% macro conf_badge(conf) -%}
+<span class="{{ {'high': 'badge-approve', 'medium': 'badge-elective', 'low': 'badge-reject'}.get(conf, 'badge') }}">신뢰도 {{ conf | conf }}</span>
 {%- endmacro %}
 
 {% macro stage_bar(stages, current) -%}
 <ol class="flex items-center gap-1" aria-label="진행 단계">
   {% for s in stages %}
-  <li class="flex items-center gap-1 text-xs {{ 'font-semibold text-ink' if loop.index0 <= current else 'text-muted-soft' }}">
-    <span class="size-2 rounded-full {{ 'bg-rausch' if loop.index0 <= current else 'bg-hairline' }}"></span>{{ s }}
+  <li class="flex items-center gap-1 text-xs {{ 'font-semibold text-ink' if loop.index0 <= current else 'text-muted' }}">
+    <span class="size-2 rounded-full {{ 'bg-primary' if loop.index0 <= current else 'bg-hairline' }}"></span>{{ s }}
     {% if not loop.last %}<span class="mx-1 h-px w-3 bg-hairline"></span>{% endif %}
   </li>
   {% endfor %}
@@ -17,9 +22,9 @@
 {% if value %}<time datetime="{{ value | iso }}" data-format="{{ format }}">{{ value.strftime('%Y-%m-%d') }}</time>{% else %}–{% endif %}
 {%- endmacro %}
 
-
+{# 상단 검정 글로벌 내비게이션 링크 (12px) #}
 {% macro nav_link(href, label, exact=False) -%}
 {% set path = request.url.path %}
 {% set active = path == href or (not exact and path.startswith(href + '/')) %}
-<a href="{{ href }}" class="relative flex h-20 items-center font-semibold {{ 'text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-ink' if active else 'text-muted hover:text-ink' }}">{{ label }}</a>
+<a href="{{ href }}" class="flex h-11 items-center text-xs tracking-[-0.12px] {{ 'text-white' if active else 'text-white/70 hover:text-white' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
 {%- endmacro %}

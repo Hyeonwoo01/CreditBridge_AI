@@ -3,21 +3,21 @@
 {% block nav %}{% include "professor/_nav.html" %}{% endblock %}
 {% block content %}
 <header class="grid gap-2">
-  <h1 class="text-[28px] font-bold">배정된 심사 {{ items | length }}건</h1>
+  <h1 class="page-title">배정된 심사 {{ items | length }}건</h1>
   <p class="text-muted">근거 구절 비교부터 보고 판정할 수 있어요. 강의계획서 전체를 읽지 않아도 돼요.</p>
 </header>
 <section class="mt-6 grid gap-3">
   {% for it in items %}
-  <a href="/professor/evaluations/{{ it.evaluation.id }}" class="card grid gap-2 p-5 hover:shadow-card">
+  <a href="/professor/evaluations/{{ it.evaluation.id }}" class="card grid gap-2 p-5 hover:border-primary/40">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <span class="font-semibold">{{ it.syllabus.course_code }} {{ it.syllabus.course_title }}</span>
       <span class="flex items-center gap-2">{{ rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.coverage is not none and it.candidate and it.evaluation.recommendation != "insufficient" %}<strong class="tabular-nums" title="개념 커버리지">{{ it.evaluation.coverage | pct }}</strong>{% endif %}</span>
     </div>
-    {% if it.appeal %}<span class="w-fit badge text-error">이의 신청 재판정</span>{% endif %}
+    {% if it.appeal %}<span class="w-fit badge text-reject">이의 신청 재판정</span>{% endif %}
     <span class="text-sm text-muted">→ {{ it.candidate.code if it.candidate else '후보 없음' }} · 배정 {{ time(it.assignment.assigned_at, "date") }}{% if it.delegated_from %} · {{ it.delegated_from.name }} 교수 부재로 대리 배정{% endif %}</span>
   </a>
   {% else %}
-  <p class="rounded-md bg-surface-soft p-6 text-center text-muted">배정된 심사가 없어요.</p>
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">배정된 심사가 없어요.</p>
   {% endfor %}
 </section>
 

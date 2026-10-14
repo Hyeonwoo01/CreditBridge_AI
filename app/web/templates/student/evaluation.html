@@ -6,11 +6,11 @@
 {% include "partials/evaluation.html" %}
 
 {% if not v.decision and v.syllabus.status == 'ready' and (v.open_materials or (v.request.status == 'draft' and v.evaluation.recommendation in ('insufficient', 'elective', 'none'))) %}
-<form method="post" action="/student/syllabi/{{ v.syllabus.id }}/supplement" enctype="multipart/form-data" class="mt-8 grid gap-3 rounded-md border-[1.5px] border-dashed p-5 {{ 'border-amber' if v.open_materials else 'border-border-strong' }}">
+<form method="post" action="/student/syllabi/{{ v.syllabus.id }}/supplement" enctype="multipart/form-data" class="mt-8 grid gap-3 dropzone {{ 'border-elective/40' if v.open_materials else 'border-muted' }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <span class="font-semibold">{{ '요청받은 보완 자료 제출' if v.open_materials else '보완 자료 올리고 다시 분석' }}</span>
   <span class="text-sm text-muted">{% if v.open_materials %}학사처·교수가 요청한 자료를 올리면 원문에 덧붙여 다시 분석하고, 심사는 같은 교수에게 이어져요.{% else %}주차별 상세 계획, 교재 목차, 시험지 등을 올리면 원문에 덧붙여 다시 분석해요.{% endif %} 이전 결과는 기록으로 남아요.</span>
-  <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-surface-strong file:px-4 file:py-2 file:font-medium">
+  <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-parchment file:text-primary file:px-4 file:py-2 file:font-normal">
   <button class="btn-secondary w-fit">보완 자료 제출</button>
 </form>
 {% endif %}
@@ -29,9 +29,9 @@
 
 {% if v.previous %}
 <section class="mt-10 grid gap-2">
-  <h2 class="text-xl font-semibold tracking-[-0.18px]">이전 분석 기록</h2>
+  <h2 class="section-title">이전 분석 기록</h2>
   {% for p in v.previous %}
-  <a class="flex items-center justify-between rounded-sm bg-surface-soft px-4 py-3 text-sm" href="/student/evaluations/{{ p.id }}"><span>{{ time(p.created_at) }}</span><span class="flex items-center gap-2">{{ rec_badge(p.recommendation) }}{% if p.coverage is not none %}커버리지 {{ p.coverage | pct }}{% endif %}</span></a>
+  <a class="flex items-center justify-between rounded-sm bg-parchment px-4 py-3 text-sm" href="/student/evaluations/{{ p.id }}"><span>{{ time(p.created_at) }}</span><span class="flex items-center gap-2">{{ rec_badge(p.recommendation) }}{% if p.coverage is not none %}커버리지 {{ p.coverage | pct }}{% endif %}</span></a>
   {% endfor %}
 </section>
 {% endif %}
