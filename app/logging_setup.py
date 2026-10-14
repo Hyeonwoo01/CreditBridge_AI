@@ -22,9 +22,22 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
+class DropQueryString(logging.Filter):
+    """uvicorn 접근 로그에서 쿼리 문자열을 지운다. 심사 큐 검색어(?q=)에 학생 이름이 들어갈 수 있다."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+        return True
+
+
 def configure_logging(level: int = logging.INFO) -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter())
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level)
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, DropQueryString) for f in access.filters):
+        access.addFilter(DropQueryString())

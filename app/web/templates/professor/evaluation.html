@@ -68,7 +68,7 @@
       </fieldset>
       <label class="field" data-reasons>
         <span class="flex justify-between gap-2"><span>소명 메모 ('기타'를 고르면 필수)</span><span class="tabular-nums text-muted"><span data-memo-count>{{ f.get('reason_memo', '') | length }}</span>/500</span></span>
-        <textarea class="textarea" name="reason_memo" rows="3" maxlength="500" data-memo placeholder="판정 근거를 학사처와 학생이 이해할 수 있게 적어 주세요.">{{ f.get('reason_memo', '') }}</textarea>
+        <textarea class="textarea" name="reason_memo" rows="3" maxlength="500" data-memo placeholder="판정 근거를 학사처와 학생이 이해할 수 있게 적어 주세요. 이름·학번·성적은 적지 마세요.">{{ f.get('reason_memo', '') }}</textarea>
       </label>
     </div>
     <div class="flex flex-wrap items-center justify-end gap-2 border-t border-divider bg-pearl px-6 py-4">
