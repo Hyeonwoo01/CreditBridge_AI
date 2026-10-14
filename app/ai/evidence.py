@@ -18,8 +18,12 @@ _EQUIV = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "
 _KEEP = set("%#&@")
 _ELLIPSIS = re.compile(r"\s*(?:\.{3,}|…)\s*")
 MIN_CHARS = 4
-# 생략 인용의 앞뒤 조각이 이 거리 안에 있어야 한 구절로 본다
-MAX_ELLIPSIS_GAP = 300
+# 생략 인용("A ... B")의 조각마다 이 글자 수 이상이어야 한다. "이수 ... 인정"처럼 짧은 조각은
+# 원문 아무 데서나 맞아 여러 주차를 하나의 근거로 묶어 버린다
+MIN_ELLIPSIS_PART = 8
+# 앞뒤 조각 사이 거리(비교용 글자 수)와 근거 구간 전체 길이(원문 글자 수) 상한
+MAX_ELLIPSIS_GAP = 200
+MAX_ELLIPSIS_SPAN = 400
 
 
 @dataclass(frozen=True)
@@ -75,7 +79,9 @@ def locate(text: str, quote: str) -> Span | None:
     parts = [p for p in _ELLIPSIS.split(quote.strip()) if p.strip()]
     needles = [_normalize_with_map(p)[0] for p in parts]
     needles = [n for n in needles if n]
-    if not needles or sum(len(n) for n in needles) < MIN_CHARS or any(len(n) < MIN_CHARS for n in needles[1:-1]):
+    if not needles or len("".join(needles)) < MIN_CHARS:
+        return None
+    if len(needles) > 1 and any(len(n) < MIN_ELLIPSIS_PART for n in needles):
         return None
     haystack, index = _normalize_with_map(text)
     first = _find(haystack, needles[0])
@@ -87,7 +93,9 @@ def locate(text: str, quote: str) -> Span | None:
                 break
             end = nxt + len(needle)
         else:
-            return Span(start=index[first], end=index[end - 1] + 1)
+            span = Span(start=index[first], end=index[end - 1] + 1)
+            if len(needles) == 1 or span.end - span.start <= MAX_ELLIPSIS_SPAN:
+                return span
         first = _find(haystack, needles[0], first + 1)
     return None
 

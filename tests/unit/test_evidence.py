@@ -58,3 +58,10 @@ def test_wrapping_quotes_and_korean_particles() -> None:
     span = locate(text, "미분법과 적분법")  # 뒤에 조사가 붙은 원문에서도 원문 위치를 찾는다
     assert span is not None and text[span.start : span.end] == "미분법과 적분법"
     assert locate(text, "미분법과 적분법 정리") is None  # 단어가 빠지면 버린다
+
+
+def test_ellipsis_with_short_or_distant_parts_is_rejected() -> None:
+    weeks = "1주차: 이수 학점 안내와 강의 소개\n2주차: 미분\n3주차: 적분\n4주차: 학점 인정 기준"
+    assert locate(weeks, "이수 ... 인정") is None  # 조각이 너무 짧아 여러 주차를 묶어 버린다
+    far = "Week 1: Limits and continuity. " + "Filler topic text. " * 30 + "Week 15: Final exam review."
+    assert locate(far, "Limits and continuity ... Final exam review") is None  # 조각 사이가 너무 멀다
