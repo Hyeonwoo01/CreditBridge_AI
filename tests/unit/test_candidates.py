@@ -38,3 +38,12 @@ def test_select_filters_by_department_in_discipline_order() -> None:
 def test_select_caps_candidates() -> None:
     many = [C(f"MATH {i}", "Mathematics") for i in range(50)]
     assert len(select(many, ["Mathematics"])) == MAX_CANDIDATES == 30
+
+
+def test_korean_discipline_names_match_english_departments() -> None:
+    assert matches("수학", "Mathematics")
+    assert matches("컴퓨터공학", "Computer Science and Engineering")
+    assert matches("물리학과", "Physics")
+    assert matches("한국사", "History")
+    assert not matches("수학", "Physics")
+    assert [c.code for c in select(CATALOG, ["물리학"])] == ["PHYSICS 1250"]

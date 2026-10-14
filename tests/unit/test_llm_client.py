@@ -69,3 +69,29 @@ def test_strict_schema_keeps_property_named_title() -> None:
     line = schema["$defs"]["TranscriptLine"]
     assert "title" in line["properties"] and "title" in line["required"]
     assert "title" not in line  # 스키마 메타데이터 title은 제거
+
+
+def test_stripped_constraints_are_written_into_description() -> None:
+    from app.schemas.evaluation import ConceptJudgment
+
+    coverage = strict_schema(ConceptJudgment)["properties"]["coverage"]
+    assert "minimum" not in coverage and "maximum" not in coverage  # 구조화 출력이 지원하지 않는 키워드
+    assert coverage["description"].endswith("(minimum 0, maximum 100)")
+
+
+def test_out_of_range_value_is_still_rejected_by_pydantic() -> None:
+    from pydantic import Field
+
+    class Score(BaseModel):
+        value: int = Field(ge=0, le=100)
+
+    llm, messages = client_with([("end_turn", '{"value": 150}'), ("end_turn", '{"value": 90}')])
+    assert llm.parse("hi", Score).output.value == 90 and len(messages.calls) == 2
+
+
+def test_server_fallback_can_be_turned_off() -> None:
+    messages = FakeMessages([("end_turn", '{"answer": "ok"}')])
+    fake = SimpleNamespace(beta=SimpleNamespace(messages=messages))
+    settings = Settings(claude_model="m", claude_server_fallback=False)
+    LLMClient(settings, client=fake).parse("hi", Out)  # type: ignore[arg-type]
+    assert "betas" not in messages.calls[0] and "fallbacks" not in messages.calls[0]

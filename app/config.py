@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     claude_model: str = ""
+    # 정책 거절 시 서버가 다른 모델로 다시 시도 (Claude API 전용). Bedrock·Vertex·프록시를 쓰면 false
+    claude_server_fallback: bool = True
 
     session_secret: str = "change-me"
     celery_task_always_eager: bool = False

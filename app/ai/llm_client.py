@@ -17,9 +17,22 @@ logger = logging.getLogger(__name__)
 
 Effort = Literal["low", "medium", "high"]
 
-# 정책 거절 시 서버가 적합한 모델로 다시 시도한다 (모델 목록을 직접 관리하지 않음)
+# 정책 거절 시 서버가 적합한 모델로 다시 시도한다 (모델 목록을 직접 관리하지 않음).
+# 이 헤더는 `fallbacks: "default"` 요청 형태와 한 쌍이라 따로 바꾸면 400이 난다. 켜고 끄기만 Settings로 한다.
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-_UNSUPPORTED_SCHEMA_KEYS = {"title", "default", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"}
+# 구조화 출력이 지원하지 않는 키워드. 보내기 전에 지우고, 응답은 원래 Pydantic 모델로 다시 검증한다.
+_METADATA_KEYS = {"title", "default"}
+_CONSTRAINT_KEYS = {
+    "minimum": "minimum",
+    "maximum": "maximum",
+    "exclusiveMinimum": "greater than",
+    "exclusiveMaximum": "less than",
+    "multipleOf": "multiple of",
+    "minLength": "min length",
+    "maxLength": "max length",
+    "minItems": "min items",
+    "maxItems": "max items",
+}
 
 
 @dataclass(frozen=True)
@@ -29,7 +42,11 @@ class LLMResult[T: BaseModel]:
 
 
 def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
-    """Pydantic 스키마를 구조화 출력용으로 정리: 모든 객체에 additionalProperties=false, 전 필드 required."""
+    """Pydantic 스키마를 구조화 출력용으로 정리: 모든 객체에 additionalProperties=false, 전 필드 required.
+
+    지원하지 않는 수치·길이 제약은 지우는 대신 description 끝에 적어 모델이 범위를 알게 한다.
+    지운 제약은 응답을 받은 뒤 원래 Pydantic 모델의 검증(실패 시 1회 재시도)이 그대로 강제한다.
+    """
 
     def walk(node: Any) -> Any:
         if isinstance(node, list):
@@ -41,8 +58,12 @@ def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
             if key in ("properties", "$defs"):
                 # 필드 이름·정의 이름은 그대로 두고 그 안의 스키마만 정리한다
                 out[key] = {name: walk(sub) for name, sub in value.items()}
-            elif key not in _UNSUPPORTED_SCHEMA_KEYS:
+            elif key not in _METADATA_KEYS and key not in _CONSTRAINT_KEYS:
                 out[key] = walk(value)
+        limits = [f"{label} {node[key]}" for key, label in _CONSTRAINT_KEYS.items() if key in node]
+        if limits:
+            note = f"({', '.join(limits)})"
+            out["description"] = f"{out['description']} {note}" if out.get("description") else note
         if out.get("type") == "object" and "properties" in out:
             out["additionalProperties"] = False
             out["required"] = list(out["properties"].keys())
@@ -57,6 +78,8 @@ class LLMClient:
         if not settings.claude_model:
             raise ConfigurationError("CLAUDE_MODEL is not set")
         self._model = settings.claude_model
+        # 서버 측 대체 모델은 Claude API에서만 쓸 수 있다. 다른 플랫폼이나 프록시를 거치면 끈다
+        self._fallback = settings.claude_server_fallback
         self._client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key or None, max_retries=3)
 
     @property
@@ -89,11 +112,12 @@ class LLMClient:
                 params: dict[str, Any] = {
                     "model": self._model,
                     "max_tokens": max_tokens,
-                    "betas": [FALLBACK_BETA],
-                    "fallbacks": "default",
                     "output_config": {"effort": effort, "format": {"type": "json_schema", "schema": schema}},
                     "messages": [{"role": "user", "content": content}],
                 }
+                if self._fallback:
+                    params["betas"] = [FALLBACK_BETA]
+                    params["fallbacks"] = "default"
                 response = self._client.beta.messages.create(**params)
             except anthropic.APIError as exc:
                 raise LLMError(f"Claude API error: {type(exc).__name__}") from exc

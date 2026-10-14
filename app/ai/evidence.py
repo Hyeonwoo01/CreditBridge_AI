@@ -1,11 +1,25 @@
-"""근거 구절 원문 검증. 원문에 실제로 있는 문자열만 근거로 저장한다 (FR-06, 근거 환각 0건)."""
+"""근거 구절 원문 검증. 원문에 실제로 있는 문자열만 근거로 저장한다 (FR-06, 근거 환각 0건).
+
+LLM이 인용할 때 흔히 생기는 표기 차이만 허용한다: 공백·줄바꿈, 대소문자, 따옴표·대시 모양, 문장부호,
+그리고 중간을 "..."로 줄인 인용. 단어가 하나라도 다르면(바꿔 말하기, 조사 변경, 지어낸 문장) 버린다.
+저장하는 위치는 언제나 원문 기준이라 화면에 보이는 근거는 원문 문자열 그대로다.
+편집 거리 기반 유사 일치는 쓰지 않는다: "covered"와 "not covered"처럼 뜻이 반대인 인용을 받아들일 수 있다.
+"""
 
 import logging
+import re
+import unicodedata
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 _EQUIV = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", " ": " "})
+# 문장부호지만 뜻이 있는 기호는 그대로 비교한다 (40%, C#, R&D, @)
+_KEEP = set("%#&@")
+_ELLIPSIS = re.compile(r"\s*(?:\.{3,}|…)\s*")
+MIN_CHARS = 4
+# 생략 인용의 앞뒤 조각이 이 거리 안에 있어야 한 구절로 본다
+MAX_ELLIPSIS_GAP = 300
 
 
 @dataclass(frozen=True)
@@ -14,35 +28,68 @@ class Span:
     end: int
 
 
+def _fold(ch: str) -> str:
+    """비교용 한 글자: 문장부호는 공백, 영문은 소문자 (원문 위치 표를 유지하려고 한 글자는 한 글자로)."""
+    if ch.isspace() or (unicodedata.category(ch).startswith("P") and ch not in _KEEP and ch != "'"):
+        return " "
+    lowered = ch.lower()
+    return lowered if len(lowered) == 1 else ch
+
+
 def _normalize_with_map(text: str) -> tuple[str, list[int]]:
-    """공백 연속을 한 칸으로 줄이고 따옴표·대시 표기를 통일한다. 정규화 위치 → 원문 위치 표를 함께 만든다."""
+    """비교용 문자열과 (비교용 위치 → 원문 위치) 표. 공백 연속은 한 칸으로 줄인다."""
     chars: list[str] = []
     index: list[int] = []
-    prev_space = False
-    for i, ch in enumerate(text.translate(_EQUIV)):
-        if ch.isspace():
-            if prev_space or not chars:
-                continue
-            chars.append(" ")
-            index.append(i)
-            prev_space = True
-        else:
-            chars.append(ch)
-            index.append(i)
-            prev_space = False
+    for i, raw in enumerate(text.translate(_EQUIV)):
+        ch = _fold(raw)
+        if ch == " " and (not chars or chars[-1] == " "):
+            continue
+        chars.append(ch)
+        index.append(i)
+    while chars and chars[-1] == " ":
+        chars.pop()
+        index.pop()
     return "".join(chars), index
 
 
+def _word_char(ch: str) -> bool:
+    # 영문·숫자만 단어 경계를 본다. 한국어는 조사가 붙어 쓰이므로("미분과") 경계를 따지지 않는다
+    return ch.isascii() and ch.isalnum()
+
+
+def _find(haystack: str, needle: str, start: int = 0) -> int:
+    """영문 단어 중간에서 시작하거나 끝나는 일치는 받지 않는다 ("rule"이 "rules"의 앞부분과 맞는 경우)."""
+    pos = haystack.find(needle, start)
+    while pos >= 0:
+        before = haystack[pos - 1] if pos > 0 else " "
+        end = pos + len(needle)
+        after = haystack[end] if end < len(haystack) else " "
+        if not (_word_char(before) and _word_char(needle[0])) and not (_word_char(after) and _word_char(needle[-1])):
+            return pos
+        pos = haystack.find(needle, pos + 1)
+    return -1
+
+
 def locate(text: str, quote: str) -> Span | None:
-    """quote가 text에 (공백·따옴표 표기 차이만 허용하고) 그대로 있으면 원문 위치를 돌려준다."""
-    needle, _ = _normalize_with_map(quote.strip())
-    if len(needle) < 4:
+    """quote가 text에 (표기 차이만 허용하고) 그대로 있으면 원문 위치를 돌려준다."""
+    parts = [p for p in _ELLIPSIS.split(quote.strip()) if p.strip()]
+    needles = [_normalize_with_map(p)[0] for p in parts]
+    needles = [n for n in needles if n]
+    if not needles or sum(len(n) for n in needles) < MIN_CHARS or any(len(n) < MIN_CHARS for n in needles[1:-1]):
         return None
     haystack, index = _normalize_with_map(text)
-    pos = haystack.find(needle)
-    if pos < 0:
-        return None
-    return Span(start=index[pos], end=index[pos + len(needle) - 1] + 1)
+    first = _find(haystack, needles[0])
+    while first >= 0:
+        end = first + len(needles[0])
+        for needle in needles[1:]:
+            nxt = _find(haystack, needle, end)
+            if nxt < 0 or nxt - end > MAX_ELLIPSIS_GAP:
+                break
+            end = nxt + len(needle)
+        else:
+            return Span(start=index[first], end=index[end - 1] + 1)
+        first = _find(haystack, needles[0], first + 1)
+    return None
 
 
 def verify_quotes(text: str, quotes: list[str], *, context: str) -> list[Span]:

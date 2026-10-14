@@ -17,6 +17,29 @@ _SYNONYMS = {
     "writing": "english",
     "composition": "english",
 }
+# 추출 프롬프트는 분야를 영어로 쓰게 하지만, 한국어로 돌아와도 후보를 찾도록 흔한 학과명을 옮긴다
+_KOREAN = {
+    "수학": "mathematics",
+    "응용수학": "mathematics",
+    "통계": "statistics",
+    "컴퓨터": "computer science",
+    "컴퓨터공학": "computer science",
+    "컴퓨터과학": "computer science",
+    "전산": "computer science",
+    "소프트웨어": "computer science",
+    "물리": "physics",
+    "화학": "chemistry",
+    "생물": "biology",
+    "생명과학": "biology",
+    "역사": "history",
+    "사학": "history",
+    "한국사": "korean history",
+    "영어": "english",
+    "영문": "english",
+    "글쓰기": "english",
+    "경영": "business",
+    "경제": "economics",
+}
 
 
 class CourseLike(Protocol):
@@ -24,10 +47,18 @@ class CourseLike(Protocol):
     code: str
 
 
+def _korean(word: str) -> str:
+    """'물리학과'·'수학과'처럼 학과 접미사가 붙어도 같은 분야로 옮긴다. 모르는 낱말은 그대로 둔다."""
+    for stem in (word, word.removesuffix("학과"), word.removesuffix("과"), word.removesuffix("학")):
+        if stem in _KOREAN:
+            return _KOREAN[stem]
+    return word
+
+
 def _tokens(name: str) -> set[str]:
     text = name.lower()
-    words = re.findall(r"[a-z]+", text)
-    expanded = " ".join(_SYNONYMS.get(w, w) for w in words)
+    words = [_korean(w) if not w.isascii() else w for w in re.findall(r"[a-z]+|[가-힣]+", text)]
+    expanded = " ".join(_SYNONYMS.get(w, w) for w in " ".join(words).split())
     return {w for w in expanded.split() if w not in _STOP}
 
 
