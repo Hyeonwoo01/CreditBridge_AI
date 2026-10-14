@@ -644,7 +644,7 @@ Apple이 제품을 돋보이게 하기 위해 여백을 좌대(Pedestal)로 삼�
 
 **`upload-dropzone-card`** — F-01 국·영문 디지털/스캔 PDF 강의계획서 업로드 영역. 배경 `{colors.canvas-parchment}`, 테두리 `1px dashed {colors.ink-muted-48}` (드래그 오버 시 `2px solid {colors.primary-focus}`), 모서리 `{rounded.lg}` (18px), 패딩 `48px`. 중앙 정렬된 문서 아이콘, 안내 타이틀(`{typography.tagline}`), 지원 규격 안내(`"디지털 또는 스캔 PDF · 한국어/영어 자동 인식(OCR) · 별도 번역 불필요"`), 그리고 `{component.button-primary}` ("파일 선택")으로 구성됩니다.
 
-**`selection-bar-dark`** (v1.1.0) — 심사 큐에서 행을 하나 이상 고르면 화면 아래(`bottom: 16px`)에 떠오르는 다크 바. 배경 `{colors.surface-tile-1}`, `{rounded.lg}`, 패딩 `12px 20px`, 그림자 없음. 왼쪽에 `{colors.primary-on-dark}` 점 + `N건 선택됨` + 설명(muted), 오른쪽에 `{component.button-primary}`("담당 교수 일괄 배정")와 선택 해제 텍스트 버튼. 선택이 0건이면 숨깁니다.
+**`selection-bar-dark`** (v1.1.0) — 심사 큐에서 행을 하나 이상 고르면 화면 아래(`bottom: 16px`)에 떠오르는 다크 바. 배경 `{colors.surface-tile-1}`, `{rounded.lg}`, 패딩 `12px 20px`, 그림자 없음. 왼쪽에 `{colors.primary-on-dark}` 점 + `N건 선택됨` + 설명(muted), 오른쪽에 `{component.button-primary}`("담당 교수 일괄 배정")와 흰 30% 테두리의 "CSV 내보내기" 보조 버튼. 선택이 0건이면 숨깁니다.
 
 **`floating-sticky-bar`** — 교수 심사 화면 및 모바일 승인 뷰(F-07)에서 화면 하단에 고정되는 프로스티드 액션 바. 배경 `{colors.canvas-parchment}` (80% 투명도 + `backdrop-filter: saturate(180%) blur(20px)`), 상단 `1px solid {colors.hairline}`, 높이 `64px`, 패딩 `12px 32px`. 바의 배경은 화면 전체 폭이고, 안쪽 내용은 본문과 같은 `max-w-[1440px]` + 좌우 `40px` 패딩으로 정렬합니다.
 - 좌측: 현재 검토 중인 과목 매칭 요약(예: `"타교 Data Structures (3학점) → 본교 자료구조 (3학점) · 개념 커버리지 86%"`) 및 과거 유사 판정 충돌 시 F-08 경고 배지 표시.

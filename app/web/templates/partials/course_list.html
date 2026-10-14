@@ -28,7 +28,7 @@
       {% if cov is not none %}
       <div class="grid justify-items-end gap-1 text-right">
         <span class="text-xs text-muted">개념 커버리지</span>
-        <strong class="font-display text-[28px] leading-none tabular-nums {{ 'text-approve' if cov >= 0.75 else ('text-elective' if cov >= 0.5 else 'text-reject') }}">{{ cov | pct }}</strong>
+        <strong class="font-display text-[28px] leading-none tabular-nums {{ 'text-approve' if cov >= 0.75 else ('text-elective' if cov >= 0.4 else 'text-reject') }}">{{ cov | pct }}</strong>
       </div>
       {% endif %}
     </div>
