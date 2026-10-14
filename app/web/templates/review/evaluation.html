@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import time %}
 {% block nav %}{% include "review/_nav.html" %}{% endblock %}
+{# 정보가 빽빽한 화면은 넓은 작업 폭(docs/DESIGN.md: 워크스페이스 확장형) #}
+{% block width %}max-w-[1440px]{% endblock %}
 {% block content %}
 <p class="mb-4 text-sm text-muted"><a class="underline" href="/review">← 심사 큐</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">판정 근거 리포트</a></p>
 {% include "partials/evaluation.html" %}

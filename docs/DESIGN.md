@@ -417,7 +417,7 @@ components:
 
 랜딩 및 학생 사전 시뮬레이션 화면(F-09)은 Apple 특유의 라이트/다크 풀블리드 타일 교차 리듬을 활용하여 예상 인정 학점, 잔여 학기, 예상 추가 비용을 직관적인 대형 타이포그래피로 전달합니다. 반면 심사관 큐(F-07)와 교수용 원문 대조 심사 화면(F-04)은 Apple 스토어 컨피규레이터의 정교한 유틸리티 그리드(`{rounded.lg}` 18px 라운드 + `1px` 헤어라인 보더)와 기관·업무 맥락을 보여주는 흰색 보조 바(`{component.workspace-sub-bar}`), 하단 고정 판정 바(`{component.floating-sticky-bar}`)를 결합해 고밀도 심사 업무에서도 시각적 피로도를 최소화합니다.
 
-> **v1.1.0 변경 (화면 목업 반영):** 심사 큐, 학생 시뮬레이션 리포트, 관리자 콘솔, 불인정 사유 선택 창을 목업에 맞춰 개편하면서 아래 컴포넌트가 추가·변경되었습니다. 풀블리드 다크 타일 → 라운드 카드형 다크 히어로(`{component.summary-hero-card-dark}`), 프로스티드 서브 내비 → 흰색 기관 보조 바(`{component.workspace-sub-bar}`) + 집계 칩(`{component.count-chip}`), 필터 칩 선택 상태 → 잉크 채움(`{component.filter-chip-selected}`), 커버리지 원형 게이지(`{component.coverage-ring}`), 진행 단계(`{component.progress-stepper}`), 하단 다크 선택 바(`{component.selection-bar-dark}`), 사유 선택 모달(`{component.reason-dialog}`). 최대 폭은 `1280px`로 통일했습니다.
+> **v1.1.0 변경 (화면 목업 반영):** 심사 큐, 학생 시뮬레이션 리포트, 관리자 콘솔, 불인정 사유 선택 창을 목업에 맞춰 개편하면서 아래 컴포넌트가 추가·변경되었습니다. 풀블리드 다크 타일 → 라운드 카드형 다크 히어로(`{component.summary-hero-card-dark}`), 프로스티드 서브 내비 → 흰색 기관 보조 바(`{component.workspace-sub-bar}`) + 집계 칩(`{component.count-chip}`), 필터 칩 선택 상태 → 잉크 채움(`{component.filter-chip-selected}`), 커버리지 원형 게이지(`{component.coverage-ring}`), 진행 단계(`{component.progress-stepper}`), 하단 다크 선택 바(`{component.selection-bar-dark}`), 사유 선택 모달(`{component.reason-dialog}`). 최대 폭은 기본 `1280px`, 심사 큐와 원문 대조 화면만 `1440px`로 정했습니다.
 
 **Key Characteristics:**
 - **근거 중심(Evidence-First) 프레젠테이션:** UI 크롬이 뒤로 물러나고 강의계획서(Syllabus) 원문 인용구와 본교 과목 편람(Catalog) 대조 뷰가 화면의 중심을 차지함.
@@ -527,8 +527,9 @@ CreditBridge_AI는 한국어와 영어 강의계획서를 별도 번역 없이 �
 
 ### Grid & Container
 - **최대 컨테이너 폭(Max content width):**
-  - **집중형 단일 컬럼 (`max-w-[980px]`):** 편입생 강의계획서 PDF 업로드(F-01), 부족 정보 진단 및 보완 서류 제출 가이드(F-06), 이의신청 작성 화면, 심사 결과 단건 상세 리포트.
-  - **워크스페이스 확장형 (`max-w-[1280px]`, 좌우 패딩 모바일 16px / 데스크톱 40px):** 학과 교수용 **좌우 1:1 원문 대조 심사 뷰(F-04)**, 심사관 대기열 큐 및 교수 배정 보드(F-07), 편입생 입학 전 시뮬레이션 대시보드(F-09), 기관 관리자 통계/감사로그 뷰.
+  - **기본 (`max-w-[1280px]`, 좌우 패딩 모바일 16px / 데스크톱 40px → 본문 1200px):** 편입생 시뮬레이션 리포트(F-09)·과목 상세·보완 서류 제출(F-06)·이의 신청, 관리자 콘솔·감사 로그, 알림 등 나머지 모든 화면. 17px 한글 본문의 한 줄 길이와 카드 비율을 지키기 위한 폭입니다.
+  - **워크스페이스 확장형 (`max-w-[1440px]` → 본문 1360px):** 정보가 빽빽한 **심사관 대기열 큐(F-07, 10열 표)**와 **원문 대조 심사 화면(F-04, 교수·심사관 공통)**만 씁니다. 표의 줄바꿈과 좌우 비교 칸의 문장 꺾임을 줄이기 위한 폭입니다.
+  - **구현:** `base.html`의 `{% block width %}`가 기본값 `max-w-[1280px]`이며, 상단 내비게이션·기관 보조 바·본문·푸터가 `self.width()`로 같은 폭을 공유해 좌우 정렬이 맞습니다. 확장형 화면은 템플릿에서 `{% block width %}max-w-[1440px]{% endblock %}`로 덮어씁니다. 화면 아래에 고정되는 바(`{component.floating-sticky-bar}`, `{component.selection-bar-dark}`)도 그 화면의 본문 폭에 맞춥니다.
   - **풀블리드 (`100%`):** 최상단 글로벌 내비게이션, 기관 보조 바, 푸터. 시뮬레이션 히어로는 컨테이너 안의 라운드 카드로 둡니다.
   - **학생 리포트 (2-Column `1fr : 320px`):** 왼쪽에 필터 칩과 과목 카드 목록, 오른쪽에 심사 진행 단계·계산 조건 카드(데스크톱에서 sticky). 모바일에서는 오른쪽 열이 목록 아래로 내려갑니다.
 - **핵심 컬럼 패턴:**
@@ -645,7 +646,7 @@ Apple이 제품을 돋보이게 하기 위해 여백을 좌대(Pedestal)로 삼�
 
 **`selection-bar-dark`** (v1.1.0) — 심사 큐에서 행을 하나 이상 고르면 화면 아래(`bottom: 16px`)에 떠오르는 다크 바. 배경 `{colors.surface-tile-1}`, `{rounded.lg}`, 패딩 `12px 20px`, 그림자 없음. 왼쪽에 `{colors.primary-on-dark}` 점 + `N건 선택됨` + 설명(muted), 오른쪽에 `{component.button-primary}`("담당 교수 일괄 배정")와 선택 해제 텍스트 버튼. 선택이 0건이면 숨깁니다.
 
-**`floating-sticky-bar`** — 교수 심사 화면 및 모바일 승인 뷰(F-07)에서 화면 하단에 고정되는 프로스티드 액션 바. 배경 `{colors.canvas-parchment}` (80% 투명도 + `backdrop-filter: saturate(180%) blur(20px)`), 상단 `1px solid {colors.hairline}`, 높이 `64px`, 패딩 `12px 32px`.
+**`floating-sticky-bar`** — 교수 심사 화면 및 모바일 승인 뷰(F-07)에서 화면 하단에 고정되는 프로스티드 액션 바. 배경 `{colors.canvas-parchment}` (80% 투명도 + `backdrop-filter: saturate(180%) blur(20px)`), 상단 `1px solid {colors.hairline}`, 높이 `64px`, 패딩 `12px 32px`. 바의 배경은 화면 전체 폭이고, 안쪽 내용은 본문과 같은 `max-w-[1440px]` + 좌우 `40px` 패딩으로 정렬합니다.
 - 좌측: 현재 검토 중인 과목 매칭 요약(예: `"타교 Data Structures (3학점) → 본교 자료구조 (3학점) · 개념 커버리지 86%"`) 및 과거 유사 판정 충돌 시 F-08 경고 배지 표시.
 - 우측: `{component.button-secondary-pill}` ("보완 자료 요청") + `{component.button-primary}` ("최종 판정 확정").
 
@@ -695,8 +696,8 @@ Apple이 제품을 돋보이게 하기 위해 여백을 좌대(Pedestal)로 삼�
 | Tablet portrait | 736–833px | 글로벌 내비게이션이 햄버거 메뉴로 접힘; 서브 내비게이션의 세부 필터 칩이 드롭다운으로 수납 |
 | Tablet landscape | 834–1023px | 글로벌 내비게이션 전체 노출 복귀; 좌우 1:1 원문 대조 Split-View 활성화 시작; 3열 유틸리티 그리드는 2열로 배치 |
 | Small desktop | 1024–1068px | 교수 심사 Split-View(좌우 패널) 및 심사관 큐 테이블 전체 컬럼 표시; 타이틀 40px 유지 |
-| Desktop | 1069–1280px | 기본 표준 워크스페이스 레이아웃; 3~4열 시뮬레이션/관리자 KPI 그리드; 최대 폭 `1280px` |
-| Wide desktop | ≥ 1281px | 콘텐츠 최대 폭을 `1280px`로 고정하고 남는 폭은 좌우 여백으로 흡수 |
+| Desktop | 1069–1440px | 기본 표준 워크스페이스 레이아웃; 3~4열 시뮬레이션/관리자 KPI 그리드; 기본 화면은 `1280px`에서 멈추고 심사 큐·원문 대조 화면은 `1440px`까지 넓어짐 |
+| Wide desktop | ≥ 1441px | 콘텐츠 최대 폭(기본 `1280px`, 확장형 `1440px`)을 고정하고 남는 폭은 좌우 여백으로 흡수 |
 
 ### Touch Targets
 - 모바일에서도 학과 교수가 즉시 승인·반려·보완요청(F-07 모바일 승인 지원)을 처리할 수 있도록 모든 터치 타겟은 최소 **`44 × 44px`** 이상을 보장합니다.

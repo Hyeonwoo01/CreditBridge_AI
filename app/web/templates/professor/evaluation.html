@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block nav %}{% include "professor/_nav.html" %}{% endblock %}
+{# 정보가 빽빽한 화면은 넓은 작업 폭(docs/DESIGN.md: 워크스페이스 확장형) #}
+{% block width %}max-w-[1440px]{% endblock %}
 {% block content %}
 <p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">← 배정된 심사</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">판정 근거 리포트</a>{% if not v.decision or v.awaiting_redecision %} · <a class="font-semibold text-primary underline" href="#decision">{{ '재판정하기' if v.decision else '판정하기' }} ↓</a>{% endif %}</p>
 {% include "partials/evaluation.html" %}
@@ -79,7 +81,7 @@
 {# 하단 고정 판정 바: 스크롤 중에도 과목 요약과 판정 액션을 유지한다 #}
 <div class="h-24" aria-hidden="true"></div>
 <div class="sticky-bar fixed inset-x-0 bottom-0 z-20 border-t border-hairline pb-[env(safe-area-inset-bottom,0px)]">
-  <div class="mx-auto flex min-h-16 max-w-[1080px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 md:px-10">
+  <div class="mx-auto flex min-h-16 max-w-[1440px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 md:px-10">
     <p class="min-w-0 text-sm text-ink-80">
       <span class="font-semibold text-ink">{{ v.syllabus.course_code or v.syllabus.course_title }}</span>
       → {{ v.candidate.code if v.candidate else '후보 없음' }}{% if v.evaluation.coverage is not none and v.candidate and v.evaluation.recommendation != 'insufficient' %} · 커버리지 <span class="tabular-nums">{{ v.evaluation.coverage | pct }}</span>{% endif %}
