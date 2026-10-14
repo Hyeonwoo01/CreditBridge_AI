@@ -6,4 +6,4 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-group dev
 COPY . .
 EXPOSE 8000
-CMD ["uv", "run", "--no-group", "dev", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "scripts/start.sh"]

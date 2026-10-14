@@ -23,6 +23,27 @@
 
 ## 실행
 
+### 가장 쉬운 방법: Docker로 한 번에 (내 컴퓨터에서만 접속)
+
+사전 설치: [Docker Desktop](https://www.docker.com/products/docker-desktop/), Git
+
+```bash
+git clone https://github.com/Hyeonwoo01/CreditBridge_AI.git
+cd CreditBridge_AI
+git checkout claude/beautiful-meitner-sc4px1
+cp .env.example .env                      # Windows PowerShell: copy .env.example .env
+# .env를 열어 ANTHROPIC_API_KEY에 Claude API 키를 넣는다 (없으면 화면은 열리지만 AI 분석이 실패함)
+docker compose --profile app up -d --build
+```
+
+처음에는 이미지 내려받기와 빌드에 몇 분 걸립니다. 웹 컨테이너가 시작하면서 DB 테이블, 문서 버킷, 데모 계정을 자동으로 만듭니다.
+브라우저에서 http://localhost:8000 을 엽니다. 모든 포트를 127.0.0.1에만 열어 같은 네트워크의 다른 기기에서는 접속할 수 없습니다.
+
+- 끄기: `docker compose --profile app down` (데이터는 남음, 모두 지우려면 `down -v`)
+- 로그 보기: `docker compose --profile app logs -f web worker`
+
+### 개발용: 인프라만 Docker, 앱은 uv로
+
 사전 설치: Docker, [uv](https://docs.astral.sh/uv/)
 
 ```bash
@@ -33,7 +54,7 @@ uv run alembic upgrade head
 uv run python -m scripts.create_bucket
 uv run python -m scripts.seed_demo        # 데모 카탈로그·계정
 uv run fastapi dev app/main.py            # http://localhost:8000
-uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미널
+uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미널 (Windows는 --pool=solo 추가)
 ```
 
 데모 계정 (비밀번호 모두 `demo1234`, 로컬 전용)
