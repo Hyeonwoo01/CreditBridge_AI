@@ -1,55 +1,167 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import rec_badge, time %}
 {% block nav %}{% include "review/_nav.html" %}{% endblock %}
+{% block crumb %}학사처 심사 워크스페이스 · 심사 대기열{% endblock %}
 {% block content %}
-<header class="grid gap-2">
-  <h1 class="page-title">심사 큐</h1>
-  <p class="text-muted">AI 분석이 끝난 제출 건이에요. 고신뢰 건은 근거 요약과 함께 학과 교수에게 바로 확인 요청을 보내세요.</p>
-</header>
+{% set conf_word = {"high": "High", "medium": "Medium", "low": "Low"} %}
+{% macro qlink(t=tab, d=department, p=1) -%}?tab={{ t }}&department={{ d | urlencode }}&sort={{ sort }}&q={{ q | urlencode }}&page={{ p }}{%- endmacro %}
 
-<nav class="mt-6 flex flex-wrap gap-2" aria-label="신뢰도">
-  {% for key, label in tabs.items() %}
-  <a href="?tab={{ key }}&department={{ department }}&sort={{ sort }}" class="chip gap-1.5 {{ 'border-primary-focus ring-1 ring-primary-focus' if tab == key else 'text-ink-80' }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }} <span class="tabular-nums text-muted">{{ counts[key] }}</span></a>
+{# ---- 머리 카드 ---- #}
+<section class="card flex flex-wrap items-center justify-between gap-6">
+  <div class="flex items-start gap-4">
+    <span class="flex size-12 shrink-0 items-center justify-center rounded-md bg-parchment text-primary" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 13l2 2 4-4"/></svg>
+    </span>
+    <div class="grid gap-1">
+      <h1 class="flex flex-wrap items-center gap-2 font-display text-[24px] leading-tight font-semibold tracking-[-0.28px] md:text-[26px]">
+        {{ user.institution.name if user.institution else '' }} 편입 학점 심사 대기열
+        <span class="badge-reject">미처리 {{ view.counts.all }}건</span>
+      </h1>
+      <p class="text-sm text-muted">판정 완료 {{ stats.courses_decided }}건 · 심사관 {{ user.name }}</p>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <button type="submit" form="assign-form" class="btn-primary btn-sm gap-1.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M18 8v6M15 11h6"/></svg>
+      선택 항목 교수 일괄 배정
+    </button>
+    <a href="/review/export.csv" class="btn-secondary btn-sm gap-1.5 border-hairline text-ink">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+      SIS CSV 내보내기
+    </a>
+  </div>
+</section>
+
+{# ---- 지표 카드 ---- #}
+<section class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="심사 현황">
+  {% for label, value, unit, tone, note in [
+    ('대기 중 심사 건수', view.counts.all, '건', 'text-ink', '판정을 기다리는 과목'),
+    ('고신뢰 (High Confidence)', view.counts.high, '건', 'text-approve', '근거가 충분해 교수 확인만 남은 건'),
+    ('정보 부족 · 보완 필요', view.counts.insufficient, '건', 'text-elective', '학생 강의계획서 보완이 필요한 건'),
+    ('평균 심사 소요 기간', stats.avg_days_to_decision if stats.avg_days_to_decision is not none else '–', '일' if stats.avg_days_to_decision is not none else '', 'text-ink', '제출부터 첫 판정까지'),
+  ] %}
+  <div class="card grid gap-2 p-5">
+    <span class="text-sm text-ink-80">{{ label }}</span>
+    <span class="font-display text-[36px] leading-none font-semibold tabular-nums {{ tone }}">{{ value }}<span class="ml-1 text-base font-normal text-muted">{{ unit }}</span></span>
+    <span class="text-xs text-muted">{{ note }}</span>
+  </div>
   {% endfor %}
-</nav>
+</section>
 
-<form method="get" class="mt-4 flex flex-wrap items-center gap-2">
-  <input type="hidden" name="tab" value="{{ tab }}">
-  <select name="department" class="h-11 rounded-full border border-hairline bg-white px-4 text-sm" onchange="this.form.submit()">
-    <option value="">전체 학과</option>
-    {% for d in departments %}<option value="{{ d }}" {% if d == department %}selected{% endif %}>{{ d }}</option>{% endfor %}
-  </select>
-  <select name="sort" class="h-11 rounded-full border border-hairline bg-white px-4 text-sm" onchange="this.form.submit()">
-    <option value="submitted" {% if sort == 'submitted' %}selected{% endif %}>접수일순</option>
-    <option value="coverage" {% if sort == 'coverage' %}selected{% endif %}>커버리지 높은 순</option>
-    <option value="department" {% if sort == 'department' %}selected{% endif %}>학과순</option>
-  </select>
-</form>
+{# ---- 검색·필터 ---- #}
+<section class="card mt-5 flex flex-wrap items-center gap-3 p-4">
+  <form method="get" class="flex min-w-0 flex-1 basis-[280px] items-center gap-2 rounded-full border border-hairline bg-parchment px-4">
+    <input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="department" value="{{ department }}"><input type="hidden" name="sort" value="{{ sort }}">
+    <svg class="shrink-0 text-muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <label class="sr-only" for="q">검색</label>
+    <input id="q" name="q" value="{{ q }}" maxlength="100" placeholder="편입생 이름, 출신 대학, 과목명·코드로 검색" class="h-11 w-full bg-transparent text-sm focus:outline-none">
+  </form>
+  <nav class="flex flex-wrap items-center gap-1.5" aria-label="필터">
+    {% for key, label in tabs.items() %}
+    <a href="{{ qlink(t=key) }}" class="inline-flex min-h-9 items-center gap-1 rounded-full border px-3.5 text-sm {{ 'border-ink bg-ink text-white' if tab == key else 'border-hairline bg-white text-ink-80' }}" {% if tab == key %}aria-current="page"{% endif %}>{% if key == 'conflict' %}<span class="size-1.5 rounded-full bg-reject"></span>{% endif %}{{ label }} <span class="tabular-nums {{ 'text-white/70' if tab == key else 'text-muted' }}">({{ view.counts[key] }})</span></a>
+    {% endfor %}
+    {% if view.departments %}<span class="mx-1 h-5 w-px bg-hairline" aria-hidden="true"></span>{% endif %}
+    {% for name, count in view.departments %}
+    <a href="{{ qlink(d='' if department == name else name) }}" class="inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-[13px] {{ 'border-primary-focus text-primary ring-1 ring-primary-focus' if department == name else 'border-hairline bg-white text-ink-80' }}">{{ name }} <span class="tabular-nums text-muted">({{ count }})</span></a>
+    {% endfor %}
+  </nav>
+</section>
 
-<form method="post" action="/review/assign" class="mt-4 grid gap-3">
+{# ---- 대기열 표 ---- #}
+<form method="post" action="/review/assign" id="assign-form" class="card mt-5 overflow-hidden p-0" data-select-form>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="tab" value="{{ tab }}">
   <div class="overflow-x-auto">
-    <table class="w-full min-w-[720px] text-sm">
-      <thead class="text-left text-muted">
-        <tr><th class="w-8 py-2"></th><th class="py-2 pr-3 font-normal">과목</th><th class="py-2 pr-3 font-normal">AI 추천</th><th class="py-2 pr-3 font-normal">학과</th><th class="py-2 pr-3 font-normal">접수</th><th class="py-2 font-normal">담당 교수</th></tr>
+    <table class="w-full min-w-[1080px] text-sm">
+      <thead class="bg-pearl text-left text-[13px] text-ink-80">
+        <tr>
+          <th class="w-12 px-4 py-3"><input type="checkbox" data-select-all aria-label="이 페이지 전체 선택"></th>
+          <th class="px-2 py-3 font-semibold">접수 / 일자</th>
+          <th class="px-2 py-3 font-semibold whitespace-nowrap">편입생 (출신 대학)</th>
+          <th class="px-2 py-3 font-semibold">제출 과목</th>
+          <th class="px-2 py-3 font-semibold">매칭 후보 과목</th>
+          <th class="px-2 py-3 font-semibold">개념 커버리지</th>
+          <th class="px-2 py-3 font-semibold">AI 추천 / 신뢰도</th>
+          <th class="px-2 py-3 font-semibold">담당 교수</th>
+          <th class="px-2 py-3 font-semibold">상태</th>
+          <th class="px-4 py-3 text-right font-semibold">액션</th>
+        </tr>
       </thead>
       <tbody>
-      {% for row in rows %}
-        <tr class="border-t border-divider align-top">
-          <td class="py-3"><input type="checkbox" name="evaluation_ids" value="{{ row.evaluation.id }}" aria-label="선택" {% if row.assignment %}disabled{% endif %}></td>
-          <td class="py-3 pr-3"><a class="font-semibold underline-offset-2 hover:underline" href="/review/evaluations/{{ row.evaluation.id }}">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</a><div class="text-muted">{{ row.request.source_institution.name }}</div></td>
-          <td class="py-3 pr-3"><div class="flex flex-wrap items-center gap-1.5">{{ rec_badge(row.evaluation.recommendation) }}{% if row.evaluation.coverage is not none and row.course and row.evaluation.recommendation != "insufficient" %}<strong class="tabular-nums" title="개념 커버리지">{{ row.evaluation.coverage | pct }}</strong>{% endif %}</div><div class="mt-1 text-muted">{{ row.course.code if row.course else '후보 없음' }} · 신뢰도 {{ row.evaluation.confidence | conf }}</div></td>
-          <td class="py-3 pr-3">{{ row.department }}</td>
-          <td class="py-3 pr-3 whitespace-nowrap">{{ time(row.request.submitted_at, "date") }}</td>
-          <td class="py-3">{% if row.reviewer %}{{ row.reviewer.name }}{% if row.delegated %} <span class="badge text-reject">대리 재배정</span>{% endif %}{% else %}<span class="text-muted">미배정</span>{% endif %}</td>
+      {% for row in view.rows %}
+        {% set ev = row.evaluation %}
+        {% set cov = ((ev.coverage or 0) * 100) | round | int %}
+        {% set rowtone = 'bg-reject-subtle/50' if row.conflicts else ('bg-elective-subtle/50' if row.tab == 'insufficient' else '') %}
+        <tr class="border-t border-divider align-middle {{ rowtone }}">
+          <td class="px-4 py-4"><input type="checkbox" name="evaluation_ids" value="{{ ev.id }}" aria-label="{{ row.syllabus.course_code }} 선택" {% if row.assignment %}disabled{% endif %}></td>
+          <td class="px-2 py-4"><span class="font-mono text-[13px] font-semibold">#{{ row.request.id }}-{{ ev.id }}</span><div class="text-xs whitespace-nowrap text-muted">{{ time(row.request.submitted_at, "date") }}</div></td>
+          <td class="px-2 py-4"><span class="font-semibold">{{ row.student.name if row.student else '–' }}</span><div class="text-xs text-muted">{{ row.request.source_institution.name }}</div></td>
+          <td class="px-2 py-4">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }} <span class="text-xs text-muted tabular-nums">({{ row.syllabus.credits if row.syllabus.credits is not none else '–' }})</span></td>
+          <td class="px-2 py-4">{% if row.course %}<span class="font-mono text-[13px] font-semibold text-primary">{{ row.course.code }}</span><div class="text-xs text-ink-80">{{ row.course.title }}</div>{% else %}<span class="text-muted">후보 없음</span>{% endif %}</td>
+          <td class="px-2 py-4">
+            {% if row.course and ev.recommendation != 'insufficient' %}
+            <span class="flex items-center gap-2"><span class="ring" style="--p: {{ cov }}; {% if cov < 40 %}--c: var(--color-reject){% elif cov < 75 %}--c: var(--color-elective){% endif %}" aria-hidden="true"></span><strong class="tabular-nums">{{ cov }}%</strong></span>
+            {% elif row.course %}<span class="flex items-center gap-2"><span class="ring" style="--p: {{ cov }}; --c: var(--color-elective)" aria-hidden="true"></span><span class="text-muted">판단 보류</span></span>
+            {% else %}<span class="text-muted">–</span>{% endif %}
+          </td>
+          <td class="px-2 py-4"><span class="{{ {'direct': 'badge-approve', 'elective': 'badge-elective', 'insufficient': 'badge-elective', 'none': 'badge-reject'}.get(ev.recommendation, 'badge') }}">{{ ev.recommendation | rec }} ({{ conf_word.get(ev.confidence, '–') }})</span></td>
+          <td class="px-2 py-4">
+            {% if row.reviewer %}
+            <span class="flex items-center gap-2"><span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-hl-target text-xs font-semibold text-primary" aria-hidden="true">{{ row.reviewer.name[:1] }}</span><span><span class="text-[13px]">{{ row.department }} {{ row.reviewer.name }}</span><span class="block text-xs {{ 'text-reject' if row.delegated else 'text-muted' }}">{{ '대리 재배정' if row.delegated else '배정 완료' }}</span></span></span>
+            {% else %}<span class="badge">미배정</span>{% endif %}
+          </td>
+          <td class="px-2 py-4">
+            {% if row.conflicts %}<span class="badge-reject">경보 감지</span>
+            {% elif row.open_materials %}<span class="badge-elective">보완 대기</span>
+            {% elif row.reviewer %}<span class="badge">교수 검토 대기</span>
+            {% else %}<span class="badge">배정 대기</span>{% endif %}
+          </td>
+          <td class="px-4 py-4 text-right">
+            {% if row.conflicts %}
+            <a href="/review/evaluations/{{ ev.id }}#history" class="btn-sm btn inline-flex bg-reject text-white">충돌 내역 확인</a>
+            {% elif row.tab == 'insufficient' and not row.open_materials %}
+            <a href="/review/evaluations/{{ ev.id }}#materials" class="btn-secondary btn-sm border-hairline text-ink">보완 요청 발송</a>
+            {% else %}
+            <a href="/review/evaluations/{{ ev.id }}" class="btn-primary btn-sm">원문 대조 확인 →</a>
+            {% endif %}
+          </td>
         </tr>
+        {% if row.conflicts %}
+        {% set past = row.conflicts[0] %}
+        <tr class="border-t border-reject/20 bg-reject-subtle">
+          <td></td>
+          <td colspan="9" class="px-2 py-3 text-[13px] text-reject">
+            <strong>[일관성 경보]</strong> 같은 출신 과목이 {{ row.course.code if row.course else '같은 대상 과목' }}로 <strong>'{{ past.result | rec }}'</strong> 판정된 과거 판례가 {{ row.conflicts | length }}건 있어요(강의계획서 유사도 {{ past.similarity | pct }}). AI 추천({{ ev.recommendation | rec }})과 결과가 다르니 판정 전에 확인해 주세요.
+            <a class="ml-1 underline underline-offset-2" href="/review/evaluations/{{ ev.id }}#history">과거 판례 {{ row.conflicts | length }}건 보기</a>
+          </td>
+        </tr>
+        {% endif %}
       {% else %}
-        <tr><td colspan="6" class="py-10 text-center text-muted">이 탭에 대기 중인 건이 없어요.</td></tr>
+        <tr><td colspan="10" class="px-4 py-12 text-center text-muted">{{ '검색 결과가 없어요.' if q else '이 조건에 대기 중인 건이 없어요.' }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  {% if rows %}<button class="btn-primary w-fit">선택한 건 교수에게 확인 요청</button>{% endif %}
+  <div class="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3 text-[13px] text-ink-80">
+    <span>대기열 {{ view.total }}건 중 {{ ((view.page - 1) * 20 + 1) if view.total else 0 }}–{{ [view.page * 20, view.total] | min }} 표시 · {{ view.page }} / {{ view.pages }} 페이지</span>
+    {% if view.pages > 1 %}
+    <nav class="flex items-center gap-1" aria-label="페이지">
+      {% if view.page > 1 %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="{{ qlink(p=view.page - 1) }}" aria-label="이전 페이지">‹</a>{% endif %}
+      {% for n in range(1, view.pages + 1) %}<a class="flex size-9 items-center justify-center rounded-full tabular-nums {{ 'bg-parchment font-semibold text-ink' if n == view.page else 'hover:bg-parchment' }}" href="{{ qlink(p=n) }}">{{ n }}</a>{% endfor %}
+      {% if view.page < view.pages %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="{{ qlink(p=view.page + 1) }}" aria-label="다음 페이지">›</a>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
+
+  {# 선택하면 아래에 뜨는 일괄 처리 바 #}
+  <div class="pointer-events-none fixed inset-x-0 bottom-4 z-20 px-4" data-select-bar hidden>
+    <div class="pointer-events-auto mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 rounded-lg bg-tile px-5 py-3 text-white">
+      <p class="flex items-center gap-3 text-sm"><span class="size-2 rounded-full bg-primary-on-dark"></span><strong><span data-select-count>0</span>건 선택됨</strong><span class="hidden text-on-dark-muted sm:inline">후보 과목 학과의 담당 교수에게 근거 요약과 함께 배정돼요</span></p>
+      <div class="flex gap-2">
+        <button class="btn-primary btn-sm">담당 교수 일괄 배정</button>
+        <a href="/review/export.csv" class="btn btn-sm border border-white/30 text-white">CSV 내보내기</a>
+      </div>
+    </div>
+  </div>
 </form>
 {% endblock %}

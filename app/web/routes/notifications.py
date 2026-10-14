@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models import User
 from app.security.session import current_user
 from app.services import notifications
+from app.services import stats as stats_service
 from app.web.templating import render
 
 router = APIRouter(prefix="/notifications")
@@ -22,3 +23,21 @@ def count(user: User = Depends(current_user), session: Session = Depends(get_db)
     n = notifications.unread_count(session, user)
     badge = f'<span class="notify-count">{n if n < 100 else "99+"}</span>' if n else ""
     return HTMLResponse(badge)
+
+
+@router.get("/workspace")
+def workspace(user: User = Depends(current_user), session: Session = Depends(get_db)) -> Response:
+    """상단 보조 바의 기관 집계 조각 (HTMX)."""
+    counts = stats_service.workspace_counts(session, user)
+    if counts is None:
+        return HTMLResponse("")
+    chips = [
+        ("제출 요청", counts.submitted, ""),
+        ("심사 대기", counts.waiting, ""),
+        ("판정 완료", counts.decided, "approve"),
+    ]
+    html = "".join(
+        f'<span class="chip-count{" chip-count-" + tone if tone else ""}">{label} <b>{value}</b></span>'
+        for label, value, tone in chips
+    )
+    return HTMLResponse(html)

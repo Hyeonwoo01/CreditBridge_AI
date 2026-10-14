@@ -1,6 +1,7 @@
 """화면에 필요한 데이터를 모으는 조회 서비스. web 계층은 repositories를 직접 부르지 않고 이 모듈을 쓴다."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -162,14 +163,39 @@ class RequestView:
     simulation: student_service.Simulation
     processing: bool
     privacy: PrivacyRequest | None = None
+    show: str = "all"  # 과목 목록 필터: all / approved / supplement / review
 
     @property
     def open_materials(self) -> int:
         return sum(len(r.open_materials) for r in self.rows)
 
+    @property
+    def visible_rows(self) -> list[student_service.CourseRow]:
+        return self.rows if self.show == "all" else [r for r in self.rows if r.group == self.show]
+
+    @property
+    def group_counts(self) -> dict[str, int]:
+        counts = {"all": len(self.rows), "approved": 0, "supplement": 0, "review": 0, "other": 0}
+        for r in self.rows:
+            counts[r.group] += 1
+        return counts
+
+    @property
+    def decided_count(self) -> int:
+        return sum(1 for r in self.rows if r.decision is not None)
+
+    @property
+    def last_analyzed(self) -> datetime | None:
+        times = [r.evaluation.created_at for r in self.rows if r.evaluation is not None]
+        return max(times) if times else None
+
+    @property
+    def analysis_done(self) -> bool:
+        return bool(self.rows) and not self.processing
+
 
 def request_view(
-    session: Session, student: User, request_id: int, tuition: int | None, degree: int | None
+    session: Session, student: User, request_id: int, tuition: int | None, degree: int | None, show: str = "all"
 ) -> RequestView:
     request = student_service.get_own_request(session, student, request_id)
     rows = student_service.course_rows(session, request)
@@ -191,6 +217,7 @@ def request_view(
         simulation,
         processing,
         privacy_service.latest_for_request(session, request),
+        show if show in ("all", "approved", "supplement", "review") else "all",
     )
 
 

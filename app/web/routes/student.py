@@ -52,10 +52,11 @@ def request_page(
     request_id: int,
     tuition: int | None = Query(None, ge=0),
     degree: int | None = Query(None, ge=1, le=300),
+    show: str = Query("all", pattern="^(all|approved|supplement|review)$"),
     user: User = Student,
     session: Session = Depends(get_db),
 ) -> Response:
-    view = views.request_view(session, user, request_id, tuition, degree)
+    view = views.request_view(session, user, request_id, tuition, degree, show)
     template = "partials/course_list.html" if request.headers.get("HX-Request") else "student/request.html"
     return render(request, template, user=user, view=view, stages=student_service.STAGES)
 

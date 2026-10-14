@@ -33,6 +33,14 @@ REASON_LABELS = {
     ReasonCode.PREREQUISITE_DIFFERENCE: "선수과목 차이",
     ReasonCode.OTHER: "기타",
 }
+# 사유 선택 창에서 각 항목 아래에 보여주는 설명
+REASON_HINTS = {
+    ReasonCode.WEEKS_INSUFFICIENT: "핵심 개념을 다루는 주차가 대상 과목보다 적거나 범위가 좁아요.",
+    ReasonCode.LEVEL_DIFFERENCE: "입문·심화 등 과목 수준이 대상 과목과 달라요.",
+    ReasonCode.NO_LAB: "대상 과목에 필요한 실험·실습이 출신 과목에 없어요.",
+    ReasonCode.PREREQUISITE_DIFFERENCE: "선수과목 체계가 달라 같은 단계의 과목으로 보기 어려워요.",
+    ReasonCode.OTHER: "위 항목에 없는 사유예요. 메모에 구체적으로 적어 주세요.",
+}
 
 
 class ConflictNeedsAcknowledgement(DecisionValidationError):

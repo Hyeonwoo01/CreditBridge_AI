@@ -111,7 +111,7 @@ def test_professor_decision_rules_and_portal(client: TestClient, seeded: Session
 
     # 학생 포털에 확정 반영 (TC-20), 요청 상태 완료
     login(client, "jiwon@student.example")
-    assert "확정 · 직접 인정" in client.get(f"/student/requests/{rid}").text
+    assert "승인 완료 · 직접 인정" in client.get(f"/student/requests/{rid}").text
     seeded.expire_all()
     assert seeded.scalars(select(TransferRequest).where(TransferRequest.id == rid)).one().status == "decided"
 

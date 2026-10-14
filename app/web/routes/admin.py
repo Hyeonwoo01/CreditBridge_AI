@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.session import get_db
 from app.documents.storage import get_storage
 from app.errors import CreditBridgeError
@@ -28,7 +29,14 @@ def audit_log(request: Request, user: User = Admin, session: Session = Depends(g
 @router.get("/stats")
 def stats(request: Request, user: User = Admin, session: Session = Depends(get_db)) -> Response:
     """운영 통계 (FR-27)."""
-    return render(request, "stats.html", user=user, s=stats_service.institution_stats(session, user))
+    return render(
+        request,
+        "stats.html",
+        user=user,
+        s=stats_service.institution_stats(session, user),
+        audit_rows=stats_service.recent_audit(session, user),
+        retention_days=get_settings().privacy_deletion_days,
+    )
 
 
 @router.get("/privacy")

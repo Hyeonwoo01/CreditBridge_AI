@@ -393,3 +393,61 @@ def test_history_is_scoped_to_target_institution(client: TestClient, seeded: Ses
     ev, _, _ = professor_for(client, seeded, "linear_algebra_detailed.txt")
     assert "같은 과목의 과거 판정" not in client.get(f"/professor/evaluations/{ev.id}").text
     assert seeded.scalars(select(Assignment)).first() is not None
+
+
+# ---------- 화면: 심사 큐 검색·경보 필터, 학생 과목 필터, 사유 선택 창, 관리자 콘솔 ----------
+
+
+def test_queue_search_and_conflict_filter(client: TestClient, seeded: Session) -> None:
+    submitted_request(client, seeded, "calculus.txt", "linear_algebra_detailed.txt")
+    login(client, "rachel@msu.example")
+    page = client.get("/review").text
+    assert "미처리 2건" in page and "MATH 101" in page and "MATH 201" in page
+    page = client.get("/review?q=calculus").text
+    assert "MATH 101" in page and "MATH 201" not in page
+    page = client.get("/review?tab=conflict").text  # 선형대수 과거 판정(직접 인정)은 AI 추천과 같아 경보 아님
+    assert "MATH 201" not in page and "MATH 101" not in page
+    assert client.get("/review?tab=nope").status_code == 422
+    chips = client.get("/notifications/workspace").text
+    assert "심사 대기 <b>2</b>" in chips
+    login(client, "jiwon@student.example")
+    assert client.get("/notifications/workspace").text.strip() == ""
+
+
+def test_student_report_filters_courses(client: TestClient, seeded: Session) -> None:
+    ev, _, token = professor_for(client, seeded, "calculus.txt")
+    approve(client, ev, token)
+    login(client, "jiwon@student.example")
+    rid = ev.transfer_request_id
+    page = client.get(f"/student/requests/{rid}").text
+    assert "편입 학점 시뮬레이션 리포트" in page and "심사 진행 현황" in page and "승인 완료 · 직접 인정" in page
+    assert "MATH 101" in client.get(f"/student/requests/{rid}?show=approved").text
+    assert "이 조건에 해당하는 과목이 없어요" in client.get(f"/student/requests/{rid}?show=supplement").text
+    assert client.get(f"/student/requests/{rid}?show=bad").status_code == 422
+
+
+def test_reason_dialog_reopens_on_validation_error(client: TestClient, seeded: Session) -> None:
+    ev, _, token = professor_for(client, seeded, "calculus.txt")
+    page = client.get(f"/professor/evaluations/{ev.id}").text
+    assert 'id="reason-dialog"' in page and "실험·실습이 출신 과목에 없어요" in page
+    assert "data-autoopen" not in page
+    r = client.post(f"/professor/evaluations/{ev.id}/decision", data={"action": "reject", "csrf_token": token})
+    assert r.status_code == 422 and "data-autoopen" in r.text and "학점 불인정 사유 선택 및 소명" in r.text
+
+
+def test_admin_console_shows_recent_audit_without_student_names(client: TestClient, seeded: Session) -> None:
+    ev, prof, token = professor_for(client, seeded, "calculus.txt")
+    client.post(
+        f"/professor/evaluations/{ev.id}/decision",
+        data={"action": "reject", "reason_codes": ["no_lab"], "csrf_token": token},
+    )
+    login(client, "admin@msu.example")
+    page = client.get("/admin/stats").text
+    assert "관리자 콘솔" in page and "AI 추천 수용률" in page and "학과별 심사 처리 지표" in page
+    assert "판정 확정 · 불인정" in page and prof.name in page and "실험·실습 미포함" in page
+    assert "LOG-" in page and "데이터 보존 및 파기 정책" in page
+    student = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
+    assert student.name not in page
+    login(client, "rachel@msu.example")
+    page = client.get("/review/stats").text
+    assert "운영 통계" in page and "최근 감사 로그" not in page

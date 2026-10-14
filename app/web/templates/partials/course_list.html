@@ -1,34 +1,78 @@
 {% from "partials/macros.html" import rec_badge, stage_bar, time %}
-<div id="course-list" class="grid gap-3" {% if view.processing %}hx-get="/student/requests/{{ view.request.id }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
-  {% for row in view.rows %}
+<div id="course-list" class="grid gap-3" {% if view.processing %}hx-get="/student/requests/{{ view.request.id }}?show={{ view.show }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+  {% for row in view.visible_rows %}
   {% set ev = row.evaluation %}
-  <a href="/student/syllabi/{{ row.syllabus.id }}" class="card grid gap-3 p-5 hover:border-primary/40">
+  {% set cov = ev.coverage if ev and ev.coverage is not none and row.candidate_code and ev.recommendation != 'insufficient' else none %}
+  {% set analyzing = row.syllabus.status in ('uploaded', 'processing') or (ev and ev.status in ('queued', 'running')) %}
+  <article class="card grid gap-4 p-5 {{ 'border-elective/50' if row.group == 'supplement' else '' }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="grid min-w-0 gap-0.5">
-        <span class="truncate font-semibold">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</span>
-        <span class="text-sm text-muted">{{ row.syllabus.original_filename }}{% if row.transcript_grade %} · 성적 {{ row.transcript_grade }}{% endif %}</span>
+      <div class="grid min-w-0 gap-1">
+        <div class="flex flex-wrap items-center gap-2">
+          {% if row.syllabus.status == 'failed' %}
+            <span class="badge text-reject">분석 실패</span>
+          {% elif analyzing %}
+            <span class="badge"><span class="size-3 animate-spin rounded-full border-2 border-primary/20 border-t-primary"></span>AI 분석 중</span>
+          {% elif row.decision and row.appeal and row.appeal.status in ('submitted', 'accepted') %}
+            <span class="badge">이의 신청 {{ row.appeal.status | appeal_status }}</span>
+          {% elif row.decision %}
+            <span class="{{ {'direct': 'badge-approve', 'elective': 'badge-approve', 'none': 'badge-reject'}.get(row.decision.result, 'badge') }}">{{ '승인 완료' if row.decision.result in ('direct', 'elective') else '불인정' }} · {{ row.decision.result | rec }}</span>
+          {% elif row.group == 'supplement' %}
+            <span class="badge-elective">보완 필요</span>
+          {% elif ev %}
+            <span class="badge">{{ '심사 중' if view.request.status != 'draft' else 'AI 추천' }}</span>{{ rec_badge(ev.recommendation) }}
+          {% endif %}
+        </div>
+        <a href="/student/syllabi/{{ row.syllabus.id }}" class="truncate text-[19px] font-semibold hover:text-primary">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</a>
+        <span class="text-sm text-muted">{{ row.syllabus.original_filename }}{% if row.syllabus.credits %} · {{ row.syllabus.credits | round(1) }}학점{% endif %}{% if row.transcript_grade %} · 성적 {{ row.transcript_grade }}{% endif %}</span>
       </div>
-      {% if row.syllabus.status == 'failed' %}
-        <span class="badge text-reject">분석 실패</span>
-      {% elif row.syllabus.status in ('uploaded', 'processing') or (ev and ev.status in ('queued', 'running')) %}
-        <span class="badge"><span class="size-3 animate-spin rounded-full border-2 border-primary/20 border-t-primary"></span>AI 분석 중</span>
-      {% elif row.decision and row.appeal and row.appeal.status in ('submitted', 'accepted') %}
-        <span class="badge">이의 신청 {{ row.appeal.status | appeal_status }}</span>
-      {% elif row.decision %}
-        <span class="{{ {'direct': 'badge-approve', 'elective': 'badge-elective', 'none': 'badge-reject'}.get(row.decision.result, 'badge') }}">확정 · {{ row.decision.result | rec }}</span>
-      {% elif ev %}
-        <span class="flex items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.coverage is not none and row.candidate_code and ev.recommendation != "insufficient" %}<strong class="tabular-nums" title="개념 커버리지">{{ ev.coverage | pct }}</strong>{% endif %}</span>
+      {% if cov is not none %}
+      <div class="grid justify-items-end gap-1 text-right">
+        <span class="text-xs text-muted">개념 커버리지</span>
+        <strong class="font-display text-[28px] leading-none tabular-nums {{ 'text-approve' if cov >= 0.75 else ('text-elective' if cov >= 0.5 else 'text-reject') }}">{{ cov | pct }}</strong>
+      </div>
       {% endif %}
     </div>
+
     {% if row.syllabus.status == 'failed' %}<p class="text-sm text-reject">{{ row.syllabus.error_message }}</p>{% endif %}
-    {% if row.open_materials %}<p class="text-sm font-semibold text-reject">보완 자료 요청 {{ row.open_materials | length }}건 · 눌러서 확인하고 자료를 올려 주세요</p>{% endif %}
-    {% if row.candidate_code %}<p class="text-sm">→ <strong>{{ row.candidate_code }}</strong>{% if ev and ev.recommendation == 'insufficient' %} 후보 · 자료 보완이 필요해요{% endif %}</p>{% endif %}
+
+    {% if row.candidate_code %}
+    <div class="grid gap-3 rounded-md bg-parchment px-4 py-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
+      <div class="grid gap-0.5">
+        <span class="text-xs text-muted">대응 교과목{% if ev and ev.recommendation == 'insufficient' %} (후보){% endif %}</span>
+        <span><strong>{{ row.candidate_code }}</strong>{% if row.candidate_title %} {{ row.candidate_title }}{% endif %}{% if row.candidate_department %} <span class="text-muted">· {{ row.candidate_department }}</span>{% endif %}</span>
+      </div>
+      {% if row.reviewer %}
+      <div class="grid gap-0.5 sm:text-right">
+        <span class="text-xs text-muted">{{ '판정 교수' if row.decision else '담당 교수' }}</span>
+        <span>{{ row.reviewer.name }}{% if row.decision %} <span class="text-muted">· {{ time(row.decision.decided_at, "date") }}</span>{% endif %}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if cov is not none %}<span class="meter" aria-hidden="true"><span style="width: {{ (cov * 100) | round | int }}%"></span></span>{% endif %}
+    {% endif %}
+
+    {% if row.group == 'supplement' and ev %}
+    {% set r = ev.coverage_json or {} %}
+    <div class="grid gap-3 rounded-md border border-elective/40 bg-elective-subtle p-4 text-sm">
+      <p class="font-semibold text-elective">정보 부족 진단</p>
+      {% if row.open_materials %}
+        {% for m in row.open_materials %}
+        <p>학사처·교수 요청: {{ m.items | join(', ') }}{% if m.note %} — {{ m.note }}{% endif %}</p>
+        {% endfor %}
+      {% endif %}
+      {% if r.missing_concepts %}<p>확인되지 않은 개념: {{ r.missing_concepts | join(', ') }}</p>{% endif %}
+      {% if r.missing_materials and not row.open_materials %}<p>있으면 좋은 자료: {{ r.missing_materials | join(', ') }}</p>{% endif %}
+      {% if not row.open_materials and not r.missing_concepts and not r.missing_materials %}<p>강의계획서만으로는 비교할 정보가 부족해요.</p>{% endif %}
+      <a href="/student/evaluations/{{ ev.id }}" class="btn-primary btn-sm justify-self-start">보완 서류 제출하기</a>
+    </div>
+    {% endif %}
+
     <div class="flex flex-wrap items-center justify-between gap-2">
       {{ stage_bar(stages, row.stage) }}
-      {% if row.expected_done %}<span class="text-xs text-muted">예상 완료 {{ time(row.expected_done, "date") }}</span>{% endif %}
+      {% if row.expected_done and not row.decision %}<span class="text-xs text-muted">예상 완료 {{ time(row.expected_done, "date") }}</span>{% endif %}
     </div>
-  </a>
+  </article>
   {% else %}
-  <p class="rounded-md bg-parchment p-6 text-center text-muted">강의계획서를 올리면 과목별 결과가 여기에 나와요.</p>
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ '강의계획서를 올리면 과목별 결과가 여기에 나와요.' if not view.rows else '이 조건에 해당하는 과목이 없어요.' }}</p>
   {% endfor %}
 </div>

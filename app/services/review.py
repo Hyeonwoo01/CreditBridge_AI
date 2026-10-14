@@ -1,6 +1,6 @@
 """심사관 업무: 심사 큐(FR-17), 교수 자동 배정(FR-18), 부재 시 대리 재배정(FR-19)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
@@ -11,11 +11,15 @@ from app.models import Assignment, Course, CourseEvaluation, Syllabus, TransferR
 from app.models.enums import Role
 from app.repositories import catalog as catalog_repo
 from app.repositories import evaluations as evaluation_repo
+from app.repositories import materials as material_repo
 from app.repositories import syllabi as syllabus_repo
 from app.repositories import users as user_repo
 from app.services import audit, notifications
+from app.services.decisions import HistoryItem, ai_result, conflicts, history
 
-TABS = {"high": "고신뢰", "low": "저신뢰", "insufficient": "정보 부족"}
+# 심사 큐 필터. all 외에는 겹치지 않는 신뢰도 구분이고, conflict는 과거 판정과 어긋나는 건만 따로 모아 본다
+TABS = {"all": "전체", "high": "고신뢰", "low": "저신뢰", "insufficient": "정보 부족", "conflict": "일관성 경보"}
+PAGE_SIZE = 20
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,24 @@ class QueueRow:
     assignment: Assignment | None
     reviewer: User | None
     delegated: bool
+    student: User | None = None
+    # 같은 출신 과목·대상 과목·유사한 강의계획서로 내린 과거 판정 중 AI 추천과 결과가 다른 것
+    conflicts: list[HistoryItem] = field(default_factory=list)
+    open_materials: int = 0
+
+    @property
+    def tab(self) -> str:
+        return tab_of(self.evaluation)
+
+
+@dataclass(frozen=True)
+class QueueView:
+    rows: list[QueueRow]  # 현재 페이지
+    counts: dict[str, int]
+    departments: list[tuple[str, int]]
+    total: int  # 필터 적용 후 전체 건수
+    page: int
+    pages: int
 
 
 def tab_of(evaluation: CourseEvaluation) -> str:
@@ -42,42 +64,86 @@ def ensure_evaluator(user: User) -> int:
     return user.institution_id
 
 
+def _matches(row: QueueRow, q: str) -> bool:
+    haystack = " ".join(
+        [
+            row.student.name if row.student else "",
+            row.syllabus.course_code,
+            row.syllabus.course_title,
+            row.request.source_institution.name,
+            row.course.code if row.course else "",
+            row.course.title if row.course else "",
+            f"#{row.request.id}",
+        ]
+    ).lower()
+    return all(term in haystack for term in q.lower().split())
+
+
 def queue(
-    session: Session, evaluator: User, tab: str, department: str | None, sort: str
-) -> tuple[list[QueueRow], dict[str, int], list[str]]:
+    session: Session,
+    evaluator: User,
+    tab: str,
+    department: str | None,
+    sort: str,
+    q: str = "",
+    page: int = 1,
+) -> QueueView:
     institution_id = ensure_evaluator(evaluator)
     raw = evaluation_repo.review_queue(session, institution_id)
     courses = catalog_repo.courses_by_ids(session, [e.candidate_course_id for e, _, _ in raw if e.candidate_course_id])
+    materials = material_repo.for_syllabi(session, [s.id for _, s, _ in raw])
+    open_by_syllabus: dict[int, int] = {}
+    for m in materials:
+        if m.status == "open":
+            open_by_syllabus[m.syllabus_id] = open_by_syllabus.get(m.syllabus_id, 0) + 1
     rows: list[QueueRow] = []
-    counts = dict.fromkeys(TABS, 0)
-    departments: set[str] = set()
     for evaluation, syllabus, request in raw:
         course = courses.get(evaluation.candidate_course_id) if evaluation.candidate_course_id else None
-        dept = course.department if course else "미분류"
-        departments.add(dept)
-        t = tab_of(evaluation)
-        counts[t] += 1
-        if t != tab or (department and dept != department):
-            continue
         assignment = evaluation_repo.active_assignment(session, evaluation.id)
         reviewer = user_repo.get_by_id(session, assignment.reviewer_id) if assignment else None
         rows.append(
             QueueRow(
-                evaluation,
-                syllabus,
-                request,
-                course,
-                dept,
-                assignment,
-                reviewer,
-                bool(assignment and assignment.reassigned_from),
+                evaluation=evaluation,
+                syllabus=syllabus,
+                request=request,
+                course=course,
+                department=course.department if course else "미분류",
+                assignment=assignment,
+                reviewer=reviewer,
+                delegated=bool(assignment and assignment.reassigned_from),
+                student=user_repo.get_by_id(session, request.student_id),
+                conflicts=conflicts(history(session, evaluation), ai_result(evaluation)),
+                open_materials=open_by_syllabus.get(syllabus.id, 0),
             )
         )
+    counts = dict.fromkeys(TABS, 0)
+    dept_counts: dict[str, int] = {}
+    for r in rows:
+        counts["all"] += 1
+        counts[r.tab] += 1
+        counts["conflict"] += bool(r.conflicts)
+        dept_counts[r.department] = dept_counts.get(r.department, 0) + 1
+    picked = [
+        r
+        for r in rows
+        if (tab == "all" or (r.conflicts if tab == "conflict" else r.tab == tab))
+        and (not department or r.department == department)
+        and (not q.strip() or _matches(r, q))
+    ]
     if sort == "coverage":
-        rows.sort(key=lambda r: r.evaluation.coverage or 0, reverse=True)
+        picked.sort(key=lambda r: r.evaluation.coverage or 0, reverse=True)
     elif sort == "department":
-        rows.sort(key=lambda r: r.department)
-    return rows, counts, sorted(departments)
+        picked.sort(key=lambda r: r.department)
+    pages = max((len(picked) + PAGE_SIZE - 1) // PAGE_SIZE, 1)
+    page = min(max(page, 1), pages)
+    return QueueView(
+        rows=picked[(page - 1) * PAGE_SIZE : page * PAGE_SIZE],
+        counts=counts,
+        departments=sorted(dept_counts.items()),
+        total=len(picked),
+        page=page,
+        pages=pages,
+    )
 
 
 def _pick_reviewer(session: Session, institution_id: int, department: str, today: date) -> tuple[User, User | None]:

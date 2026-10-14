@@ -30,6 +30,7 @@ from app.repositories import evaluations as evaluation_repo
 from app.repositories import materials as material_repo
 from app.repositories import requests as request_repo
 from app.repositories import syllabi as syllabus_repo
+from app.repositories import users as user_repo
 from app.services import analysis, audit, materials
 
 
@@ -215,6 +216,18 @@ class CourseRow:
     transcript_grade: str | None
     appeal: Appeal | None = None
     open_materials: list[MaterialRequest] = field(default_factory=list)
+    candidate_title: str | None = None
+    candidate_department: str | None = None
+    reviewer: User | None = None  # 판정했으면 판정 교수, 아니면 배정된 교수
+
+    @property
+    def group(self) -> str:
+        """학생 화면 필터: approved(인정 확정) / supplement(보완 필요) / review(심사 중) / other."""
+        if self.decision is not None and not (self.appeal and self.appeal.status in ("submitted", "accepted")):
+            return "approved" if self.decision.result in ("direct", "elective") else "other"
+        if self.open_materials or (self.evaluation and self.evaluation.recommendation == "insufficient"):
+            return "supplement"
+        return "review"
 
 
 def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
@@ -250,6 +263,8 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
         else:
             stage, expected = (1 if s.status == SyllabusStatus.READY else 0), None
         course = courses.get(ev.candidate_course_id) if ev and ev.candidate_course_id else None
+        assignment = evaluation_repo.active_assignment(session, ev.id) if ev else None
+        reviewer_id = decision.decided_by if decision else (assignment.reviewer_id if assignment else None)
         rows.append(
             CourseRow(
                 syllabus=s,
@@ -262,6 +277,9 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
                 transcript_grade=grades.get(s.id),
                 appeal=appeals.get(ev.id) if ev else None,
                 open_materials=open_materials.get(s.id, []),
+                candidate_title=course.title if course else None,
+                candidate_department=course.department if course else None,
+                reviewer=user_repo.get_by_id(session, reviewer_id) if reviewer_id else None,
             )
         )
     return rows

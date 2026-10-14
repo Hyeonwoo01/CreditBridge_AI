@@ -1,28 +1,90 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import time %}
 {% block nav %}{% include "partials/role_nav.html" %}{% endblock %}
 {% block content %}
-<header class="grid gap-2">
-  <h1 class="page-title">운영 통계</h1>
-  <p class="text-muted">{{ user.institution.name if user.institution else '' }}의 기관 단위 집계예요. 개인별 성과 평가에 쓰지 않아요.</p>
+{% set admin = user.role == 'admin' %}
+{% set inst = user.institution.name if user.institution else '' %}
+<header class="flex flex-wrap items-end justify-between gap-4">
+  <div class="grid gap-1">
+    <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase">{{ 'Governance' if admin else 'Operations' }}</p>
+    <h1 class="page-title">{{ inst }} {{ '관리자 콘솔' if admin else '운영 통계' }}</h1>
+    <p class="text-sm text-muted">기관 단위 집계예요. 개인별 성과 평가에 쓰지 않아요.</p>
+  </div>
+  {% if admin %}
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/sis" class="btn-secondary btn-sm">학사정보 연동</a>
+    <a href="/admin/audit" class="btn-primary btn-sm">전체 감사 로그</a>
+  </div>
+  {% endif %}
 </header>
 
-<section class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+<section class="mt-6 grid gap-3 md:grid-cols-3" aria-label="핵심 지표">
+  <div class="card grid content-start gap-2 p-5">
+    <span class="text-sm text-muted">AI 추천 수용률</span>
+    <span class="font-display text-[40px] leading-none font-semibold tabular-nums">{{ (s.acceptance_rate | pct) if s.acceptance_rate is not none else '–' }}</span>
+    {% if s.acceptance_rate is not none %}<span class="meter"><span style="width: {{ (s.acceptance_rate * 100) | round | int }}%"></span></span>{% endif %}
+    <span class="text-xs text-muted">AI-교수 불일치율 {{ (s.disagreement_rate | pct) if s.disagreement_rate is not none else '–' }} · 정보 부족 제외 첫 판정 {{ s.disagreement_base }}건 기준</span>
+  </div>
+  <div class="card grid content-start gap-2 p-5">
+    <span class="text-sm text-muted">개인정보 보호</span>
+    <span class="font-display text-[40px] leading-none font-semibold tabular-nums">{{ s.transcripts_masked }}<span class="text-base font-normal text-muted"> 건 마스킹</span></span>
+    <span class="text-xs text-muted">성적표 이름·학번을 가린 뒤에만 AI에 전달</span>
+    <span class="text-xs text-muted">삭제 요청 완료 {{ s.privacy_completed }}{% if s.privacy_completed %} (기한 내 {{ s.privacy_on_time }}){% endif %} · 처리 중 {{ s.privacy_open }}{% if s.privacy_overdue %} · <strong class="text-reject">기한 초과 {{ s.privacy_overdue }}</strong>{% endif %}</span>
+  </div>
+  <div class="card grid content-start gap-2 p-5">
+    <span class="text-sm text-muted">SIS 연동</span>
+    <span class="flex items-center gap-2">
+      <span class="size-2.5 rounded-full {{ 'bg-approve' if s.sis_token else 'bg-hairline' }}" aria-hidden="true"></span>
+      <span class="font-display text-[28px] leading-none font-semibold">{{ '연동 토큰 활성' if s.sis_token else '토큰 미발급' }}</span>
+    </span>
+    <span class="text-xs text-muted">확정 판정 {{ s.courses_decided }}과목을 CSV·API로 내보낼 수 있어요</span>
+    {% if admin %}<a href="/admin/sis" class="btn-text text-sm">연동 설정 보기</a>{% else %}<a href="/review/export.csv" class="btn-text text-sm">SIS CSV 내보내기</a>{% endif %}
+  </div>
+</section>
+
+<section class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="처리 현황">
   {% for label, value, hint in [
     ('심사 요청', s.requests_submitted, '완료 ' ~ s.requests_decided ~ '건'),
+    ('판정 대기 과목', s.queue_waiting, '심사 큐 기준'),
     ('판정한 과목', s.courses_decided, '현재 유효한 판정 기준'),
     ('평균 소요일', (s.avg_days_to_decision ~ '일') if s.avg_days_to_decision is not none else '–', '제출부터 첫 판정까지'),
-    ('AI-교수 불일치율', (s.disagreement_rate | pct) if s.disagreement_rate is not none else '–', '정보 부족 제외 ' ~ s.disagreement_base ~ '건 중'),
   ] %}
-  <div class="card grid gap-1 p-4">
-    <span class="text-sm text-muted">{{ label }}</span>
-    <span class="page-title tabular-nums">{{ value }}</span>
+  <div class="rounded-lg bg-parchment p-4 grid gap-1">
+    <span class="text-xs text-muted">{{ label }}</span>
+    <span class="text-[24px] font-semibold tabular-nums">{{ value }}</span>
     <span class="text-xs text-muted">{{ hint }}</span>
   </div>
   {% endfor %}
 </section>
 
-<section class="mt-8 grid gap-6 md:grid-cols-2">
-  <div class="grid gap-3">
+<section class="mt-10 grid gap-4" aria-label="학과별 심사 처리 지표">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="section-title">학과별 심사 처리 지표</h2>
+    <span class="text-xs text-muted">판정 대상 과목(판정 과목 또는 AI 후보)의 학과 기준</span>
+  </div>
+  {% if s.departments %}
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {% for d in s.departments %}
+    <div class="card grid gap-3 p-5">
+      <div class="flex items-baseline justify-between gap-2">
+        <span class="font-semibold">{{ d.name }}</span>
+        <span class="text-sm tabular-nums text-muted">{{ d.decided }} / {{ d.received }}건</span>
+      </div>
+      <span class="meter"><span style="width: {{ (d.rate * 100) | round | int }}%"></span></span>
+      <div class="flex justify-between text-xs text-muted">
+        <span>처리율 {{ d.rate | pct }}</span>
+        <span>평균 {{ (d.avg_days ~ '일') if d.avg_days is not none else '–' }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">아직 심사 큐에 들어온 과목이 없어요.</p>
+  {% endif %}
+</section>
+
+<section class="mt-10 grid gap-6 md:grid-cols-2">
+  <div class="card grid content-start gap-3 p-5">
     <h2 class="font-semibold">월별 판정 건수 (최근 6개월)</h2>
     {% set peak = (s.monthly | map(attribute=1) | max) or 1 %}
     <ul class="grid gap-2 text-sm">
@@ -31,15 +93,58 @@
       {% endfor %}
     </ul>
   </div>
-  <div class="grid content-start gap-3 text-sm">
+  <div class="card grid content-start gap-2 p-5 text-sm">
     <h2 class="font-semibold">판정 구성</h2>
     <p>교수 처리: 승인 {{ s.actions.get('approve', 0) }} · 수정 {{ s.actions.get('modify', 0) }} · 반려 {{ s.actions.get('reject', 0) }}</p>
     <p>현재 결과: 직접 인정 {{ s.results.get('direct', 0) }} · 선택 인정 {{ s.results.get('elective', 0) }} · 불인정 {{ s.results.get('none', 0) }}</p>
     <p>과거 판정과 다르게 확정(경보 확인): {{ s.conflict_acknowledged }}건</p>
     <h2 class="mt-3 font-semibold">이의 신청</h2>
     <p>전체 {{ s.appeals_total }} · 처리 중 {{ s.appeals_open }} · 기각 {{ s.appeals_dismissed }} · 재판정으로 결과 변경 {{ s.appeals_changed }}</p>
-    <h2 class="mt-3 font-semibold">개인정보 삭제 요청</h2>
-    <p>처리 중 {{ s.privacy_open }}{% if s.privacy_overdue %} · <span class="font-semibold text-reject">기한 초과 {{ s.privacy_overdue }}</span>{% endif %}</p>
   </div>
 </section>
+
+{% if admin %}
+<section class="mt-10 grid gap-4" aria-label="최근 감사 로그">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="section-title">최근 감사 로그</h2>
+    <a href="/admin/audit" class="btn-text text-sm">전체 보기</a>
+  </div>
+  <div class="card overflow-x-auto p-0">
+    <table class="w-full min-w-[820px] text-sm">
+      <thead class="bg-pearl text-left text-xs text-muted">
+        <tr><th class="px-5 py-3 font-normal">로그 ID</th><th class="px-3 py-3 font-normal">일시</th><th class="px-3 py-3 font-normal">처리자</th><th class="px-3 py-3 font-normal">처리 내용</th><th class="px-3 py-3 font-normal">AI 추천 → 판정</th><th class="px-5 py-3 font-normal">사유</th></tr>
+      </thead>
+      <tbody>
+      {% for a in audit_rows %}
+        {% set badge = {'direct': 'badge-approve', 'elective': 'badge-elective', 'none': 'badge-reject'}.get(a.result, 'badge') if a.tone == 'decision' else {'elective': 'badge-elective', 'reject': 'badge-reject'}.get(a.tone, 'badge') %}
+        <tr class="border-t border-divider">
+          <td class="px-5 py-3 font-mono text-xs text-muted">LOG-{{ '%06d' | format(a.log.id) }}</td>
+          <td class="px-3 py-3 whitespace-nowrap">{{ time(a.log.created_at) }}</td>
+          <td class="px-3 py-3">{% if a.actor and a.actor.role != 'student' %}{{ a.actor.name }} <span class="text-xs text-muted">{{ {'evaluator': '심사관', 'professor': '교수', 'admin': '관리자'}.get(a.actor.role, '') }}</span>{% else %}<span class="text-muted">학생</span>{% endif %}</td>
+          <td class="px-3 py-3"><span class="{{ badge }}">{{ a.label }}{% if a.tone == 'decision' and a.result %} · {{ a.result | rec }}{% endif %}</span></td>
+          <td class="px-3 py-3 whitespace-nowrap">{% if a.ai or a.result %}<span class="text-muted">{{ a.ai | rec if a.ai else '–' }}</span> → <strong>{{ a.result | rec if a.result else '–' }}</strong>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+          <td class="px-5 py-3 text-muted">{{ a.reasons | map('reason') | join(', ') if a.reasons else '–' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="px-5 py-6 text-center text-muted">아직 기록이 없어요.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-muted">감사 로그와 판정 기록은 추가 전용이에요. 수정하거나 삭제할 수 없어요.</p>
+</section>
+
+<section class="mt-10 card grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center" aria-label="데이터 보존 및 파기 정책">
+  <div class="grid gap-2">
+    <h2 class="font-semibold">데이터 보존 및 파기 정책</h2>
+    <ul class="grid gap-1 text-sm text-ink-80">
+      <li>학생이 삭제를 요청하면 <strong>{{ retention_days }}일</strong> 안에 처리해요. 심사관 확인 후 관리자가 승인하면 즉시 삭제돼요.</li>
+      <li>삭제 대상: 강의계획서·보완 자료·성적표 원본, 추출 텍스트·구조화 결과, 성적표 과목 목록</li>
+      <li>남는 기록: 교수 판정과 감사 로그 (판정 결과와 당시 AI 추천 요약만, 원본 문서 없음)</li>
+      <li>학생 문서는 모델 학습에 쓰지 않아요.</li>
+    </ul>
+  </div>
+  <a href="/admin/privacy" class="btn-secondary btn-sm justify-self-start">삭제 승인 화면{% if s.privacy_open %} ({{ s.privacy_open }}){% endif %}</a>
+</section>
+{% endif %}
 {% endblock %}

@@ -9,15 +9,15 @@
 
 {% if not v.decision or v.awaiting_redecision %}
 {% set f = form or {} %}
-<form method="post" action="/professor/evaluations/{{ v.evaluation.id }}/decision" id="decision" class="card mt-10 grid scroll-mt-16 gap-5">
+{% set ai = v.evaluation.recommendation if v.evaluation.recommendation in ('direct', 'elective', 'none') else 'insufficient' %}
+{% set past = v.history | selectattr("same_target") | selectattr("same_syllabus") | map(attribute="result") | list %}
+{% set reopen = conflict or (error and f.get('action') in ('reject', 'modify')) %}
+<form method="post" action="/professor/evaluations/{{ v.evaluation.id }}/decision" id="decision" class="card mt-10 grid scroll-mt-16 gap-5"
+      data-decision-form data-ai="{{ ai }}" data-candidate="{{ v.candidate.id if v.candidate else '' }}" data-past='{{ past | tojson }}'>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <h2 class="section-title">{{ '이의 신청 재판정' if v.decision else '최종 판정' }}</h2>
   {% if v.decision %}<p class="text-sm text-muted">학생의 이의 사유와 원 판정을 확인하고 다시 판정해 주세요. 원 판정은 지워지지 않고 기록으로 남아요.</p>{% endif %}
-  {% if error %}<p class="text-sm text-reject">{{ error }}</p>{% endif %}
-  {% if conflict %}
-  <div class="rounded-sm bg-elective-subtle p-3 text-sm"><p class="font-semibold">{{ conflict }}</p>
-    <label class="mt-2 flex items-center gap-2"><input type="checkbox" name="acknowledge_conflict" value="true"> 과거 판정을 확인했고 이 판정으로 확정합니다</label></div>
-  {% endif %}
+  {% if error and not reopen %}<p class="text-sm text-reject">{{ error }}</p>{% endif %}
   <fieldset class="flex flex-wrap gap-2">
     <legend class="sr-only">판정</legend>
     {% for value, label in [('approve', 'AI 추천대로 승인'), ('modify', '수정'), ('reject', '반려(불인정)')] %}
@@ -32,16 +32,48 @@
       <select name="target_course_id" class="input h-11"><option value="">선택</option>{% for c in v.target_courses %}<option value="{{ c.id }}" {% if f.get('target_course_id') == c.id|string or (not f.get('target_course_id') and v.candidate and c.id == v.candidate.id) %}selected{% endif %}>{{ c.code }} {{ c.title }}</option>{% endfor %}</select>
     </label>
   </div>
-  <fieldset class="grid gap-2">
-    <legend class="text-sm font-normal text-muted">사유 (반려하거나 AI 추천과 다르게 판정하면 1개 이상)</legend>
-    <div class="flex flex-wrap gap-2">
-      {% for code, label in reason_labels.items() %}
-      <label class="chip cursor-pointer"><input class="sr-only" type="checkbox" name="reason_codes" value="{{ code }}" {% if code in f.get('reason_codes', []) %}checked{% endif %}>{{ label }}</label>
-      {% endfor %}
-    </div>
-  </fieldset>
-  <label class="field"><span>메모 ('기타'를 고르면 필수)</span><textarea class="textarea" name="reason_memo" rows="2">{{ f.get('reason_memo', '') }}</textarea></label>
+  <p class="text-sm text-muted">반려하거나 AI 추천과 다르게 판정하면 확정 전에 사유를 고르는 창이 열려요.</p>
   <button class="btn-primary w-fit">판정 확정</button>
+
+  {# 사유 선택 및 소명 창: 반려·추천과 다른 판정·과거 판정과 다른 결과일 때 확정 전에 연다 #}
+  <dialog id="reason-dialog" class="m-auto max-h-[calc(100dvh-32px)] w-[min(640px,calc(100%-32px))] overflow-y-auto rounded-lg border border-hairline bg-white p-0 text-ink backdrop:bg-black/50" aria-labelledby="reason-title" {% if reopen %}data-autoopen{% endif %}>
+    <div class="flex items-start justify-between gap-4 border-b border-divider px-6 py-5">
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-reject-subtle text-reject" aria-hidden="true"><svg class="size-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 6v5m0 3h.01M3.5 16h13L10 4 3.5 16Z" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div class="grid gap-1">
+          <h3 id="reason-title" class="text-[21px] font-semibold" data-reason-title>{{ '학점 불인정 사유 선택 및 소명' if f.get('action') == 'reject' else ('판정 변경 사유 선택 및 소명' if f.get('action') == 'modify' else '과거 판정과 다른 결과 확인') }}</h3>
+          <p class="text-sm text-muted">{{ v.syllabus.course_code or '' }} {{ v.syllabus.course_title }} → {{ v.candidate.code if v.candidate else '후보 없음' }} · AI 추천 {{ v.evaluation.recommendation | rec }}</p>
+        </div>
+      </div>
+      <button type="button" class="grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-parchment" data-dialog-close aria-label="닫기"><svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 5 10 10M15 5 5 15" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="grid gap-5 px-6 py-5">
+      {% if error and reopen %}<p class="rounded-sm bg-reject-subtle px-3 py-2 text-sm text-reject">{{ error }}</p>{% endif %}
+      <div class="grid gap-2 rounded-md border border-elective/40 bg-elective-subtle p-4 text-sm" data-conflict-warning {% if not conflict %}hidden{% endif %}>
+        <p class="font-semibold text-elective">일관성 경보</p>
+        <p data-conflict-text>{{ conflict or '' }}</p>
+        <a href="#history" class="btn-text w-fit text-sm" data-dialog-close>과거 판정 이력 보기</a>
+        <label class="flex items-center gap-2"><input type="checkbox" name="acknowledge_conflict" value="true" {% if f.get('acknowledge_conflict') %}checked{% endif %}> 과거 판정을 확인했고 이 판정으로 확정합니다</label>
+      </div>
+      <fieldset class="grid gap-2" data-reasons>
+        <legend class="mb-2 text-sm font-semibold">사유 <span class="font-normal text-muted">(1개 이상 선택)</span></legend>
+        {% for code, label in reason_labels.items() %}
+        <label class="grid cursor-pointer grid-cols-[20px_1fr] gap-3 rounded-md border border-hairline px-4 py-3 has-[:checked]:border-reject/50 has-[:checked]:bg-reject-subtle">
+          <input type="checkbox" name="reason_codes" value="{{ code }}" class="mt-1 size-4 accent-[#c9342b]" {% if code in f.get('reason_codes', []) %}checked{% endif %}>
+          <span class="grid gap-0.5"><span class="font-semibold">{{ label }}</span><span class="text-sm text-muted">{{ reason_hints.get(code, '') }}</span></span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <label class="field" data-reasons>
+        <span class="flex justify-between gap-2"><span>소명 메모 ('기타'를 고르면 필수)</span><span class="tabular-nums text-muted"><span data-memo-count>{{ f.get('reason_memo', '') | length }}</span>/500</span></span>
+        <textarea class="textarea" name="reason_memo" rows="3" maxlength="500" data-memo placeholder="판정 근거를 학사처와 학생이 이해할 수 있게 적어 주세요.">{{ f.get('reason_memo', '') }}</textarea>
+      </label>
+    </div>
+    <div class="flex flex-wrap items-center justify-end gap-2 border-t border-divider bg-pearl px-6 py-4">
+      <button type="button" class="btn-secondary btn-sm" data-dialog-close>취소 / 판정 변경</button>
+      <button type="submit" class="btn-primary btn-sm" data-reason-submit>{{ '불인정 사유 저장 및 판정 확정' if f.get('action') == 'reject' else ('사유 저장 및 판정 확정' if f.get('action') == 'modify' else '확인하고 판정 확정') }}</button>
+    </div>
+  </dialog>
 </form>
 
 {# 하단 고정 판정 바: 스크롤 중에도 과목 요약과 판정 액션을 유지한다 #}

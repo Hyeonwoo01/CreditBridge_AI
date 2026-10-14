@@ -4,45 +4,70 @@
 {% block content %}
 {% set req = view.request %}
 {% set sim = view.simulation %}
-<header class="grid gap-2">
-  <p class="text-sm text-muted"><a href="/student" class="underline">내 편입 요청</a></p>
-  <h1 class="page-title">{{ req.source_institution.name }} → {{ req.target_institution.name }}</h1>
-  <p class="text-muted">{{ {"draft": "자료를 올리고 예상 결과를 확인하는 단계예요. 준비가 되면 학사처에 심사를 요청하세요.", "submitted": "학사처 심사 중이에요. 과목별 진행 단계와 예상 완료일을 확인하세요.", "decided": "모든 과목의 판정이 끝났어요."}[req.status] }}</p>
+{% set gc = view.group_counts %}
+<header class="flex flex-wrap items-end justify-between gap-4">
+  <div class="grid gap-1">
+    <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase"><a href="/student" class="hover:underline">내 편입 요청</a> · Transfer Credit Simulation</p>
+    <h1 class="page-title">{{ user.name }} 님의 편입 학점 시뮬레이션 리포트</h1>
+    <p class="text-sm text-muted">{{ req.source_institution.name }} → {{ req.target_institution.name }}{% if req.major %} · {{ req.major }}{% endif %}{% if view.last_analyzed %} · 최근 분석 {{ time(view.last_analyzed) }}{% endif %}</p>
+  </div>
+  {% if req.status == 'draft' %}<a href="#upload" class="btn-primary btn-sm"><svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke-linecap="round"/></svg>새 강의계획서 추가 업로드</a>{% endif %}
 </header>
 
 {% set cr = (sim.credits_low | round(1)) ~ ('' if sim.credits_high == sim.credits_low else '~' ~ (sim.credits_high | round(1))) %}
-<section class="tile-dark mt-8 grid gap-8" aria-label="예상 결과">
-  <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 class="section-title">예상 결과</h2>
-    <span class="text-xs text-on-dark-muted">추천과 신뢰도로 계산한 예상치 · 최종 인정은 학과 교수 판정</span>
-  </div>
-  <div class="grid gap-8 sm:grid-cols-3">
-    <div class="grid content-start gap-1">
-      <span class="text-sm text-on-dark-muted">예상 인정 학점</span>
-      <span class="font-display text-[40px] leading-[1.07] font-semibold tracking-[-0.28px] tabular-nums lg:text-[56px]">{{ cr }}</span>
-      <span class="text-xs text-on-dark-muted">이수 {{ sim.source_credits | round(1) }}학점 중</span>
+{% set max_pct = ((sim.credits_high / sim.source_credits * 100) | round | int) if sim.source_credits else 0 %}
+<section class="tile-dark mt-6 grid gap-8" aria-label="예상 결과">
+  <div class="flex flex-wrap items-end justify-between gap-6">
+    <div class="grid gap-2">
+      <span class="text-sm text-on-dark-muted">AI 분석 기반 예상치 · {{ {"draft": "제출 전", "submitted": "학사처 심사 중", "decided": "판정 완료"}[req.status] }}</span>
+      <p class="font-display text-[32px] leading-[1.1] font-semibold tracking-[-0.28px] lg:text-[44px]">예상 인정 학점: <span class="text-primary-on-dark tabular-nums">{{ cr }}</span> <span class="text-on-dark-muted tabular-nums">/ {{ sim.source_credits | round(1) }} 학점</span>{% if sim.source_credits %} <span class="text-[0.55em] font-normal text-on-dark-muted">(최대 {{ max_pct }}%)</span>{% endif %}</p>
     </div>
-    <div class="grid content-start gap-1">
+    <div class="flex items-center gap-4 rounded-md border border-white/15 px-5 py-3 text-sm">
+      <span class="grid"><span class="text-xs text-on-dark-muted">출신 대학 이수</span><strong class="tabular-nums">{{ sim.source_credits | round(1) }}학점</strong></span>
+      <svg class="size-4 text-on-dark-muted" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 10h12m-4-4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="grid"><span class="text-xs text-on-dark-muted">{{ req.target_institution.name }} 인정</span><strong class="text-primary-on-dark tabular-nums">{{ cr }}학점</strong></span>
+    </div>
+  </div>
+  <div class="grid gap-3 sm:grid-cols-3">
+    <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
       <span class="text-sm text-on-dark-muted">졸업까지 남은 학기</span>
-      <span class="font-display text-[40px] leading-[1.07] font-semibold tracking-[-0.28px] tabular-nums lg:text-[56px]">{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}</span>
-      <span class="text-xs text-on-dark-muted">졸업 {{ sim.degree_credits }}학점 기준</span>
+      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}<span class="text-base font-normal text-on-dark-muted"> 학기</span></span>
+      <span class="text-xs text-on-dark-muted">졸업 {{ sim.degree_credits }}학점 · 학기당 15학점 기준</span>
     </div>
-    <div class="grid content-start gap-1">
+    <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
       <span class="text-sm text-on-dark-muted">미인정 시 추가 비용</span>
-      <span class="font-display text-[40px] leading-[1.07] font-semibold tracking-[-0.28px] tabular-nums lg:text-[56px]">${{ '{:,}'.format(sim.extra_cost_low) }}{% if sim.extra_cost_high != sim.extra_cost_low %}<span class="text-[0.6em]">~{{ '{:,}'.format(sim.extra_cost_high) }}</span>{% endif %}</span>
-      <span class="text-xs text-on-dark-muted">학점당 ${{ '{:,}'.format(sim.tuition_per_credit) }}</span>
+      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">${{ '{:,}'.format(sim.extra_cost_low) }}{% if sim.extra_cost_high != sim.extra_cost_low %}<span class="text-[0.6em]">~{{ '{:,}'.format(sim.extra_cost_high) }}</span>{% endif %}</span>
+      <span class="text-xs text-on-dark-muted">인정되면 최대 ${{ '{:,}'.format((sim.credits_high * sim.tuition_per_credit) | round | int) }} 절감 · 학점당 ${{ '{:,}'.format(sim.tuition_per_credit) }}</span>
+    </div>
+    <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
+      <span class="text-sm text-on-dark-muted">심사 진행 상태</span>
+      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{{ view.decided_count }}<span class="text-base font-normal text-on-dark-muted"> / {{ gc.all }} 과목 확정</span></span>
+      <span class="text-xs text-on-dark-muted">인정 {{ gc.approved }} · 보완 필요 {{ gc.supplement }} · 심사 중 {{ gc.review }}{% if gc.other %} · 불인정 {{ gc.other }}{% endif %}</span>
     </div>
   </div>
+  <p class="text-xs text-on-dark-muted">추천과 신뢰도로 계산한 예상치예요. 최종 인정 여부는 학과 교수가 판정하며, 확정된 과목은 판정 결과로 계산해요.</p>
 </section>
 
 {% if view.open_materials %}
-<p class="mt-6 rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">학사처·교수가 보완 자료를 요청한 과목이 {{ view.open_materials }}개 있어요. 과목을 눌러 요청 내용을 확인하고 자료를 올려 주세요.</p>
+<p class="mt-6 rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">학사처·교수가 보완 자료를 요청한 과목이 {{ view.open_materials }}개 있어요. 아래 <strong>보완 필요</strong> 과목에서 요청 내용을 확인하고 자료를 올려 주세요.</p>
 {% endif %}
 
-<div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+<div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
   <div class="grid gap-8">
+    <section class="grid gap-4" aria-label="과목별 결과">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <nav class="flex flex-wrap gap-2" aria-label="과목 필터">
+          {% for key, label in [('all', '전체'), ('approved', '승인 완료'), ('supplement', '보완 필요'), ('review', '심사 중')] %}
+          <a href="?show={{ key }}{% if request.query_params.get('tuition') %}&tuition={{ sim.tuition_per_credit }}{% endif %}{% if request.query_params.get('degree') %}&degree={{ sim.degree_credits }}{% endif %}" class="chip {{ 'border-ink bg-ink text-white' if view.show == key else '' }}" {% if view.show == key %}aria-current="true"{% endif %}>{{ label }} <span class="ml-1 tabular-nums {{ 'text-white/70' if view.show == key else 'text-muted' }}">{{ gc[key] }}</span></a>
+          {% endfor %}
+        </nav>
+        <span class="text-xs text-muted">개념 커버리지 75% 이상이면 직접 인정 추천</span>
+      </div>
+      {% include "partials/course_list.html" %}
+    </section>
+
     {% if req.status == 'draft' %}
-    <section class="grid gap-4 md:grid-cols-2">
+    <section id="upload" class="grid scroll-mt-20 gap-4 md:grid-cols-2">
       <form method="post" action="/student/requests/{{ req.id }}/syllabi" enctype="multipart/form-data" class="grid gap-3 dropzone">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <span class="font-semibold">강의계획서 올리기</span>
@@ -59,11 +84,6 @@
       </form>
     </section>
     {% endif %}
-
-    <section class="grid gap-4">
-      <h2 class="section-title">과목별 결과</h2>
-      {% include "partials/course_list.html" %}
-    </section>
 
     {% if view.entries %}
     <section id="transcript" class="grid gap-3">
@@ -96,29 +116,62 @@
     {% endif %}
   </div>
 
-  <aside class="card grid gap-5 lg:sticky lg:top-16">
-    <p class="text-sm font-semibold">계산 조건</p>
-    <form method="get" class="grid grid-cols-2 gap-3">
-      <label class="field"><span>학점당 등록금($)</span><input class="input h-11" type="number" name="tuition" min="0" step="50" value="{{ sim.tuition_per_credit }}"></label>
-      <label class="field"><span>졸업 학점</span><input class="input h-11" type="number" name="degree" min="1" max="300" value="{{ sim.degree_credits }}"></label>
-      <button class="btn-secondary btn-sm col-span-2">다시 계산</button>
-    </form>
-    {% if req.status == 'draft' %}
-    <form method="post" action="/student/requests/{{ req.id }}/submit">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="btn-primary w-full" {% if view.processing or not view.rows %}disabled{% endif %}>학사처에 심사 요청</button>
-    </form>
-    {% endif %}
-    {% set pr = view.privacy %}
-    {% if pr and pr.status != 'completed' %}
-    <p class="text-sm text-muted">문서 삭제 요청: {{ pr.status | privacy_status }} · {{ time(pr.due_at, "date") }}까지 처리돼요.</p>
-    {% else %}
-    {% if pr %}<p class="text-sm text-muted">문서 삭제 완료 · {{ time(pr.completed_at, "date") }}</p>{% endif %}
-    <form method="post" action="/student/requests/{{ req.id }}/delete-documents" onsubmit="return confirm('올린 원본 파일·추출 텍스트·성적표 정보 삭제를 요청할까요? 학사처 확인과 기관 승인을 거쳐 기한 안에 삭제되고, 되돌릴 수 없어요.')">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="text-sm text-muted underline underline-offset-2">내 문서 삭제 요청</button>
-    </form>
-    {% endif %}
+  <aside class="grid gap-4 lg:sticky lg:top-16">
+    <section class="card grid gap-4 p-5" aria-label="심사 진행 현황">
+      <h2 class="font-semibold">심사 진행 현황</h2>
+      {% set submitted = req.status in ('submitted', 'decided') %}
+      {% set steps = [
+        ('서류 접수', view.rows | length > 0, ('강의계획서 ' ~ (view.rows | length) ~ '건') if view.rows else '강의계획서를 올려 주세요'),
+        ('AI 구조화·근거 추출', view.analysis_done, '과목별 개념·근거 구절 추출 완료' if view.analysis_done else ('분석 중이에요' if view.processing else '업로드 후 자동으로 시작돼요')),
+        ('학과 교수 심사', req.status == 'decided', (view.decided_count ~ ' / ' ~ gc.all ~ ' 과목 판정') if submitted else '학사처에 심사를 요청하면 시작돼요'),
+        ('최종 확정', req.status == 'decided', '모든 과목 판정 완료' if req.status == 'decided' else '교수 판정이 끝나면 확정돼요'),
+      ] %}
+      {% set ns = namespace(current_set=false) %}
+      <ol class="grid">
+        {% for label, done, hint in steps %}
+        {% set current = not done and not ns.current_set and (loop.index0 != 2 or submitted) %}
+        {% if current %}{% set ns.current_set = true %}{% endif %}
+        <li class="relative grid grid-cols-[24px_1fr] gap-3 pb-5 last:pb-0">
+          {% if not loop.last %}<span class="absolute top-6 bottom-0 left-[11px] w-px {{ 'bg-primary' if done else 'bg-hairline' }}" aria-hidden="true"></span>{% endif %}
+          <span class="relative grid size-6 place-items-center rounded-full text-xs font-semibold {{ 'bg-primary text-white' if done else ('border-2 border-primary bg-white text-primary' if current else 'border border-hairline bg-white text-muted') }}">{% if done %}<svg class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 10 3.5 3.5L15 7" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}{{ loop.index }}{% endif %}</span>
+          <span class="grid gap-1">
+            <span class="text-sm {{ 'font-semibold' if done or current else 'text-muted' }}">{{ label }}{% if current %} <span class="text-xs font-normal text-primary">진행 중</span>{% endif %}</span>
+            <span class="text-xs text-muted">{{ hint }}</span>
+            {% if loop.index0 == 2 and submitted and gc.all %}<span class="meter mt-1"><span style="width: {{ (view.decided_count / gc.all * 100) | round | int }}%"></span></span>{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ol>
+      {% if req.status == 'draft' %}
+      <form method="post" action="/student/requests/{{ req.id }}/submit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn-primary w-full" {% if view.processing or not view.rows %}disabled{% endif %}>학사처에 심사 요청</button>
+      </form>
+      {% endif %}
+    </section>
+
+    <section class="card grid gap-3 p-5" aria-label="계산 조건">
+      <p class="text-sm font-semibold">계산 조건</p>
+      <form method="get" class="grid grid-cols-2 gap-3">
+        {% if view.show != 'all' %}<input type="hidden" name="show" value="{{ view.show }}">{% endif %}
+        <label class="field"><span>학점당 등록금($)</span><input class="input h-11" type="number" name="tuition" min="0" step="50" value="{{ sim.tuition_per_credit }}"></label>
+        <label class="field"><span>졸업 학점</span><input class="input h-11" type="number" name="degree" min="1" max="300" value="{{ sim.degree_credits }}"></label>
+        <button class="btn-secondary btn-sm col-span-2">다시 계산</button>
+      </form>
+    </section>
+
+    <div class="px-1">
+      {% set pr = view.privacy %}
+      {% if pr and pr.status != 'completed' %}
+      <p class="text-sm text-muted">문서 삭제 요청: {{ pr.status | privacy_status }} · {{ time(pr.due_at, "date") }}까지 처리돼요.</p>
+      {% else %}
+      {% if pr %}<p class="text-sm text-muted">문서 삭제 완료 · {{ time(pr.completed_at, "date") }}</p>{% endif %}
+      <form method="post" action="/student/requests/{{ req.id }}/delete-documents" onsubmit="return confirm('올린 원본 파일·추출 텍스트·성적표 정보 삭제를 요청할까요? 학사처 확인과 기관 승인을 거쳐 기한 안에 삭제되고, 되돌릴 수 없어요.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="text-sm text-muted underline underline-offset-2">내 문서 삭제 요청</button>
+      </form>
+      {% endif %}
+    </div>
   </aside>
 </div>
 {% endblock %}

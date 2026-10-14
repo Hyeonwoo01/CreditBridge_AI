@@ -51,16 +51,29 @@
       {% endif %}
     </div>
   </header>
-  <main class="mx-auto w-full max-w-[1080px] flex-1 px-4 pt-8 pb-20 md:px-10 md:pt-12">
+  {% if user and user.role != 'student' %}
+  {# 보조 바: 소속 기관과 심사 집계 (HTMX로 불러온다) #}
+  <div class="border-b border-hairline bg-white">
+    <div class="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5 md:px-10">
+      <p class="flex min-w-0 items-center gap-2 text-[13px] text-ink-80">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h6"/></svg>
+        <span class="font-semibold text-ink">{{ user.institution.name if user.institution else '' }}</span>
+        <span class="text-muted">/ {% block crumb %}{{ {"evaluator": "학사처 심사 워크스페이스", "professor": "학과 심사 워크스페이스", "admin": "관리자 콘솔"}[user.role] }}{% endblock %}</span>
+      </p>
+      <div class="flex flex-wrap gap-1.5" hx-get="/notifications/workspace" hx-trigger="load" hx-swap="innerHTML"></div>
+    </div>
+  </div>
+  {% endif %}
+  <main class="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-8 pb-20 md:px-10 md:pt-10">
     {% for f in flashes %}
     <div role="status" class="mb-4 rounded-md px-4 py-3 text-sm {{ 'bg-reject-subtle text-reject' if f.kind == 'error' else 'bg-parchment text-ink-80' }}">{{ f.message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="bg-parchment text-ink-80">
-    <div class="mx-auto max-w-[1080px] px-4 py-10 text-xs leading-relaxed tracking-[-0.12px] text-muted md:px-10">
-      <p>본 시스템의 AI 분석 결과는 심사 참고용 근거 자료이며, 최종 학점 인정 여부는 해당 학과 교수의 승인으로 확정됩니다.</p>
-      <p class="mt-1">제출한 문서는 심사 목적으로만 쓰이며, 삭제 요청 시 기관 승인을 거쳐 처리 기한 안에 지워집니다.</p>
+  <footer class="border-t border-hairline bg-parchment text-ink-80">
+    <div class="mx-auto grid max-w-[1280px] gap-3 px-4 py-8 text-xs leading-relaxed tracking-[-0.12px] md:px-10">
+      <p class="flex gap-2"><svg class="mt-0.5 shrink-0 text-primary" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span><strong class="text-ink">Human-in-the-Loop 고지:</strong> 본 시스템의 AI 분석 결과는 심사 참고용 근거 자료이며, 최종 학점 인정 여부는 해당 학과 교수의 승인으로 확정됩니다.</span></p>
+      <p class="text-muted">제출한 문서는 심사 목적으로만 쓰이며, 삭제 요청 시 기관 승인을 거쳐 처리 기한 안에 지워집니다. · © CreditBridge AI</p>
     </div>
   </footer>
 </body>

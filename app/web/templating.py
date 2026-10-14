@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
 from app.security.csrf import csrf_token
-from app.services.decisions import REASON_LABELS
+from app.services.decisions import REASON_HINTS, REASON_LABELS
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -83,6 +83,7 @@ TEMPLATES.env.filters.update(
     privacy_status=lambda v: PRIVACY_LABEL.get(v, v),
 )
 TEMPLATES.env.globals["reason_labels"] = REASON_LABELS
+TEMPLATES.env.globals["reason_hints"] = REASON_HINTS
 
 
 def render(request: Request, name: str, status_code: int = 200, **context: Any) -> Response:

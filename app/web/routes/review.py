@@ -29,24 +29,26 @@ Evaluator = Depends(require(Role.EVALUATOR))
 @router.get("")
 def queue(
     request: Request,
-    tab: str = Query("high", pattern="^(high|low|insufficient)$"),
+    tab: str = Query("all", pattern="^(all|high|low|insufficient|conflict)$"),
     department: str = Query(""),
     sort: str = Query("submitted", pattern="^(submitted|coverage|department)$"),
+    q: str = Query("", max_length=100),
+    page: int = Query(1, ge=1),
     user: User = Evaluator,
     session: Session = Depends(get_db),
 ) -> Response:
-    rows, counts, departments = review_service.queue(session, user, tab, department or None, sort)
+    view = review_service.queue(session, user, tab, department or None, sort, q, page)
     return render(
         request,
         "review/queue.html",
         user=user,
-        rows=rows,
-        counts=counts,
-        departments=departments,
+        view=view,
         tab=tab,
         tabs=review_service.TABS,
         department=department,
         sort=sort,
+        q=q,
+        stats=stats_service.institution_stats(session, user),
     )
 
 
@@ -54,7 +56,7 @@ def queue(
 def assign(
     request: Request,
     evaluation_ids: list[int] = Form([]),
-    tab: str = Form("high"),
+    tab: str = Form("all"),
     csrf_token: str = Form(""),
     user: User = Evaluator,
     session: Session = Depends(get_db),
