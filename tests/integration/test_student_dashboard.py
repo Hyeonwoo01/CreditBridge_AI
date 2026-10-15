@@ -77,28 +77,31 @@ def test_nav_badges_for_new_results_clear_when_viewed(client: TestClient, seeded
     assert "새 이의 신청 결과" not in client.get("/student").text
 
 
-def test_precedents_show_counts_without_who(client: TestClient, seeded: Session) -> None:
-    ev, prof, token = professor_for(client, seeded, "calculus.txt")
-    approve(client, ev, token)
+def test_precedents_show_only_institution_equivalency_table(client: TestClient, seeded: Session) -> None:
+    ev, _, token = professor_for(client, seeded, "calculus.txt")
+    approve(client, ev, token)  # 다른 학생의 확정 판정은 사례로 보이지 않는다
 
-    login(client, "senior@student.example")  # 다른 학생도 과목 단위 사례는 볼 수 있다
+    login(client, "senior@student.example")
     page = client.get("/student/precedents").text
-    assert "선배 인정 사례" in page and "MATH 101" in page and '판정 <span class="tabular-nums">1</span>건' in page
-    assert "직접 인정" in page
-    assert "Lee" not in page and "jiwon" not in page and prof.name not in page  # 누가 받았는지·판정자 없음
-    assert "MATH 101" not in client.get("/student/precedents?q=chemistry").text
-    assert "MATH 101" in client.get("/student/precedents?q=math").text
+    assert "선배 인정 사례" in page and "MATH 101 Calculus I" not in page
+    assert "동등 과목표에 아직 이 대학 과목이 없어요" in page
 
     token = login(client, "rachel@msu.example")
     assert client.get("/student/precedents").status_code == 403
     csv = (
         "source_institution,source_course,target_course,result,decided_on,note\n"
         "Hankuk University (한국대학교),CHEM 110 General Chemistry,,선택 인정,2021-02-01,내부 메모\n"
+        "Hankuk University (한국대학교),CHEM 110 General Chemistry,,선택 인정,2023-03-02,\n"
+        "Hankuk University (한국대학교),MATH 101,,불인정,2019-08-30,구 교육과정\n"
     )
     client.post(
         "/review/equivalencies", files={"file": ("eq.csv", csv.encode(), "text/csv")}, data={"csrf_token": token}
     )
     login(client, "senior@student.example")
+    page = client.get("/student/precedents").text
+    assert page.count("CHEM 110 General Chemistry") == 1 and "2023-03-02" in page  # 같은 기준은 한 줄, 최근 날짜
+    assert "선택 인정" in page and "불인정" in page
+    assert "내부 메모" not in page and "구 교육과정" not in page  # 기관 메모는 보여 주지 않는다
+    assert "MATH 1151" not in page  # 확정 판정에서 온 행 없음
     page = client.get("/student/precedents?q=chem").text
-    assert "CHEM 110 General Chemistry" in page and "동등 과목표" in page and "2021-02" in page
-    assert "선택 인정" in page and "내부 메모" not in page  # 기관 메모는 보여 주지 않는다
+    assert "CHEM 110" in page and ">MATH 101<" not in page

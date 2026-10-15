@@ -45,7 +45,7 @@
 | 기능 | 상태 | 비고 |
 | --- | --- | --- |
 | FR-25 근거 원문 위치 이동 | 🟡 | 근거 구절을 누르면 학생·기준 강의계획서 원문의 해당 위치로 이동하고 표시(`templating.highlight`). 원본 PDF의 페이지 번호로 이동은 아직 없음 (`test_evidence_links_jump_to_source_positions`) |
-| FR-26 기존 동등 과목표 가져오기 | ✅ | CSV(엑셀 'CSV UTF-8', cp949도 읽음) 일괄 가져오기, 한 줄이라도 틀리면 저장 안 함. 과거 판정 이력에 "기존 동등 과목표"로 표시하되 강의계획서가 없어 경보 대상은 아님. 학생 "선배 인정 사례"(`/student/precedents`, `services/precedents.py`)에서 동등 과목표와 확정 판정(현재 판정만)을 출신 과목·인정 과목·결과별 건수로 검색 — 누가 받았는지·사유·메모는 보이지 않음 (`test_equivalency_import_shows_in_history_without_blocking`, `test_precedents_show_counts_without_who`) |
+| FR-26 기존 동등 과목표 가져오기 | ✅ | CSV(엑셀 'CSV UTF-8', cp949도 읽음) 일괄 가져오기, 한 줄이라도 틀리면 저장 안 함. 과거 판정 이력에 "기존 동등 과목표"로 표시하되 강의계획서가 없어 경보 대상은 아님. 학생 "선배 인정 사례"(`/student/precedents`, `services/precedents.py`)에서 기관 동등 과목표만 출신 대학·과목으로 검색(같은 기준은 한 줄, 최근 판정일). 다른 학생의 CreditBridge 판정과 동등 과목표 메모는 보이지 않음 (`test_equivalency_import_shows_in_history_without_blocking`, `test_precedents_show_only_institution_equivalency_table`) |
 | FR-27 운영 통계 | ✅ | 처리량, 판정 대기 과목, 평균 소요일, AI 추천 수용률(=1-AI-교수 불일치율), 학과별 처리 지표(접수·판정·처리율·평균 소요일), 승인·수정·반려 구성, 이의 신청·삭제 요청 현황, 월별 판정 (`services/stats.py`). 관리자는 "관리자 콘솔"(`/admin/stats`, 감사 로그·보존 정책 포함), 심사관은 "운영 통계"(`/review/stats`) (`test_stats_page_counts_decisions_and_disagreement`, `test_admin_console_shows_recent_audit_without_student_names`) |
 | FR-28 복수 대학 비교 | ⬜ | 기능 명세상 합격 전 학생 대상이라 사업 모델 확정 후 정의 |
 
@@ -71,7 +71,7 @@
 | --- | --- | --- | --- | --- |
 | 공통 레이아웃 | 모든 화면 | `base.html` (기관 보조 바·집계 칩, Human-in-the-Loop 푸터), 학생 메뉴 배지 `student/_nav.html`·`web/nav.py` | FR-12, FR-19·20 알림 | `test_queue_search_and_conflict_filter`(집계 칩, 학생에게 숨김), `test_nav_badges_for_new_results_clear_when_viewed` |
 | 학생 홈(대시보드) | `/student` | `student/index.html` | FR-15 요청 만들기·요청별 예상 인정 학점·판정 확정 수·남은 학기, FR-21 할 일·서류 준비율 | `test_request_needs_affiliated_student_and_valid_major`, `test_dashboard_lists_todos_and_readiness` |
-| 선배 인정 사례(학생) | `/student/precedents` | `student/precedents.html` | FR-26 동등 과목표 + 확정 판정의 과목 단위 건수 | `test_precedents_show_counts_without_who` |
+| 선배 인정 사례(학생) | `/student/precedents` | `student/precedents.html` | FR-26 기관 동등 과목표 검색 | `test_precedents_show_only_institution_equivalency_table` |
 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | `student/request.html`, `partials/course_list.html` | FR-01·02·15·21·22, FR-13 삭제 요청 | `test_request_page_shows_simulation_and_stage`, `test_student_report_filters_courses` |
 | 이의 신청(학생) | `/student/appeals` | `student/appeals.html` | FR-23 | `test_student_sees_own_appeals_and_report_links_back` |
 | 이의 신청 작성(학생) | `/student/evaluations/{id}/appeal` | `student/appeal_form.html` | FR-23 | `test_appeal_form_with_evidence_files` |

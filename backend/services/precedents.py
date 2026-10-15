@@ -1,7 +1,7 @@
-"""선배 인정 사례 (학생용): 소속 대학이 같은 출신 대학 과목을 어떻게 인정해 왔는지 과목 단위로 모아 보여 준다.
+"""선배 인정 사례 (학생용): 소속 대학의 기존 동등 과목표(FR-26)를 출신 대학·과목으로 찾아 보여 준다.
 
-기관의 기존 동등 과목표(FR-26)와 CreditBridge에서 확정된 판정(현재 판정만)을 과목·대상 과목·결과별 건수로 합친다.
-누가 받은 판정인지, 사유·성적·메모는 보여 주지 않는다 (FR-12: 다른 학생의 심사 건 자체에는 접근하지 않는다).
+기관이 공식 기준으로 가져온 동등 과목표만 쓴다. CreditBridge에서 내린 다른 학생의 판정은 보여 주지 않는다
+(FR-12: 학생은 본인 건만). 동등 과목표의 메모도 기관 내부용이라 보여 주지 않는다.
 """
 
 from dataclasses import dataclass, field
@@ -13,7 +13,6 @@ from backend.errors import PermissionDeniedError
 from backend.models import Course, Institution, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
-from backend.repositories import decisions as decision_repo
 from backend.repositories import equivalencies as equivalency_repo
 from backend.repositories import requests as request_repo
 from backend.services.equivalencies import course_key
@@ -24,9 +23,7 @@ class PrecedentRow:
     source_label: str
     target_course: Course | None
     result: str  # direct / elective / none
-    decided: int = 0  # CreditBridge 확정 판정 건수
-    listed: int = 0  # 기관 동등 과목표 건수
-    latest: date | None = None
+    latest: date | None = None  # 동등 과목표의 가장 최근 판정일
 
 
 @dataclass
@@ -53,29 +50,16 @@ def search(session: Session, student: User, source_id: int | None, query: str) -
     if source is None:
         return found
 
+    # 같은 과목·인정 과목·결과가 여러 줄이면 한 줄로 합치고 가장 최근 판정일을 남긴다
     groups: dict[tuple[str, int | None, str], PrecedentRow] = {}
-    course_ids: set[int] = set()
-
-    def add(label: str, course_id: int | None, result: str, when: date | None, decided: bool) -> None:
-        key = (course_key(label), course_id, result)
-        row = groups.setdefault(key, PrecedentRow(label, None, result))
-        if decided:
-            row.decided += 1
-        else:
-            row.listed += 1
-        if when and (row.latest is None or when > row.latest):
-            row.latest = when
-        if course_id:
-            course_ids.add(course_id)
-
-    for decision, syllabus in decision_repo.current_for_pair(session, target.id, source.id):
-        label = " ".join(x for x in (syllabus.course_code, syllabus.course_title) if x).strip()
-        if label:
-            add(label, decision.target_course_id, decision.result, decision.decided_at.date(), True)
     for e in equivalency_repo.of_pair(session, target.id, source.id):
-        add(e.source_course_label, e.target_course_id, e.result, e.decided_on, False)
-
-    courses = catalog_repo.courses_by_ids(session, list(course_ids))
+        row = groups.setdefault(
+            (course_key(e.source_course_label), e.target_course_id, e.result),
+            PrecedentRow(e.source_course_label, None, e.result),
+        )
+        if e.decided_on and (row.latest is None or e.decided_on > row.latest):
+            row.latest = e.decided_on
+    courses = catalog_repo.courses_by_ids(session, [cid for _, cid, _ in groups if cid])
     needle = found.query.lower()
     for (_, course_id, _), row in groups.items():
         row.target_course = courses.get(course_id) if course_id else None
