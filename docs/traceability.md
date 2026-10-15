@@ -22,7 +22,7 @@
 | FR-10 판정 이력·감사 로그 | ✅ | `decisions`, `audit_logs` 추가 전용 + `docs/db-grants.sql`. 관리자 콘솔에 최근 감사 로그 8건(`services/stats.py::recent_audit`: 소속 기관 행위만, 로그인 제외, 처리 내용·AI 추천→판정·사유, 학생은 이름 대신 "학생") | `test_decisions_table_has_no_update_path`, `test_admin_console_shows_recent_audit_without_student_names` |
 | FR-11 일관성 경보 | ✅ | 같은 출신 대학·과목의 과거 판정은 모두 표시(유사도 포함). 같은 대상 과목·강의계획서 유사도 0.80 이상·결과 다름일 때만 확정 전 경보(기준값은 첫 측정 후 확정). 교수 화면은 사유 선택 창 안에서 경보 확인, 심사 큐는 AI 추천과 어긋나는 건을 "일관성 경보" 필터·인라인 경보 행·"충돌 내역 확인" 버튼으로 미리 표시(`services/review.py` `QueueRow.conflicts`) | `test_consistency_alert_for_conflicting_past_decision`, `test_same_result_raises_no_alert`, `test_revised_syllabus_raises_no_alert` (TC-18), `test_queue_search_and_conflict_filter` |
 | FR-12 역할 기반 접근 제어 | ✅ | `security/permissions.py`, `security/session.py` | `test_role_based_access`, `test_no_decision_without_assigned_professor` |
-| FR-13 개인정보 보호 | ✅ | 성적표 마스킹 후 LLM 전달, S3 SSE 설정, 삭제 요청 흐름(학생 요청 → 심사관 처리 → 관리자 승인 시 삭제, 처리 기한·기한 초과 표시, 보완 자료 원본까지 삭제) `services/privacy.py`, [privacy.md](privacy.md). 관리자 콘솔에 마스킹 건수·삭제 요청 처리 현황·데이터 보존 및 파기 정책 카드. 교수·관리자 화면에 학생 이름을 보여 주지 않음. 접근 로그에서 쿼리 문자열(심사 큐 검색어) 제거 `logging_setup.py` | `test_injection_and_masking.py`(`test_access_log_drops_query_string` 포함), `test_privacy_request_review_and_admin_approval`, `test_admin_console_shows_recent_audit_without_student_names` |
+| FR-13 개인정보 보호 | ✅ | 성적표 마스킹 후 LLM 전달, S3 SSE 설정, 삭제 요청 흐름(학생 요청 → 심사관 처리 → 관리자 승인 시 삭제, 처리 기한·기한 초과 표시, 보완 자료·이의 신청 근거 자료 원본까지 삭제) `services/privacy.py`, [privacy.md](privacy.md). 관리자 콘솔에 마스킹 건수·삭제 요청 처리 현황·데이터 보존 및 파기 정책 카드. 교수·관리자 화면에 학생 이름을 보여 주지 않음. 접근 로그에서 쿼리 문자열(심사 큐 검색어) 제거 `logging_setup.py` | `test_injection_and_masking.py`(`test_access_log_drops_query_string` 포함), `test_privacy_request_review_and_admin_approval`, `test_appeal_form_with_evidence_files`, `test_admin_console_shows_recent_audit_without_student_names` |
 | FR-14 숨은 지시 문구 탐지 | ✅ | `ai/injection.py` (영·한 패턴, LLM 입력에서 제외, 경고) | `test_hidden_instruction_is_flagged_and_removed_from_prompt` |
 
 ## P2 중요 (파일럿)
@@ -34,10 +34,10 @@
 | FR-17 심사 큐 대시보드 | ✅ | `services/review.py::queue` → `review/queue.html`: 전체(기본)·고신뢰·저신뢰·정보 부족·일관성 경보 필터, 학과 필터, 정렬, 검색(이름·과목·출신 대학·`#요청번호`), 페이지당 20건, 지표 카드, 커버리지 원형 게이지. 화면 상단 기관 보조 바 집계(`GET /notifications/workspace`, `stats.workspace_counts`) | `test_queue_tabs_and_department_assignment`, `test_queue_search_and_conflict_filter` |
 | FR-18 교수 자동 배정 | ✅ | 후보 과목 학과의 배정이 가장 적은 교수, 배정 알림. 심사 큐에서 행을 고르면 하단 선택 바·머리 카드 버튼으로 일괄 배정 | 같은 테스트, `test_notifications_for_assignment_and_delegation` |
 | FR-19 부재 시 대리 재배정 | ✅ | 대리 재배정, 대리 심사자·심사관 알림(화면 + SMTP 설정 시 메일) `services/notifications.py` | `test_away_professor_is_replaced_by_delegate`, `test_notifications_for_assignment_and_delegation` (TC-15) |
-| FR-20 모바일 승인 | 🟡 | 근거 우선 모바일 화면, 모바일 메뉴, 하단 고정 판정 바, 화면 폭 - 32px로 뜨는 사유 선택 창, 화면·메일 알림. 웹 푸시는 없음(서비스 워커·추가 라이브러리 필요) | 수동 확인 |
+| FR-20 모바일 승인 | 🟡 | 근거 우선 모바일 화면, 모바일 메뉴(학생 메뉴 배지 포함), 하단 고정 판정 바, 화면 폭 - 32px로 뜨는 사유 선택 창, 화면·메일 알림. 웹 푸시는 없음(서비스 워커·추가 라이브러리 필요) | 수동 확인 |
 | FR-21 진행 상황 포털 | ✅ | 과목별 접수→AI 분석→교수 검토→확정, 예상 완료일, 보완 요청·이의 신청 상태. 요청 단위 "심사 진행 현황" 4단계(서류 접수 → AI 구조화·근거 추출 → 학과 교수 심사(확정 수/전체) → 최종 확정, `RequestView.analysis_done`·`decided_count`). 학생 홈 대시보드: 할 일(보완 자료 제출, 성적표·강의계획서 누락, 과목 연결 확인, 분석 실패, 준비되면 "학사처에 심사 요청하기")과 제출 전 서류 준비율(`student.readiness`), 새 판정 결과 알림. 학생 메뉴 배지: 채워야 할 서류 앰버 "!N", 새 판정·이의 신청 결과 파랑 "N" — 해당 화면을 열면 읽음 처리(`notifications.mark_seen`) | `test_professor_decision_rules_and_portal`, `test_student_report_filters_courses`, `test_dashboard_lists_todos_and_readiness`, `test_nav_badges_for_new_results_clear_when_viewed` |
 | FR-22 보완 자료 요청 | ✅ | 심사관·배정 교수가 항목·메모 지정해 요청 → 학생 알림 → 제출 시 처리됨·요청자 알림, 재분석 결과에 교수 배정 이어짐 `services/materials.py`. 학생 리포트의 보완 필요 과목에 정보 부족 진단(요청 항목·부족 개념·필요 자료)과 "보완 서류 제출하기", 심사 큐에 "보완 요청 발송"·"보완 대기" 표시 | `test_material_request_flow_keeps_assignment`, `test_evaluator_can_request_materials_but_not_after_decision` |
-| FR-23 이의 신청·근거 리포트 | ✅ | 학생 신청 → 심사관 받아들임(재판정 교수 배정)·기각(사유 필수) → 교수 재판정(새 판정 행, 원 판정 보존). 리포트에 경과 표시 `services/appeals.py`. 학생 메뉴 "이의 신청"(`/student/appeals`, `appeals.student_rows`)에서 본인 이의 신청의 상태·재판정 결과·기각 사유를 모아 보기. 같은 화면에 "이의 신청할 수 있는 과목"(`appeals.appealable`: 판정 확정, 처리 중 이의 없음). 작성 화면 `/student/evaluations/{id}/appeal`(원 판정 요약·근거가 약한 개념·사유 20~3000자·근거 자료 PDF/JPG/PNG 최대 3개, `appeal_files` 테이블). 근거 자료는 `/appeal-files/{id}`로 학생 본인·심사관·담당 교수만 내려받기(`appeals.file_for_download`). 판정 근거 리포트에 역할별 "돌아가기"(교수 판정 화면·심사관 심사 건·학생 과목 결과) | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_dismiss_requires_note`, `test_student_sees_own_appeals_and_report_links_back`, `test_appeal_form_with_evidence_files` |
+| FR-23 이의 신청·근거 리포트 | ✅ | 학생 신청 → 심사관 받아들임(재판정 교수 배정)·기각(사유 필수) → 교수 재판정(새 판정 행, 원 판정 보존). 리포트에 경과 표시 `services/appeals.py`. 학생 메뉴 "이의 신청"(`/student/appeals`, `appeals.student_rows`)에서 본인 이의 신청의 상태·재판정 결과·기각 사유를 모아 보기. 같은 화면에 "이의 신청할 수 있는 과목"(`appeals.appealable`: 판정 확정, 처리 중 이의 없음). 작성 화면 `/student/evaluations/{id}/appeal`(원 판정 요약·근거가 약한 개념·사유 20~3000자·근거 자료 PDF/JPG/PNG 최대 3개, `appeal_files` 테이블·Alembic 0005, 실패하면 적은 사유를 유지한 채 422로 다시 표시). 근거 자료는 `/appeal-files/{id}`로 학생 본인·심사관·담당 교수만 내려받기(`appeals.file_for_download`). 판정 근거 리포트에 역할별 "돌아가기"(교수 판정 화면·심사관 심사 건·학생 과목 결과) | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_dismiss_requires_note`, `test_student_sees_own_appeals_and_report_links_back`, `test_appeal_form_with_evidence_files` |
 | FR-24 학사정보시스템 내보내기 | ✅ | CSV + 토큰 인증 JSON API `GET /api/sis/decisions` (관리자 발급·폐기, 재판정은 최신만 + 대체 판정 번호) `services/sis.py`. 심사 큐 "SIS CSV 내보내기", 관리자 콘솔 SIS 연동 카드(토큰 상태·확정 과목 수) | `test_sis_api_requires_admin_issued_token`, 이의 신청 테스트의 CSV 확인 |
 
 ## P3 선택
@@ -69,6 +69,7 @@
 
 | 화면 | URL | 템플릿 | 기능 | 화면 테스트 |
 | --- | --- | --- | --- | --- |
+| 로그인 | `/login` | `login.html` (실패 5번 1분 잠금·10번 초기화 안내) | FR-12, 운영 데이터 준비 | `test_five_failures_lock_login_for_a_minute`, `test_lockout_without_mail_sends_user_to_admin` |
 | 공통 레이아웃 | 모든 화면 | `base.html` (기관 보조 바·집계 칩, Human-in-the-Loop 푸터), 학생 메뉴 배지 `student/_nav.html`·`web/nav.py` | FR-12, FR-19·20 알림 | `test_queue_search_and_conflict_filter`(집계 칩, 학생에게 숨김), `test_nav_badges_for_new_results_clear_when_viewed` |
 | 학생 홈(대시보드) | `/student` | `student/index.html` | FR-15 요청 만들기·요청별 예상 인정 학점·판정 확정 수·남은 학기, FR-21 할 일·서류 준비율 | `test_request_needs_affiliated_student_and_valid_major`, `test_dashboard_lists_todos_and_readiness` |
 | 선배 인정 사례(학생) | `/student/precedents` | `student/precedents.html` | FR-26 기관 동등 과목표 검색 | `test_precedents_show_only_institution_equivalency_table` |
@@ -78,14 +79,29 @@
 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | `student/evaluation.html`, `partials/evaluation.html` | FR-05~08·22·23·25 | `test_material_request_flow_keeps_assignment`, `test_evidence_links_jump_to_source_positions` |
 | 심사 큐 | `/review` | `review/queue.html` | FR-11·17·18·24 | `test_queue_tabs_and_department_assignment`, `test_queue_search_and_conflict_filter` |
 | 심사 건 상세 | `/review/evaluations/{id}` | `review/evaluation.html`, `partials/history.html`(`#history`), `partials/material_request_form.html`(`#materials`) | FR-11·22 | `test_evaluator_can_request_materials_but_not_after_decision` |
-| 이의 신청·삭제 요청·동등 과목표 | `/review/appeals`, `/review/privacy`, `/admin/privacy`, `/review/equivalencies` | `review/appeals.html`, `privacy.html`, `review/equivalencies.html` | FR-23·13·26 | 각 기능 테스트 |
+| 이의 신청 처리(근거 자료 내려받기)·삭제 요청·동등 과목표 | `/review/appeals`, `/appeal-files/{id}`, `/review/privacy`, `/admin/privacy`, `/review/equivalencies` | `review/appeals.html`, `privacy.html`, `review/equivalencies.html` | FR-23·13·26 | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_form_with_evidence_files`, `test_privacy_request_review_and_admin_approval`, `test_equivalency_import_shows_in_history_without_blocking` |
 | 관리자 콘솔 · 운영 통계 | `/admin/stats`, `/review/stats` | `stats.html` | FR-27·10·13·24 | `test_stats_page_counts_decisions_and_disagreement`, `test_admin_console_shows_recent_audit_without_student_names` |
+| 교수 홈(배정된 심사) | `/professor` | `professor/index.html` (배정 목록·이의 신청 재판정·부재 설정) | FR-18·19·23 | `test_away_professor_is_replaced_by_delegate` |
 | 교수 판정 화면 | `/professor/evaluations/{id}` | `professor/evaluation.html` (사유 선택 창, 하단 판정 바) | FR-09·11·20·22·23 | `test_professor_decision_rules_and_portal`, `test_reason_dialog_reopens_on_validation_error` |
-| 판정 근거 리포트 | `/evaluations/{id}/report` | `report.html` | FR-10·23 | `test_consistency_alert_for_conflicting_past_decision` |
+| 판정 근거 리포트 | `/evaluations/{id}/report` | `report.html` (역할별 메뉴·돌아가기) | FR-10·23 | `test_consistency_alert_for_conflicting_past_decision`, `test_student_sees_own_appeals_and_report_links_back` |
+| 알림 | `/notifications` | `notifications.html` (열면 모두 읽음) | FR-19·20·22·23 | `test_notifications_for_assignment_and_delegation` |
 | 계정·과목 관리 | `/admin/data`, `/account/password`, `/account/forgot`, `/account/reset` | `admin/data.html`, `account/password.html`, `account/forgot.html`, `account/reset.html` | 운영 데이터 준비 | `test_institution_data.py` 전체 |
 | 학사정보 연동·감사 로그 | `/admin/sis`, `/admin/audit` | `admin/sis.html`, `admin/audit.html` | FR-24·10 | `test_sis_api_requires_admin_issued_token` |
+| 오류 | 모든 화면 | `error.html` (400·403·404) | FR-12 | `test_role_based_access` |
 
 화면에 넣지 않은 것: 판정 확률(%), 실제 데이터가 없는 인증 배지·전주 대비 증감·해시 체인·상담 담당자 카드, 교수·관리자 화면의 학생 이름.
+
+학생 화면 참고안(사이드바형 정보 구조)에서 검토했지만 넣지 않은 것:
+
+| 항목 | 이유 |
+| --- | --- |
+| 사이드바, 목표 대학 전환·복수 대학 비교 | DESIGN.md는 상단 메뉴. 복수 대학 비교는 FR-28(P3, 사업 모델 확정 후 정의)이고 MVP 학생 계정은 입학이 확정된 대학 한 곳에 소속 |
+| 졸업 요건 감사(Degree Audit)·상위 과정·거주 학점 | 테스트 명세 범위에서 제외. 남은 학기 예상(FR-15)까지만 |
+| 4.0 GPA·WES/ECE 환산 | 명세에 없음. 성적은 민감 정보이고 공인 평가를 대신 계산하지 않음 |
+| 국문 강의계획서 영문 번역 | FR-01 "번역 없이 인식". 근거 구절은 원문과 일치할 때만 저장 |
+| 교양(Gen-Ed) 인정 단계 | 추천은 3단계로 고정(`services/scoring.py`). 바꾸려면 규칙 버전과 대학별 교양 과목 데이터 필요 |
+| 청원서·커버레터 생성기 | 이의 신청은 같은 기관 안에서 처리하고 근거 비교는 판정 근거 리포트가 맡음. AI는 추천만 |
+| 다른 학생의 판정 사례 | FR-12(학생은 본인 건만). 선배 인정 사례는 기관 동등 과목표만 보여 줌 |
 
 ## 테스트 명세 대비 아직 측정하지 않은 것
 

@@ -7,7 +7,7 @@
 - 학과 교수: 근거 구절 비교 화면에서 승인·수정·반려, 반려하거나 추천과 다르게 판정하면 사유 선택 창에서 사유·소명 입력, 과거 판정과 다르면 확정 전 경보, 보완 자료 요청, 이의 신청 재판정
 - 기관 관리자: 관리자 콘솔(AI 추천 수용률·학과별 처리 지표·최근 감사 로그·보존 정책), 계정·과목 CSV 가져오기와 기준 강의계획서 등록, 문서 삭제 승인, 학사정보시스템 연동 토큰, 전체 감사 로그
 
-심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`).
+심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청(근거 자료 첨부)과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`).
 
 기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
 
@@ -25,10 +25,14 @@
 
 | 화면 | 주소 | 누가 | 내용 |
 | --- | --- | --- | --- |
+| 내 편입 요청(대시보드) | `/student` | 학생 | 할 일(보완 자료 제출·성적표 올리기·과목 연결 확인 등), 요청별 예상 인정 학점·판정 확정 수·남은 학기, 제출 전 서류 준비율. 메뉴에 채워야 할 서류(주황 !N)·새 결과(파랑 N) 배지 |
 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | "예상 인정 학점: 낮음~높음 / 이수 학점" 요약, 남은 학기·추가 비용·심사 진행 카드, 과목 필터, 정보 부족 진단과 보완 서류 제출, 심사 진행 4단계 |
+| 이의 신청 | `/student/appeals`, `/student/evaluations/{id}/appeal` | 학생 | 이의 신청할 수 있는 과목, 처리 상황(접수·재판정 중·기각 사유·재판정 결과). 작성 화면에서 원 판정 요약을 보며 사유와 근거 자료(PDF·JPG·PNG 최대 3개) 제출 |
+| 선배 인정 사례 | `/student/precedents` | 학생 | 기관 동등 과목표를 출신 대학·과목으로 검색 (다른 학생이 받은 판정은 보이지 않음) |
 | 심사 대기열 | `/review` | 심사관 | 지표 카드, 이름·과목·출신 대학 검색, 신뢰도·일관성 경보·학과 필터, 커버리지 게이지, 경보 행, 행 선택 후 교수 일괄 배정, SIS CSV 내보내기 |
+| 이의 신청 처리 | `/review/appeals` | 심사관 | 학생 사유·근거 자료 확인, 받아들이면 재판정 교수 배정, 기각하면 사유 전달 |
 | 판정 화면 | `/professor/evaluations/{id}` | 학과 교수 | 좌우 근거 구절 비교, 과거 판정 이력, 하단 고정 판정 바, 불인정·판정 변경 사유 선택 창 |
-| 계정·과목 관리 | `/admin/data` | 기관 관리자 | 과목 CSV(필수 개념 포함)·계정 CSV 가져오기, 새 계정 임시 비밀번호(한 번만 표시), 과목별 기준 강의계획서 올리기, 출신 대학 등록 |
+| 계정·과목 관리 | `/admin/data` | 기관 관리자 | ①~④ 순서로 과목 CSV(필수 개념 포함)·과목별 기준 강의계획서·계정 CSV·출신 대학, 비밀번호 초기화(메일 있으면 설정 링크 자동 발송, 없으면 임시 비밀번호 한 번 표시) |
 | 관리자 콘솔 | `/admin/stats` | 기관 관리자 | AI 추천 수용률, 개인정보 보호·SIS 연동 상태, 학과별 처리 지표, 최근 감사 로그, 데이터 보존 및 파기 정책 (심사관은 `/review/stats`에서 감사 로그를 뺀 운영 통계) |
 
 - 화면은 [DESIGN.md](docs/DESIGN.md)(단일 Action Blue, 1px 헤어라인, 그림자 없음)를 따릅니다. 폭은 기본 1280px이고, 정보가 많은 심사 대기열과 원문 대조 화면만 1440px입니다.
@@ -81,7 +85,7 @@ uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 �
 | 관리자 | admin@msu.example |
 | 물리·화학·영어·역사 교수 | mbrown@msu.example, ewong@msu.example, alopez@msu.example, jreed@msu.example, twhite@msu.example |
 
-로그인하면 역할별 첫 화면으로 갑니다: 학생은 내 편입 요청 목록(요청을 누르면 시뮬레이션 리포트), 심사관은 심사 대기열, 교수(예: mbrown)는 배정된 심사, 관리자는 관리자 콘솔입니다.
+로그인하면 역할별 첫 화면으로 갑니다: 학생은 내 편입 요청 대시보드(할 일·서류 준비율, 요청을 누르면 시뮬레이션 리포트), 심사관은 심사 대기열, 교수(예: mbrown)는 배정된 심사, 관리자는 관리자 콘솔입니다.
 
 `scripts/demo_data/`에 페르소나의 강의계획서 PDF(미적분학, 선형대수 상세형·부실형, C프로그래밍, 자료구조, 일반물리, 일반화학, 한국사)가 있습니다. 작년에 같은 선형대수가 직접 인정된 이력도 시드되어 있어 일관성 경보를 시연할 수 있습니다.
 
@@ -136,13 +140,14 @@ backend/         ← 백엔드 (Python, import 이름도 backend)
   ai/            llm_client.py(SDK 단일 진입점) · prompts/*.md · extraction · candidates · matching · evidence · injection
   documents/     PyMuPDF 텍스트 추출(PDF·JPG·PNG), S3 저장
   services/      analysis(파이프라인) · scoring(추천 규칙) · student · review(심사 대기열) · decisions(판정·경보)
-                 materials · appeals · privacy · notifications · sis · equivalencies · stats(통계·관리자 콘솔) · views(화면 조회)
+                 materials · appeals(이의 신청·근거 자료) · privacy · notifications · sis · equivalencies · precedents(학생 인정 사례)
+                 stats(통계·관리자 콘솔) · views(화면 조회·학생 대시보드·메뉴 배지)
                  institution_data(계정·과목 CSV, 기준 강의계획서, 출신 대학, 첫 관리자) · csv_import(CSV 공통)
   repositories/  SQL은 여기만
   models/        SQLAlchemy 2.0, 테이블당 1파일
   workers/       Celery 작업
   security/      세션·권한·CSRF·개인정보 마스킹
-  web/           라우트(routes/), JSON API(api/), 템플릿 렌더링(templating.py: frontend/templates 사용)
+  web/           라우트(routes/), JSON API(api/), 템플릿 렌더링(templating.py: frontend/templates 사용), 학생 메뉴 배지(nav.py)
 frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   templates/     Jinja2 + HTMX 템플릿: base · student · review · professor · admin · partials · stats · report
   static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘) · samples/(CSV 예시)
