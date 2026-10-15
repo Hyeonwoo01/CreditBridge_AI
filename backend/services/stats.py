@@ -207,6 +207,12 @@ ACTION_LABELS = {
     "equivalency.import": ("동등 과목표 가져오기", "neutral"),
     "professor.away": ("부재 설정", "neutral"),
     "auth.login": ("로그인", "neutral"),
+    "auth.password_change": ("비밀번호 변경", "neutral"),
+    "account.import": ("계정 가져오기", "neutral"),
+    "account.bootstrap": ("첫 관리자 생성", "neutral"),
+    "course.import": ("과목 가져오기", "neutral"),
+    "course.reference_upload": ("기준 강의계획서 등록", "neutral"),
+    "institution.create": ("출신 대학 등록", "neutral"),
 }
 
 
