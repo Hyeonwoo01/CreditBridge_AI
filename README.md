@@ -9,7 +9,7 @@
 
 심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`).
 
-기준 문서: [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
+기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
 
 ## AI가 판정을 추천하는 방식
 
@@ -83,6 +83,16 @@ uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미
 로그인하면 역할별 첫 화면으로 갑니다: 학생은 내 편입 요청 목록(요청을 누르면 시뮬레이션 리포트), 심사관은 심사 대기열, 교수(예: mbrown)는 배정된 심사, 관리자는 관리자 콘솔입니다.
 
 `scripts/demo_data/`에 페르소나의 강의계획서 PDF(미적분학, 선형대수 상세형·부실형, C프로그래밍, 자료구조, 일반물리, 일반화학, 한국사)가 있습니다. 작년에 같은 선형대수가 직접 인정된 이력도 시드되어 있어 일관성 경보를 시연할 수 있습니다.
+
+## 개발 규칙 (CLAUDE.md)
+
+코드를 고치기 전에 [CLAUDE.md](CLAUDE.md)를 먼저 읽어 주세요. 사람과 Claude Code가 함께 따르는 규칙이며, Claude Code는 이 파일을 자동으로 읽습니다. 핵심만 옮기면:
+
+- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, MariaDB + PyMySQL, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
+- **구조**: web → services → repositories → models. SQL은 `app/repositories`에만, LLM 호출은 `app/ai/llm_client.py`로만, 프롬프트는 `app/ai/prompts/*.md`(바꾸면 버전 올림), 추천 규칙은 `app/services/scoring.py` 한 곳(바꾸면 `RULES_VERSION` 올림).
+- **사람이 최종 판정**: AI는 추천만 합니다. 판정 확률(%)은 계산·표시하지 않고, 확정 판정에는 `decided_by`가 필수이며, `decisions`·`audit_logs`는 INSERT만 합니다(재판정도 새 행).
+- **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.
+- **작업 완료 전**: 아래 품질 검사를 모두 통과시키고, 스키마를 바꾸면 Alembic 마이그레이션을, 새 Tailwind 클래스를 쓰면 `app.css` 재빌드를 함께 커밋합니다.
 
 ## 품질 검사
 
