@@ -143,7 +143,7 @@
         {% endfor %}
       </ol>
       {% if req.status == 'draft' %}
-      <form method="post" action="/student/requests/{{ req.id }}/submit">
+      <form id="submit" method="post" action="/student/requests/{{ req.id }}/submit" class="scroll-mt-20">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="btn-primary w-full" {% if view.processing or not view.rows %}disabled{% endif %}>학사처에 심사 요청</button>
       </form>

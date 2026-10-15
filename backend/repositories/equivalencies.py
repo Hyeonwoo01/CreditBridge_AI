@@ -32,3 +32,11 @@ def of_institution(session: Session, target_institution_id: int, limit: int = 20
         .limit(limit)
     )
     return list(session.scalars(stmt))
+
+
+def of_pair(session: Session, target_institution_id: int, source_institution_id: int) -> list[Equivalency]:
+    stmt = select(Equivalency).where(
+        Equivalency.target_institution_id == target_institution_id,
+        Equivalency.source_institution_id == source_institution_id,
+    )
+    return list(session.scalars(stmt))

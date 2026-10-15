@@ -10,14 +10,17 @@ from backend.models.enums import Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import appeals as appeal_service
+from backend.services import notifications as notification_service
+from backend.services import precedents as precedent_service
 from backend.services import privacy as privacy_service
 from backend.services import student as student_service
 from backend.services import views
+from backend.web.nav import student_badges
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
 from backend.workers import tasks
 
-router = APIRouter(prefix="/student")
+router = APIRouter(prefix="/student", dependencies=[Depends(student_badges)])
 Student = Depends(require(Role.STUDENT))
 
 
@@ -182,6 +185,7 @@ def evaluation_page(
     request: Request, evaluation_id: int, user: User = Student, session: Session = Depends(get_db)
 ) -> Response:
     view = views.evaluation_view(session, user, evaluation_id)
+    notification_service.mark_seen(session, user, link=f"/student/evaluations/{evaluation_id}")
     return render(request, "student/evaluation.html", user=user, v=view)
 
 
@@ -263,10 +267,26 @@ def appeal(
 @router.get("/appeals")
 def appeals(request: Request, user: User = Student, session: Session = Depends(get_db)) -> Response:
     """내 이의 신청: 신청할 수 있는 과목, 처리 상태, 재판정 결과, 기각 사유 (FR-23)."""
+    rows = appeal_service.student_rows(session, user)
+    notification_service.mark_seen(session, user, kinds=notification_service.APPEAL_RESULT_KINDS)
     return render(
         request,
         "student/appeals.html",
         user=user,
-        rows=appeal_service.student_rows(session, user),
+        rows=rows,
         appealable=appeal_service.appealable(session, user),
+    )
+
+
+@router.get("/precedents")
+def precedents(
+    request: Request,
+    source: int | None = Query(None),
+    q: str = Query("", max_length=100),
+    user: User = Student,
+    session: Session = Depends(get_db),
+) -> Response:
+    """선배 인정 사례: 같은 출신 대학 과목이 소속 대학에서 어떻게 인정됐는지 (동등 과목표 + 확정 판정 건수)."""
+    return render(
+        request, "student/precedents.html", user=user, found=precedent_service.search(session, user, source, q)
     )

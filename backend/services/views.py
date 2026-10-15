@@ -35,6 +35,7 @@ from backend.schemas.results import CandidateResult, EvaluationResult
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import appeals as appeal_service
 from backend.services import materials as material_service
+from backend.services import notifications as notification_service
 from backend.services import privacy as privacy_service
 from backend.services import sis as sis_service
 from backend.services import student as student_service
@@ -224,23 +225,74 @@ def request_view(
     )
 
 
+@dataclass(frozen=True)
+class RequestSummary:
+    """학생 홈 대시보드의 편입 요청 한 건: 예상 인정 학점, 판정 진행, 서류 준비율과 할 일."""
+
+    request: TransferRequest
+    simulation: student_service.Simulation
+    readiness: student_service.Readiness
+    courses: int
+    decided: int
+
+
 @dataclass
 class StudentHome:
     requests: list[TransferRequest]
     sources: list[Institution]
     target: Institution | None  # 입학이 확정된 소속 대학
     majors: list[str]
+    summaries: list[RequestSummary] = field(default_factory=list)
+    unread_results: int = 0  # 아직 열어 보지 않은 판정 결과 알림
+
+    @property
+    def todos(self) -> list[tuple[TransferRequest, student_service.Todo]]:
+        return [(s.request, t) for s in self.summaries for t in s.readiness.todos]
 
 
 def student_home(session: Session, student: User) -> StudentHome:
     target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
     if target is not None and not target.is_target:
         target = None
+    requests = request_repo.of_student(session, student.id)
+    summaries = []
+    for r in requests:
+        rows = student_service.course_rows(session, r)
+        inst = r.target_institution
+        summaries.append(
+            RequestSummary(
+                r,
+                student_service.simulate(rows, inst.degree_credits or 120, inst.tuition_per_credit or 1000),
+                student_service.readiness(session, r),
+                len(rows),
+                sum(1 for row in rows if row.decision is not None),
+            )
+        )
     return StudentHome(
-        requests=request_repo.of_student(session, student.id),
+        requests=requests,
         sources=catalog_repo.source_institutions(session),
         target=target,
         majors=catalog_repo.departments_of(session, target.id) if target else [],
+        summaries=summaries,
+        unread_results=notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
+    )
+
+
+@dataclass(frozen=True)
+class StudentBadges:
+    """학생 메뉴 배지. missing: 채워야 할 서류(앰버), results·appeal_results: 새로 도착한 결과(파랑)."""
+
+    missing: int
+    results: int
+    appeal_results: int
+
+
+def student_badges(session: Session, student: User) -> StudentBadges:
+    missing = sum(student_service.readiness(session, r).missing for r in request_repo.of_student(session, student.id))
+    return StudentBadges(
+        missing,
+        notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
+        notification_service.unread_of_kinds(session, student, notification_service.APPEAL_RESULT_KINDS),
     )
 
 

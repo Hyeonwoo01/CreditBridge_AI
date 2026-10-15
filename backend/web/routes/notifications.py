@@ -7,12 +7,13 @@ from backend.models import User
 from backend.security.session import current_user
 from backend.services import notifications
 from backend.services import stats as stats_service
+from backend.web.nav import student_badges
 from backend.web.templating import render
 
 router = APIRouter(prefix="/notifications")
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(student_badges)])
 def inbox(request: Request, user: User = Depends(current_user), session: Session = Depends(get_db)) -> Response:
     return render(request, "notifications.html", user=user, items=notifications.inbox(session, user))
 

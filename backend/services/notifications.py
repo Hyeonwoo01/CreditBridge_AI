@@ -43,6 +43,21 @@ def unread_count(session: Session, user: User) -> int:
     return notification_repo.unread_count(session, user.id)
 
 
+# 학생 메뉴 배지: 판정 결과(내 편입 요청)와 이의 신청 처리 결과(이의 신청)
+RESULT_KINDS = ["decision.created"]
+APPEAL_RESULT_KINDS = ["appeal.accepted", "appeal.dismissed", "decision.redecided"]
+
+
+def unread_of_kinds(session: Session, user: User, kinds: list[str]) -> int:
+    return notification_repo.unread_by_kind(session, user.id, kinds)
+
+
+def mark_seen(session: Session, user: User, link: str | None = None, kinds: list[str] | None = None) -> None:
+    """알림이 가리키는 화면을 직접 열었으면 그 알림은 읽은 것으로 본다."""
+    if notification_repo.mark_read_where(session, user.id, utcnow(), link=link, kinds=kinds):
+        session.commit()
+
+
 def inbox(session: Session, user: User) -> list[Notification]:
     """최근 알림을 돌려주고 모두 읽음으로 표시한다."""
     items = notification_repo.recent_for(session, user.id)

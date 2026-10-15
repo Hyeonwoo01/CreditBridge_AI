@@ -73,3 +73,27 @@ def for_evaluation_all(session: Session, evaluation_id: int) -> list[Decision]:
     """한 심사 건의 판정 전체 (원 판정과 이의 신청 재판정), 오래된 순."""
     stmt = select(Decision).where(Decision.course_evaluation_id == evaluation_id).order_by(Decision.id)
     return list(session.scalars(stmt))
+
+
+def current_for_pair(
+    session: Session, target_institution_id: int, source_institution_id: int
+) -> list[tuple[Decision, Syllabus]]:
+    """대상 대학·출신 대학 쌍의 강의계획서별 현재 판정 (이의 신청 재판정이 있으면 재판정만)."""
+    latest = (
+        select(func.max(Decision.id))
+        .join(CourseEvaluation, CourseEvaluation.id == Decision.course_evaluation_id)
+        .join(Syllabus, Syllabus.id == CourseEvaluation.syllabus_id)
+        .join(TransferRequest, TransferRequest.id == CourseEvaluation.transfer_request_id)
+        .where(
+            TransferRequest.target_institution_id == target_institution_id,
+            Syllabus.institution_id == source_institution_id,
+        )
+        .group_by(Syllabus.id)
+    )
+    stmt = (
+        select(Decision, Syllabus)
+        .join(CourseEvaluation, CourseEvaluation.id == Decision.course_evaluation_id)
+        .join(Syllabus, Syllabus.id == CourseEvaluation.syllabus_id)
+        .where(Decision.id.in_(latest))
+    )
+    return [(d, s) for d, s in session.execute(stmt)]

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block nav %}{% include "student/_nav.html" %}{% endblock %}
+{% block content %}
+{% set tone = {'direct': 'badge-approve', 'elective': 'badge-elective', 'none': 'badge-reject'} %}
+<header class="grid gap-1">
+  <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase">Precedents</p>
+  <h1 class="page-title">선배 인정 사례</h1>
+  <p class="text-sm text-muted">같은 대학에서 온 학생들의 과목이 {{ found.target.name if found.target else '소속 대학' }}에서 어떻게 인정됐는지 과목별로 모았어요. 누가 받은 판정인지는 보여 주지 않아요.</p>
+</header>
+
+{% if not found.target %}
+<p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">입학이 확정된 대학에 소속된 계정만 인정 사례를 볼 수 있어요.</p>
+{% else %}
+<form method="get" action="/student/precedents" class="mt-6 flex flex-col gap-3 rounded-lg border border-hairline bg-white p-4 md:flex-row md:items-end">
+  <label class="field md:w-80"><span>다니던 대학</span>
+    <select name="source" class="input h-11">
+      {% for i in found.sources %}<option value="{{ i.id }}" {% if found.source and i.id == found.source.id %}selected{% endif %}>{{ i.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="field flex-1"><span>과목 검색</span><input class="input h-11" type="search" name="q" value="{{ found.query }}" maxlength="100" placeholder="과목 코드나 이름 (예: MATH, 미적분)"></label>
+  <button class="btn-primary h-11">찾기</button>
+</form>
+
+<section class="mt-6 grid gap-3" aria-label="인정 사례">
+  {% if found.rows %}
+  <p class="text-sm text-muted">{{ found.source.name }} 과목 {{ found.rows | length }}건</p>
+  <div class="overflow-x-auto rounded-lg border border-hairline bg-white">
+    <table class="w-full min-w-[640px] text-left text-sm">
+      <thead class="bg-pearl text-xs text-muted">
+        <tr><th scope="col" class="px-5 py-3 font-normal">출신 과목</th><th scope="col" class="px-3 py-3 font-normal">인정된 과목</th><th scope="col" class="px-3 py-3 font-normal">결과</th><th scope="col" class="px-3 py-3 font-normal">근거</th><th scope="col" class="px-5 py-3 font-normal">최근</th></tr>
+      </thead>
+      <tbody class="divide-y divide-divider">
+        {% for r in found.rows %}
+        <tr>
+          <td class="px-5 py-3 font-semibold">{{ r.source_label }}</td>
+          <td class="px-3 py-3">{% if r.target_course %}{{ r.target_course.code }} <span class="text-muted">{{ r.target_course.title }}</span>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+          <td class="px-3 py-3"><span class="{{ tone.get(r.result, 'badge') }}">{{ r.result | rec }}</span></td>
+          <td class="px-3 py-3 text-muted">{% if r.decided %}판정 <span class="tabular-nums">{{ r.decided }}</span>건{% endif %}{% if r.decided and r.listed %} · {% endif %}{% if r.listed %}동등 과목표{% endif %}</td>
+          <td class="px-5 py-3 whitespace-nowrap text-muted tabular-nums">{{ r.latest.strftime('%Y-%m') if r.latest else '–' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="rounded-md bg-parchment p-8 text-center text-muted">{% if found.query %}"{{ found.query }}"에 맞는 사례가 없어요. 과목 코드만 넣어 다시 찾아보세요.{% else %}아직 이 대학 과목의 인정 사례가 없어요.{% endif %}</p>
+  {% endif %}
+  <p class="text-xs text-muted">과거 사례는 참고용이에요. 강의계획서 내용이 다르면 결과가 달라질 수 있고, 최종 판정은 학과 교수가 합니다.</p>
+</section>
+{% endif %}
+{% endblock %}

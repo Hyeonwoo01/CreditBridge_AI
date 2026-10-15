@@ -349,3 +349,74 @@ def simulate(
 def ensure_student(user: User) -> None:
     if user.role != Role.STUDENT:
         raise PermissionDeniedError("학생 계정으로 로그인해 주세요.")
+
+
+# ---------- 대시보드: 할 일과 서류 준비율 ----------
+
+
+@dataclass(frozen=True)
+class Todo:
+    kind: str  # missing: 학생이 채워야 할 서류(앰버) / action: 다음 단계(파랑)
+    label: str
+    href: str
+
+
+@dataclass(frozen=True)
+class Readiness:
+    """편입 요청 하나의 서류 준비 상태. 준비율은 제출 전(초안)에만 센다."""
+
+    request: TransferRequest
+    done: int
+    total: int
+    todos: list[Todo]
+
+    @property
+    def percent(self) -> int | None:
+        return round(self.done * 100 / self.total) if self.total else None
+
+    @property
+    def missing(self) -> int:
+        return sum(1 for t in self.todos if t.kind == "missing")
+
+
+def readiness(session: Session, request: TransferRequest) -> Readiness:
+    """할 일: 보완 자료 요청, (초안이면) 성적표·강의계획서 누락과 연결 확인, 분석 실패, 심사 요청."""
+    base = f"/student/requests/{request.id}"
+    syllabi = syllabus_repo.of_request(session, request.id)
+    todos: list[Todo] = []
+    asked = {m.syllabus_id for m in material_repo.for_syllabi(session, [s.id for s in syllabi]) if m.status == "open"}
+    for s in syllabi:
+        if s.id in asked:
+            course = (s.course_code or s.course_title or s.original_filename).strip()
+            todos.append(Todo("missing", f"{course} 보완 자료 제출", f"/student/syllabi/{s.id}"))
+    done = total = 0
+    if request.status == RequestStatus.DRAFT:
+        entries = request_repo.transcript_entries(session, request.id)
+        total += 1
+        if request.transcript_file_key:
+            done += 1
+        else:
+            todos.append(Todo("missing", "성적표 올리기", f"{base}#transcript"))
+        if entries:
+            # 강의계획서 없이 확인한 과목(인정 신청하지 않는 과목)은 준비된 것으로 본다
+            unlinked = sum(1 for e in entries if e.syllabus_id is None and not e.link_confirmed)
+            unconfirmed = sum(1 for e in entries if e.syllabus_id is not None and not e.link_confirmed)
+            total += len(entries)
+            done += len(entries) - unlinked - unconfirmed
+            if unlinked:
+                todos.append(Todo("missing", f"강의계획서 미등록 {unlinked}건", f"{base}#upload"))
+            if unconfirmed:
+                todos.append(Todo("missing", f"성적표 과목 연결 확인 {unconfirmed}건", f"{base}#transcript"))
+        else:
+            total += 1
+            if syllabi:
+                done += 1
+            else:
+                todos.append(Todo("missing", "강의계획서 올리기", f"{base}#upload"))
+        failed = sum(1 for s in syllabi if s.status == SyllabusStatus.FAILED)
+        if failed:
+            todos.append(Todo("missing", f"분석하지 못한 강의계획서 {failed}건 다시 올리기", base))
+        busy = any(s.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING) for s in syllabi)
+        if syllabi and not busy and not any(t.kind == "missing" for t in todos):
+            todos.append(Todo("action", "학사처에 심사 요청하기", f"{base}#submit"))
+    return Readiness(request, done, total, todos)
