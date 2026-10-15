@@ -53,7 +53,7 @@ def test_account_import_gives_one_time_passwords_and_forces_change(client: TestC
     assert prof.role == "professor" and prof.department == "Mathematics" and prof.must_change_password
     assert temp not in prof.password_hash  # 해시만 저장
     log = seeded.scalars(select(AuditLog).where(AuditLog.action == "account.import")).one()
-    assert log.payload_json == {"created": 2, "skipped": 1}  # 이름·이메일은 감사 로그에 넣지 않는다
+    assert log.payload_json == {"created": 2, "skipped": 1, "by_email": False}  # 이름·이메일은 넣지 않는다
     # 다시 열면 임시 비밀번호는 보이지 않는다
     assert temp not in client.get("/admin/data").text
 

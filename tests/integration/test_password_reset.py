@@ -167,3 +167,60 @@ def test_changing_password_keeps_this_session_and_ends_others(client: TestClient
     )
     assert r.status_code == 303 and client.get("/review").status_code == 200
     assert other.get("/review", follow_redirects=False).headers["location"] == "/login"
+
+
+def link_path(mail: Any) -> str:
+    m = re.search(r"https://cb\.test(/account/reset\?token=\S+)", mail.get_content())
+    assert m
+    return m.group(1)
+
+
+def set_password(client: TestClient, path: str, new: str) -> Any:
+    client.cookies.clear()
+    page = client.get(path)
+    assert page.status_code == 200, page.text
+    token = re.search(r'name="token" value="([^"]+)"', page.text).group(1)  # type: ignore[union-attr]
+    data = {"token": token, "new": new, "confirm": new, "csrf_token": csrf_of(client, path)}
+    return client.post("/account/reset", data=data, follow_redirects=False)
+
+
+def test_with_mail_new_accounts_get_setup_links_instead_of_passwords(
+    client: TestClient, seeded: Session, smtp: list[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = login(client, "admin@msu.example")
+    body = "email,name,role,department\nnew.eval@msu.example,New Evaluator,evaluator,\n"
+    r = client.post(
+        "/admin/data/accounts",
+        files={"file": ("a.csv", body.encode(), "text/csv")},
+        data={"csrf_token": token},
+    )
+    assert r.status_code == 200 and "비밀번호 설정 링크(72시간 유효" in r.text
+    assert "임시 비밀번호 CSV 받기" not in r.text and 'font-mono">' not in r.text.split("새로 만든 계정")[1][:3000]
+    mails = [m for m in smtp if m["Subject"] == "[CreditBridge] 계정이 만들어졌어요"]
+    assert (
+        len(mails) == 1 and mails[0]["To"] == "new.eval@msu.example" and "New Evaluator" not in mails[0].get_content()
+    )
+
+    monkeypatch.setattr(auth, "RESET_MAX_AGE", -1)  # 30분짜리 재설정 기한이 지나도 계정 설정 링크(72시간)는 유효
+    assert set_password(client, link_path(mails[0]), "evaluator-pass-1").status_code == 303
+    login(client, "new.eval@msu.example", "evaluator-pass-1")
+    assert client.get("/review").status_code == 200  # 링크로 정했으니 첫 로그인 변경 화면을 거치지 않는다
+
+
+def test_with_mail_admin_reset_sends_link_and_shows_no_password(
+    client: TestClient, seeded: Session, smtp: list[Any]
+) -> None:
+    token = login(client, "admin@msu.example")
+    r = client.post("/admin/data/password-reset", data={"email": "dkim@msu.example", "csrf_token": token})
+    assert "dkim@msu.example 메일로 비밀번호 설정 링크(72시간 유효)를 보냈어요" in r.text
+    assert "font-mono text-[17px]" not in r.text
+    mails = [m for m in smtp if m["To"] == "dkim@msu.example"]
+    assert len(mails) == 1 and "기관 관리자가 CreditBridge AI 비밀번호를 초기화했어요" in mails[0].get_content()
+    client.cookies.clear()
+    r = client.post(
+        "/login",
+        data={"email": "dkim@msu.example", "password": "demo1234", "csrf_token": csrf_of(client)},
+    )
+    assert r.status_code == 401  # 이전 비밀번호는 무효
+    assert set_password(client, link_path(mails[0]), "dkim-new-pass-1").status_code == 303
+    login(client, "dkim@msu.example", "dkim-new-pass-1")

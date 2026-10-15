@@ -54,7 +54,7 @@ def process_reference(syllabus_id: int, course_id: int) -> None:
 
 
 @celery_app.task(name="auth.password_reset_email")
-def send_password_reset(user_id: int, lockout: bool = False) -> None:
-    # 토큰은 작업 안에서 만든다: 작업 큐(Redis)에는 사용자 id만 지나간다
+def send_password_reset(user_id: int, kind: str = "reset") -> None:
+    # 토큰은 작업 안에서 만든다: 작업 큐(Redis)에는 사용자 id와 메일 종류만 지나간다
     with SessionLocal() as session:
-        auth.send_reset_email(session, user_id, lockout=lockout)
+        auth.send_reset_email(session, user_id, kind=kind)

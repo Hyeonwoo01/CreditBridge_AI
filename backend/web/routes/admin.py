@@ -137,21 +137,26 @@ def import_accounts(
 ) -> Response:
     check_csrf(request, csrf_token)
     try:
-        result = institution_data.import_accounts(session, user, file.filename or "", file.file.read())
+        by_email = notifications.email_enabled()
+        result = institution_data.import_accounts(session, user, file.filename or "", file.file.read(), by_email)
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
         return RedirectResponse("/admin/data", status_code=303)
     if result.errors:
         return _data_page(request, user, session, status_code=422, account_errors=result.errors)
-    # 임시 비밀번호는 이 응답에서 한 번만 보여준다. 브라우저·프록시에 남지 않게 캐시를 막는다
+    if by_email:  # 각자의 메일로 72시간짜리 비밀번호 설정 링크를 보낸다 (관리자가 비밀번호를 전달하지 않는다)
+        for created in result.created:
+            tasks.send_password_reset.delay(created.user_id, kind="welcome")
+    # 임시 비밀번호(메일을 못 쓸 때)는 이 응답에서 한 번만 보여준다. 브라우저·프록시에 남지 않게 캐시를 막는다
     response = _data_page(
         request,
         user,
         session,
         created=result.created,
         skipped=result.skipped,
-        sheet=_password_sheet(result.created) if result.created else None,
+        sheet=_password_sheet(result.created) if result.created and not by_email else None,
+        by_email=by_email,
     )
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -229,13 +234,21 @@ def reset_password(
     user: User = Admin,
     session: Session = Depends(get_db),
 ) -> Response:
-    """메일을 쓸 수 없는 사용자에게 임시 비밀번호를 다시 발급한다. 이 응답에서 한 번만 보여준다."""
+    """비밀번호 초기화: 메일을 쓸 수 있으면 사용자에게 설정 링크를 보내고, 아니면 임시 비밀번호를 한 번만 보여준다."""
     check_csrf(request, csrf_token)
+    by_email = notifications.email_enabled()
     try:
-        target, password = auth_service.admin_reset_password(session, user, email)
+        target, password = auth_service.admin_reset_password(session, user, email, by_email)
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
+        return RedirectResponse("/admin/data#password-reset", status_code=303)
+    if password is None:
+        tasks.send_password_reset.delay(target.id, kind="admin")
+        flash(
+            request,
+            f"{target.email} 메일로 비밀번호 설정 링크(72시간 유효)를 보냈어요. 이전 비밀번호는 더 이상 쓸 수 없어요.",
+        )
         return RedirectResponse("/admin/data#password-reset", status_code=303)
     reset = institution_data.CreatedAccount(target.email, target.name, target.role, password)
     response = _data_page(request, user, session, reset=reset)

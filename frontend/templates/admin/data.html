@@ -66,15 +66,16 @@
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="grid gap-1">
       <p class="font-semibold">새 계정 {{ created | length }}개를 만들었어요{% if skipped %} · 이미 있는 계정 {{ skipped | length }}개는 건너뛰었어요{% endif %}</p>
-      {% if created %}<p class="text-sm text-muted">임시 비밀번호는 <strong class="text-ink">지금 한 번만</strong> 보여드려요. 파일로 받아 안전하게 전달해 주세요. 첫 로그인 때 본인이 새 비밀번호로 바꿔야 해요.</p>{% endif %}
+      {% if created and by_email %}<p class="text-sm text-muted">각자의 메일로 <strong class="text-ink">비밀번호 설정 링크(72시간 유효, 한 번만 사용)</strong>를 보냈어요. 따로 전달할 것은 없어요. 링크가 만료되면 로그인 화면의 "비밀번호를 잊으셨나요?"로 다시 받을 수 있어요.</p>
+      {% elif created %}<p class="text-sm text-muted">메일 발송이 설정되지 않아 임시 비밀번호를 만들었어요. <strong class="text-ink">지금 한 번만</strong> 보여드려요. 파일로 받아 안전하게 전달해 주세요. 첫 로그인 때 본인이 새 비밀번호로 바꿔야 해요.</p>{% endif %}
     </div>
     {% if sheet %}<a href="{{ sheet }}" download="initial-passwords.csv" class="btn-primary btn-sm">임시 비밀번호 CSV 받기</a>{% endif %}
   </div>
   {% if created %}
   <div class="overflow-x-auto">
     <table class="w-full min-w-[560px] text-sm">
-      <thead class="text-left text-xs text-muted"><tr><th class="py-2 pr-3 font-normal">이메일</th><th class="py-2 pr-3 font-normal">이름</th><th class="py-2 pr-3 font-normal">역할</th><th class="py-2 font-normal">임시 비밀번호</th></tr></thead>
-      <tbody>{% for a in created %}<tr class="border-t border-divider"><td class="py-2 pr-3">{{ a.email }}</td><td class="py-2 pr-3">{{ a.name }}</td><td class="py-2 pr-3">{{ role_names.get(a.role, a.role) }}</td><td class="py-2 font-mono">{{ a.temporary_password }}</td></tr>{% endfor %}</tbody>
+      <thead class="text-left text-xs text-muted"><tr><th class="py-2 pr-3 font-normal">이메일</th><th class="py-2 pr-3 font-normal">이름</th><th class="py-2 pr-3 font-normal">역할</th><th class="py-2 font-normal">{{ '비밀번호' if by_email else '임시 비밀번호' }}</th></tr></thead>
+      <tbody>{% for a in created %}<tr class="border-t border-divider"><td class="py-2 pr-3">{{ a.email }}</td><td class="py-2 pr-3">{{ a.name }}</td><td class="py-2 pr-3">{{ role_names.get(a.role, a.role) }}</td>{% if by_email %}<td class="py-2 text-muted">설정 링크 메일 발송</td>{% else %}<td class="py-2 font-mono">{{ a.temporary_password }}</td>{% endif %}</tr>{% endfor %}</tbody>
     </table>
   </div>
   {% endif %}
@@ -148,7 +149,7 @@
     <ul class="list-disc pl-5 text-sm text-muted">
       <li>role: student·evaluator·professor·admin (또는 학생·심사관·교수·관리자)</li>
       <li>교수는 <strong class="text-ink">department</strong>가 필수예요. 과목 CSV의 학과명과 똑같이 적어야 그 학과 과목이 배정돼요.</li>
-      <li>비밀번호 열은 없어요. 새 계정마다 임시 비밀번호를 만들어 가져온 직후 한 번만 보여드려요. 이미 있는 이메일은 건너뛰어요.</li>
+      <li>비밀번호 열은 없어요. {% if email_enabled %}새 계정마다 본인 메일로 <strong class="text-ink">비밀번호 설정 링크</strong>(72시간 유효)를 자동으로 보내요{% else %}메일 발송이 설정되지 않아 새 계정마다 임시 비밀번호를 만들어 가져온 직후 한 번만 보여드려요{% endif %}. 이미 있는 이메일은 건너뛰어요.</li>
     </ul>
     <a href="/static/samples/accounts.csv" download class="btn-text w-fit text-sm">예시 파일 받기</a>
     {{ file_field(".csv,text/csv") }}
@@ -156,12 +157,16 @@
     {% if account_errors %}{{ errors_box(account_errors) }}{% endif %}
   </form>
 
-  <form id="password-reset" method="post" action="/admin/data/password-reset" class="card grid scroll-mt-20 content-start gap-3" onsubmit="return confirm('이 계정의 지금 비밀번호를 무효로 하고 임시 비밀번호를 발급할까요?')">
+  <form id="password-reset" method="post" action="/admin/data/password-reset" class="card grid scroll-mt-20 content-start gap-3" onsubmit="return confirm('이 계정의 지금 비밀번호를 무효로 할까요?')">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <h2 class="font-semibold">비밀번호 초기화</h2>
-    <p class="text-sm text-muted">비밀번호를 잊었는데 메일로 재설정할 수 없는 사용자, 로그인 실패로 비밀번호가 초기화된 사용자에게 임시 비밀번호를 다시 발급해요. 사용자는 로그인 화면의 "비밀번호를 잊으셨나요?"에서 메일로 직접 재설정할 수도 있어요{% if not email_enabled %}(지금은 메일 발송이 설정되지 않아 이 방법만 쓸 수 있어요){% endif %}.</p>
+    {% if email_enabled %}
+    <p class="text-sm text-muted">지금 비밀번호를 무효로 하고 사용자 메일로 <strong class="text-ink">비밀번호 설정 링크</strong>(72시간 유효)를 자동으로 보내요. 비밀번호를 전달할 필요가 없어요. 사용자는 로그인 화면의 "비밀번호를 잊으셨나요?"로 직접 재설정할 수도 있고, 로그인 실패 10회로 초기화되면 링크가 자동으로 가요.</p>
+    {% else %}
+    <p class="text-sm text-muted">메일 발송이 설정되지 않아 임시 비밀번호를 다시 발급해 화면에 한 번만 보여드려요. 비밀번호를 잊은 사용자, 로그인 실패로 비밀번호가 초기화된 사용자에게 쓰세요. 메일 발송(<code>SMTP_HOST</code>)을 설정하면 사용자 메일로 링크가 자동으로 가서 관리자가 처리할 일이 없어져요.</p>
+    {% endif %}
     <label class="field"><span>사용자 이메일</span><input class="input" type="email" name="email" required></label>
-    <button class="btn-secondary w-fit">임시 비밀번호 발급</button>
+    <button class="btn-secondary w-fit">{{ '설정 링크 메일 보내기' if email_enabled else '임시 비밀번호 발급' }}</button>
   </form>
 </section>
 

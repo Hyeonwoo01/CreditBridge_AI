@@ -40,7 +40,7 @@ def login(
     check_csrf(request, csrf_token)
     attempt = login_attempt(session, email, password)
     if attempt.send_reset_to is not None and notifications.email_enabled():
-        tasks.send_password_reset.delay(attempt.send_reset_to, lockout=True)
+        tasks.send_password_reset.delay(attempt.send_reset_to, kind="lockout")
     user = attempt.user
     if user is None:
         return render(request, "login.html", status_code=attempt.status_code, error=attempt.error, email=email)

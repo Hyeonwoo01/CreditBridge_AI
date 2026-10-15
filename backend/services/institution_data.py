@@ -25,7 +25,7 @@ from backend.repositories import catalog as catalog_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import analysis, audit, csv_import
-from backend.services.auth import RESET_AFTER, hash_password, temporary_password
+from backend.services.auth import RESET_AFTER, hash_password, temporary_password, unusable_password
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,8 @@ class CreatedAccount:
     email: str
     name: str
     role: str
-    temporary_password: str
+    temporary_password: str  # 메일로 설정 링크를 보내는 경우 빈 문자열
+    user_id: int = 0
 
 
 @dataclass
@@ -133,7 +134,9 @@ def overview(session: Session, admin: User) -> Overview:
 # ---------- 계정 ----------
 
 
-def import_accounts(session: Session, admin: User, filename: str, data: bytes) -> AccountImport:
+def import_accounts(session: Session, admin: User, filename: str, data: bytes, by_email: bool = False) -> AccountImport:
+    """by_email이면 비밀번호를 아무도 모르는 값으로 두고(호출자가 설정 링크 메일을 보낸다)
+    임시 비밀번호를 만들지 않는다."""
     institution_id = ensure_admin(admin)
     departments = set(catalog_repo.departments_of(session, institution_id))
     result = AccountImport()
@@ -180,8 +183,8 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes) -
     if not pending and not result.skipped:
         raise CreditBridgeError("가져올 행이 없어요.")
     for email, name, role, department in pending:
-        password = temporary_password()
-        user_repo.add(
+        password = "" if by_email else temporary_password()
+        created = user_repo.add(
             session,
             User(
                 email=email,
@@ -189,11 +192,11 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes) -
                 role=role,
                 institution_id=institution_id,
                 department=department,
-                password_hash=hash_password(password),
+                password_hash=unusable_password() if by_email else hash_password(password),
                 must_change_password=True,
             ),
         )
-        result.created.append(CreatedAccount(email, name, role, password))
+        result.created.append(CreatedAccount(email, name, role, password, created.id))
     audit.record(
         session,
         admin,
@@ -202,6 +205,7 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes) -
         str(institution_id),
         created=len(result.created),
         skipped=len(result.skipped),
+        by_email=by_email,
     )
     session.commit()
     return result

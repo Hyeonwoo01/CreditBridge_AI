@@ -88,7 +88,7 @@ def _failed(session: Session, user: User, now: datetime) -> LoginAttempt:
     session.refresh(user)
     if count >= RESET_AFTER:
         # 아무도 모르는 값으로 바꾼다: 비밀번호 지문이 바뀌어 이전 세션·재설정 링크도 모두 무효가 된다
-        user.password_hash = _hasher.hash(secrets.token_urlsafe(32))
+        user.password_hash = unusable_password()
         user.locked_until = None
         audit.record(session, user, "auth.lockout_reset", "user", str(user.id), failed=count)
         session.commit()
@@ -142,27 +142,63 @@ def change_password(session: Session, user: User, current: str, new: str, confir
     session.commit()
 
 
-# ---------- 비밀번호 재설정 ----------
+# ---------- 비밀번호 재설정·설정 링크 ----------
 
-RESET_MAX_AGE = 30 * 60  # 초
+RESET_MAX_AGE = 30 * 60  # 초: 본인 요청·로그인 실패 초기화 링크
+SETUP_MAX_AGE = 72 * 60 * 60  # 초: 새 계정·관리자 초기화 링크 (바로 메일을 못 볼 수 있어 길게)
 RESET_COOLDOWN = timedelta(minutes=5)  # 같은 계정에 재설정 메일을 연달아 보내지 않는다
+
+# 메일 종류 → (토큰 용도, 제목, 첫 줄, 마지막 안내)
+_MAILS = {
+    "reset": (
+        "reset",
+        "[CreditBridge] 비밀번호 재설정",
+        "CreditBridge AI 비밀번호 재설정 요청을 받았어요.",
+        "요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요.",
+    ),
+    "lockout": (
+        "reset",
+        "[CreditBridge] 비밀번호 재설정",
+        f"로그인 실패가 {RESET_AFTER}번 이어져 보안을 위해 CreditBridge AI 비밀번호를 초기화했어요.",
+        "본인이 시도한 것이 아니라면 누군가 비밀번호를 추측하려 한 것일 수 있어요. 기관 관리자에게도 알려 주세요.",
+    ),
+    "admin": (
+        "setup",
+        "[CreditBridge] 비밀번호 재설정",
+        "기관 관리자가 CreditBridge AI 비밀번호를 초기화했어요. 이전 비밀번호는 더 이상 쓸 수 없어요.",
+        "초기화를 요청한 적이 없다면 기관 관리자에게 문의해 주세요.",
+    ),
+    "welcome": (
+        "setup",
+        "[CreditBridge] 계정이 만들어졌어요",
+        "CreditBridge AI 계정이 만들어졌어요. 로그인 이메일은 이 메일을 받은 주소예요.",
+        "모르는 계정이라면 이 메일을 무시하고 기관 관리자에게 알려 주세요.",
+    ),
+}
 
 
 def _serializer(settings: Settings) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings.session_secret, salt="password-reset")
 
 
-def reset_token(user: User, settings: Settings | None = None) -> str:
-    return _serializer(settings or get_settings()).dumps({"u": user.id, "p": password_fingerprint(user)})
+def reset_token(user: User, settings: Settings | None = None, purpose: str = "reset") -> str:
+    data = {"u": user.id, "p": password_fingerprint(user), "k": purpose}
+    return _serializer(settings or get_settings()).dumps(data)
 
 
 def user_for_reset_token(session: Session, token: str, settings: Settings | None = None) -> User | None:
-    """유효한 토큰의 사용자. 서명이 틀렸거나 30분이 지났거나 이미 비밀번호가 바뀌었으면 None."""
+    """유효한 토큰의 사용자. 서명이 틀렸거나 기한(재설정 30분, 계정 설정 72시간)이 지났거나
+    이미 비밀번호가 바뀌었으면 None."""
     try:
-        data = _serializer(settings or get_settings()).loads(token, max_age=RESET_MAX_AGE)
+        data, signed_at = _serializer(settings or get_settings()).loads(
+            token, max_age=max(RESET_MAX_AGE, SETUP_MAX_AGE), return_timestamp=True
+        )
     except BadSignature:  # 만료(SignatureExpired)도 여기에 포함된다
         return None
     if not isinstance(data, dict) or not isinstance(data.get("u"), int):
+        return None
+    limit = SETUP_MAX_AGE if data.get("k") == "setup" else RESET_MAX_AGE
+    if (datetime.now(signed_at.tzinfo) - signed_at).total_seconds() > limit:
         return None
     user = user_repo.get_by_id(session, data["u"])
     if user is None or data.get("p") != password_fingerprint(user):
@@ -183,30 +219,28 @@ def request_reset(session: Session, email: str) -> int | None:
     return user.id
 
 
-def send_reset_email(session: Session, user_id: int, settings: Settings | None = None, lockout: bool = False) -> bool:
-    """작업 큐에서 부른다. 토큰은 여기서 만들어 메일로만 보낸다(DB·작업 큐·로그에 남기지 않는다)."""
+def send_reset_email(session: Session, user_id: int, settings: Settings | None = None, kind: str = "reset") -> bool:
+    """작업 큐에서 부른다. 토큰은 여기서 만들어 메일로만 보낸다(DB·작업 큐·로그에 남기지 않는다).
+    kind: reset(본인 요청) / lockout(로그인 실패 10회) / admin(관리자 초기화) / welcome(새 계정)."""
     settings = settings or get_settings()
     user = user_repo.get_by_id(session, user_id)
     if user is None:
         return False
-    link = f"{settings.app_base_url.rstrip('/')}/account/reset?token={quote(reset_token(user, settings))}"
-    intro = (
-        f"로그인 실패가 {RESET_AFTER}번 이어져 보안을 위해 CreditBridge AI 비밀번호를 초기화했어요.\n"
-        if lockout
-        else "CreditBridge AI 비밀번호 재설정 요청을 받았어요.\n"
-    )
-    ignore = (
-        "본인이 시도한 것이 아니라면 누군가 비밀번호를 추측하려 한 것일 수 있어요. 기관 관리자에게도 알려 주세요.\n"
-        if lockout
-        else "요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요.\n"
-    )
+    purpose, subject, intro, outro = _MAILS[kind]
+    token = reset_token(user, settings, purpose)
+    link = f"{settings.app_base_url.rstrip('/')}/account/reset?token={quote(token)}"
+    within = "72시간" if purpose == "setup" else f"{RESET_MAX_AGE // 60}분"
     body = (
-        intro
-        + f"아래 링크에서 {RESET_MAX_AGE // 60}분 안에 새 비밀번호를 정해 주세요. 링크는 한 번만 쓸 수 있어요.\n"
-        + ignore
-        + f"\n{link}\n"
+        f"{intro}\n"
+        f"아래 링크에서 {within} 안에 비밀번호를 정해 주세요. 링크는 한 번만 쓸 수 있어요.\n"
+        f"{outro}\n\n{link}\n"
     )
-    return notifications.send_email(user.email, "[CreditBridge] 비밀번호 재설정", body, settings)
+    return notifications.send_email(user.email, subject, body, settings)
+
+
+def unusable_password() -> str:
+    """아무도 모르는 비밀번호의 해시. 메일 링크로만 비밀번호를 정하게 할 때 쓴다."""
+    return _hasher.hash(secrets.token_urlsafe(32))
 
 
 def reset_password(session: Session, token: str, new: str, confirm: str) -> User:
@@ -222,8 +256,11 @@ def reset_password(session: Session, token: str, new: str, confirm: str) -> User
     return user
 
 
-def admin_reset_password(session: Session, admin: User, email: str) -> tuple[User, str]:
-    """기관 관리자가 소속 사용자에게 임시 비밀번호를 다시 발급한다. 다음 로그인 때 바꿔야 한다."""
+def admin_reset_password(session: Session, admin: User, email: str, by_email: bool) -> tuple[User, str | None]:
+    """기관 관리자가 소속 사용자의 비밀번호를 초기화한다. 이전 비밀번호와 다른 기기 로그인은 무효가 된다.
+
+    by_email이면 아무도 모르는 값으로 바꾸고(호출자가 72시간짜리 설정 링크 메일을 보낸다) 비밀번호를 돌려주지
+    않는다. 메일을 쓸 수 없으면 임시 비밀번호를 만들어 돌려주고 다음 로그인 때 바꾸게 한다."""
     if admin.role != Role.ADMIN or admin.institution_id is None:
         raise PermissionDeniedError("기관 관리자만 사용할 수 있어요.")
     user = user_repo.get_by_email(session, email)
@@ -231,10 +268,10 @@ def admin_reset_password(session: Session, admin: User, email: str) -> tuple[Use
         raise NotFoundError("우리 기관에 그 이메일의 계정이 없어요.")
     if user.id == admin.id:
         raise CreditBridgeError("본인 비밀번호는 비밀번호 변경 화면에서 바꿔 주세요.")
-    password = temporary_password()
-    user.password_hash = _hasher.hash(password)
+    password = None if by_email else temporary_password()
+    user.password_hash = unusable_password() if password is None else _hasher.hash(password)
     user.must_change_password = True
     user.failed_logins, user.locked_until = 0, None
-    audit.record(session, admin, "account.password_reset_by_admin", "user", str(user.id))
+    audit.record(session, admin, "account.password_reset_by_admin", "user", str(user.id), by_email=by_email)
     session.commit()
     return user, password
