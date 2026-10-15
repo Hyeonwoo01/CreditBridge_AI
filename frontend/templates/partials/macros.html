@@ -23,11 +23,11 @@
 {%- endmacro %}
 
 {# 상단 검정 글로벌 내비게이션 링크 (12px) #}
-{# badges: [(건수, 'missing'|'new'|'count', 읽어 줄 설명)] — 채워야 할 서류는 앰버 "!N", 새 결과는 파랑 "N", 단순 개수는 중립 "N" #}
+{# badges: [(건수, 'missing'|'new'|'count', 읽어 줄 설명)] — 숫자만 쓰고 색으로 구분 — 채워야 할 서류는 앰버, 새 결과는 파랑, 단순 개수는 중립 #}
 {% macro nav_link(href, label, exact=False, current=none, badges=[]) -%}
 {% set path = request.url.path %}
 {% set active = current if current is not none else (path == href or (not exact and path.startswith(href + '/'))) %}
 <a href="{{ href }}" class="flex h-11 items-center gap-1.5 text-xs tracking-[-0.12px] {{ 'text-white' if active else 'text-white/70 hover:text-white' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}
-  {%- for n, tone, title in badges if n %}<span class="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[11px] leading-none font-semibold tabular-nums {{ {'missing': 'bg-elective-subtle text-elective', 'new': 'bg-hl-target text-primary'}.get(tone, 'bg-white/20 text-white') }}" title="{{ title }}"><span class="sr-only">{{ title }} </span>{{ '!' if tone == 'missing' }}{{ n }}</span>{% endfor -%}
+  {%- for n, tone, title in badges if n %}<span class="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[11px] leading-none font-semibold tabular-nums {{ {'missing': 'bg-elective-subtle text-elective', 'new': 'bg-hl-target text-primary'}.get(tone, 'bg-white/20 text-white') }}" title="{{ title }}"><span class="sr-only">{{ title }} </span>{{ n }}</span>{% endfor -%}
 </a>
 {%- endmacro %}

@@ -24,6 +24,7 @@ def test_dashboard_lists_todos_and_readiness(client: TestClient, seeded: Session
     assert "할 일" in home and "성적표 올리기" in home and "강의계획서 올리기" in home
     assert '서류 준비 <strong class="tabular-nums">0%</strong>' in home
     assert "채워야 할 서류 2건" in home  # 메뉴 배지(앰버)와 카드
+    assert "채워야 할 서류 2건 </span>2</span>" in home and "!2" not in home  # 배지는 숫자만
 
     upload(client, rid, token, "calculus.txt", "data_structures.txt")
     client.post(
