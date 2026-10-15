@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, String, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
@@ -19,6 +19,8 @@ class User(IdMixin, CreatedAtMixin, Base):
     # 부재 시 대리 심사자 (FR-19)
     delegate_user_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("users.id"))
     away_until: Mapped[date | None] = mapped_column(default=None)
+    # 관리자가 CSV로 만든 계정은 임시 비밀번호로 첫 로그인한 뒤 바로 바꿔야 한다
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     institution: Mapped[Institution | None] = relationship(lazy="joined")
 

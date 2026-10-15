@@ -9,11 +9,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from backend.config import get_settings
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
 from backend.logging_setup import configure_logging
-from backend.security.session import LoginRequired
+from backend.security.session import PASSWORD_PAGE, LoginRequired, PasswordChangeRequired
 from backend.web.api import decisions as api_decisions
 from backend.web.api import evaluations as api_evaluations
 from backend.web.api import sis as api_sis
-from backend.web.routes import admin, auth, notifications, professor, review, shared, student
+from backend.web.routes import account, admin, auth, notifications, professor, review, shared, student
 from backend.web.templating import render
 
 configure_logging()
@@ -41,6 +41,7 @@ for router in (
     shared.router,
     admin.router,
     notifications.router,
+    account.router,
 ):
     app.include_router(router)
 app.include_router(api_evaluations.router, prefix="/api")
@@ -58,6 +59,15 @@ def login_required(request: Request, exc: LoginRequired) -> Response:
     if request.url.path.startswith("/api/"):
         return Response(status_code=401)
     return RedirectResponse("/login", status_code=303)
+
+
+@app.exception_handler(PasswordChangeRequired)
+def password_change_required(request: Request, exc: PasswordChangeRequired) -> Response:
+    if request.url.path.startswith("/api/"):
+        return Response(status_code=403)
+    if request.headers.get("HX-Request"):
+        return Response(status_code=204, headers={"HX-Redirect": PASSWORD_PAGE})
+    return RedirectResponse(PASSWORD_PAGE, status_code=303)
 
 
 @app.exception_handler(PermissionDeniedError)

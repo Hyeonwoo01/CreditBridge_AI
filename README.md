@@ -5,7 +5,7 @@
 - 학생(이지원): 편입 학점 시뮬레이션 리포트에서 예상 인정 학점·남은 학기·추가 비용, 과목별 결과(승인 완료·보완 필요·심사 중), 부족한 자료, 심사 진행 단계를 확인
 - 심사관(레이첼): 검색·필터가 있는 심사 대기열, 일관성 경보 미리 보기, 학과 교수 일괄 배정, 부재 시 대리 재배정, 판정 내보내기
 - 학과 교수: 근거 구절 비교 화면에서 승인·수정·반려, 반려하거나 추천과 다르게 판정하면 사유 선택 창에서 사유·소명 입력, 과거 판정과 다르면 확정 전 경보, 보완 자료 요청, 이의 신청 재판정
-- 기관 관리자: 관리자 콘솔(AI 추천 수용률·학과별 처리 지표·최근 감사 로그·보존 정책), 문서 삭제 승인, 학사정보시스템 연동 토큰, 전체 감사 로그
+- 기관 관리자: 관리자 콘솔(AI 추천 수용률·학과별 처리 지표·최근 감사 로그·보존 정책), 계정·과목 CSV 가져오기와 기준 강의계획서 등록, 문서 삭제 승인, 학사정보시스템 연동 토큰, 전체 감사 로그
 
 심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`).
 
@@ -28,6 +28,7 @@
 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | "예상 인정 학점: 낮음~높음 / 이수 학점" 요약, 남은 학기·추가 비용·심사 진행 카드, 과목 필터, 정보 부족 진단과 보완 서류 제출, 심사 진행 4단계 |
 | 심사 대기열 | `/review` | 심사관 | 지표 카드, 이름·과목·출신 대학 검색, 신뢰도·일관성 경보·학과 필터, 커버리지 게이지, 경보 행, 행 선택 후 교수 일괄 배정, SIS CSV 내보내기 |
 | 판정 화면 | `/professor/evaluations/{id}` | 학과 교수 | 좌우 근거 구절 비교, 과거 판정 이력, 하단 고정 판정 바, 불인정·판정 변경 사유 선택 창 |
+| 계정·과목 관리 | `/admin/data` | 기관 관리자 | 과목 CSV(필수 개념 포함)·계정 CSV 가져오기, 새 계정 임시 비밀번호(한 번만 표시), 과목별 기준 강의계획서 올리기, 출신 대학 등록 |
 | 관리자 콘솔 | `/admin/stats` | 기관 관리자 | AI 추천 수용률, 개인정보 보호·SIS 연동 상태, 학과별 처리 지표, 최근 감사 로그, 데이터 보존 및 파기 정책 (심사관은 `/review/stats`에서 감사 로그를 뺀 운영 통계) |
 
 - 화면은 [DESIGN.md](docs/DESIGN.md)(단일 Action Blue, 1px 헤어라인, 그림자 없음)를 따릅니다. 폭은 기본 1280px이고, 정보가 많은 심사 대기열과 원문 대조 화면만 1440px입니다.
@@ -94,6 +95,24 @@ uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 �
 - **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.
 - **작업 완료 전**: 아래 품질 검사를 모두 통과시키고, 스키마를 바꾸면 Alembic 마이그레이션을, 새 Tailwind 클래스를 쓰면 `app.css` 재빌드를 함께 커밋합니다.
 
+## 실제 데이터로 시작하기
+
+데모 데이터 없이(`SEED_DEMO=false`) 실제 기관에서 쓸 때의 순서입니다.
+
+1. **첫 관리자 만들기** (서버에서 한 번):
+   ```bash
+   uv run python -m scripts.create_admin --institution "대학 이름" --country KR \
+       --email admin@univ.ac.kr --name "학사정보처 관리자" --tuition 1350 --degree 130
+   # Docker: docker compose --profile app exec web uv run --no-group dev python -m scripts.create_admin ...
+   ```
+   임시 비밀번호가 한 번만 출력됩니다. 첫 로그인 때 새 비밀번호(10자 이상)로 바꿔야 다른 화면을 쓸 수 있습니다.
+2. **과목 CSV** (`/admin/data`): `code,title,credits,department,level,concepts`. `concepts`는 학과가 정한 필수 개념을 `;`로 구분해 적습니다. 과목 코드가 이미 있으면 새 값으로 고칩니다.
+3. **과목별 기준 강의계획서**: 같은 화면의 과목 목록에서 PDF·JPG·PNG를 올립니다. **기준 강의계획서가 없는 과목은 AI 비교 후보에서 빠집니다.**
+4. **계정 CSV**: `email,name,role,department`. role은 student·evaluator·professor·admin(또는 학생·심사관·교수·관리자). 교수의 department는 과목 CSV의 학과명과 똑같아야 그 학과 과목이 배정됩니다. 새 계정마다 임시 비밀번호를 만들어 가져온 직후 한 번만 보여 주고(CSV로 받기 가능) 저장하지 않습니다. 이미 있는 이메일은 건너뜁니다.
+5. **출신 대학 등록**: 학생이 편입 요청을 만들 때 고르는 목록입니다.
+
+CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니다(한국어 엑셀 기본 CSV도 읽습니다). 한 줄이라도 틀리면 아무것도 저장하지 않고 틀린 행 번호와 이유를 보여 줍니다. 예시 파일은 화면의 "예시 파일 받기" 또는 `frontend/static/samples/`에 있습니다.
+
 ## 품질 검사
 
 ```bash
@@ -114,6 +133,7 @@ backend/         ← 백엔드 (Python, import 이름도 backend)
   documents/     PyMuPDF 텍스트 추출(PDF·JPG·PNG), S3 저장
   services/      analysis(파이프라인) · scoring(추천 규칙) · student · review(심사 대기열) · decisions(판정·경보)
                  materials · appeals · privacy · notifications · sis · equivalencies · stats(통계·관리자 콘솔) · views(화면 조회)
+                 institution_data(계정·과목 CSV, 기준 강의계획서, 출신 대학, 첫 관리자) · csv_import(CSV 공통)
   repositories/  SQL은 여기만
   models/        SQLAlchemy 2.0, 테이블당 1파일
   workers/       Celery 작업
@@ -121,10 +141,10 @@ backend/         ← 백엔드 (Python, import 이름도 backend)
   web/           라우트(routes/), JSON API(api/), 템플릿 렌더링(templating.py: frontend/templates 사용)
 frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   templates/     Jinja2 + HTMX 템플릿: base · student · review · professor · admin · partials · stats · report
-  static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘)
+  static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘) · samples/(CSV 예시)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (MySQL 8.0 호환 문법만)
-scripts/         start.sh · build_css.sh · seed_demo · create_bucket · demo_data/
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · demo_data/
 tests/           unit · integration(MariaDB) · eval(골든셋)
 ```
 
@@ -134,6 +154,7 @@ tests/           unit · integration(MariaDB) · eval(골든셋)
 
 ## 운영 시 확인할 것
 
+- 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.

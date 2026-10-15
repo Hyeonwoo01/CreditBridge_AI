@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block nav %}{% include "admin/_nav.html" %}{% endblock %}
+{% block crumb %}관리자 콘솔 · 계정·과목{% endblock %}
+{% block content %}
+{% set role_names = {"student": "학생", "evaluator": "심사관", "professor": "교수", "admin": "관리자"} %}
+{% macro errors_box(errors) -%}
+<section class="rounded-md bg-reject-subtle p-4 text-sm text-reject" role="alert">
+  <p class="font-semibold">아래 행을 고친 뒤 다시 올려 주세요. 아무것도 저장하지 않았어요.</p>
+  <ul class="mt-2 list-disc pl-5">{% for e in errors[:50] %}<li>{{ e }}</li>{% endfor %}</ul>
+  {% if errors | length > 50 %}<p class="mt-1">외 {{ errors | length - 50 }}건</p>{% endif %}
+</section>
+{%- endmacro %}
+{% macro file_field(accept) -%}
+<input type="file" name="file" required accept="{{ accept }}" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-parchment file:px-4 file:py-2 file:font-normal file:text-primary">
+{%- endmacro %}
+
+<header class="grid gap-1">
+  <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase">Institution data</p>
+  <h1 class="page-title">{{ o.institution.name }} 계정·과목 관리</h1>
+  <p class="text-sm text-muted">처음 쓸 때는 ① 과목 CSV → ② 과목별 기준 강의계획서 → ③ 계정 CSV → ④ 출신 대학 순서로 준비해요. 엑셀은 <strong>다른 이름으로 저장 → CSV UTF-8</strong>로 저장해 올려 주세요.</p>
+</header>
+
+<section class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="준비 현황">
+  <div class="card grid content-start gap-1 p-5">
+    <span class="text-sm text-muted">과목</span>
+    <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.courses | length }}<span class="text-base font-normal text-muted"> 개</span></span>
+    <span class="text-xs {{ 'text-reject' if o.missing_reference else 'text-muted' }}">기준 강의계획서 없음 {{ o.missing_reference }}개</span>
+  </div>
+  <div class="card grid content-start gap-1 p-5">
+    <span class="text-sm text-muted">계정</span>
+    <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.role_counts.values() | sum }}<span class="text-base font-normal text-muted"> 개</span></span>
+    <span class="text-xs text-muted">{% for key in ['student', 'evaluator', 'professor', 'admin'] %}{{ role_names[key] }} {{ o.role_counts.get(key, 0) }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+  </div>
+  <div class="card grid content-start gap-1 p-5">
+    <span class="text-sm text-muted">첫 비밀번호 변경 대기</span>
+    <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.pending_password }}<span class="text-base font-normal text-muted"> 명</span></span>
+    <span class="text-xs text-muted">임시 비밀번호로 아직 로그인하지 않은 계정</span>
+  </div>
+  <div class="card grid content-start gap-1 p-5">
+    <span class="text-sm text-muted">출신 대학</span>
+    <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.source_institutions | length }}<span class="text-base font-normal text-muted"> 곳</span></span>
+    <span class="text-xs text-muted">학생이 편입 요청을 만들 때 고르는 목록</span>
+  </div>
+</section>
+
+{% if o.departments_without_professor %}
+<p class="mt-4 rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">교수 계정이 없는 학과: <strong>{{ o.departments_without_professor | join(', ') }}</strong>. 이 학과 과목은 자동 배정되지 않아요. 계정 CSV에서 교수의 department를 과목의 학과명과 똑같이 적어 주세요.</p>
+{% endif %}
+
+{% if created is defined %}
+<section class="mt-6 grid gap-4 rounded-lg border border-ink p-5" role="status" aria-label="새로 만든 계정">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="grid gap-1">
+      <p class="font-semibold">새 계정 {{ created | length }}개를 만들었어요{% if skipped %} · 이미 있는 계정 {{ skipped | length }}개는 건너뛰었어요{% endif %}</p>
+      {% if created %}<p class="text-sm text-muted">임시 비밀번호는 <strong class="text-ink">지금 한 번만</strong> 보여드려요. 파일로 받아 안전하게 전달해 주세요. 첫 로그인 때 본인이 새 비밀번호로 바꿔야 해요.</p>{% endif %}
+    </div>
+    {% if sheet %}<a href="{{ sheet }}" download="initial-passwords.csv" class="btn-primary btn-sm">임시 비밀번호 CSV 받기</a>{% endif %}
+  </div>
+  {% if created %}
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[560px] text-sm">
+      <thead class="text-left text-xs text-muted"><tr><th class="py-2 pr-3 font-normal">이메일</th><th class="py-2 pr-3 font-normal">이름</th><th class="py-2 pr-3 font-normal">역할</th><th class="py-2 font-normal">임시 비밀번호</th></tr></thead>
+      <tbody>{% for a in created %}<tr class="border-t border-divider"><td class="py-2 pr-3">{{ a.email }}</td><td class="py-2 pr-3">{{ a.name }}</td><td class="py-2 pr-3">{{ role_names.get(a.role, a.role) }}</td><td class="py-2 font-mono">{{ a.temporary_password }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="mt-8 grid gap-4 lg:grid-cols-2" aria-label="CSV 가져오기">
+  <form method="post" action="/admin/data/courses" enctype="multipart/form-data" class="card grid content-start gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h2 class="font-semibold">① 과목 CSV 가져오기</h2>
+    <p class="text-sm text-muted">첫 줄 열 이름: <code class="rounded bg-parchment px-1">{{ course_columns | join(',') }}</code></p>
+    <ul class="list-disc pl-5 text-sm text-muted">
+      <li>과목 코드가 이미 있으면 과목명·학점·학과·필수 개념을 새 값으로 고쳐요.</li>
+      <li><strong class="text-ink">concepts</strong>: 학과가 정한 필수 개념을 <code>;</code>로 구분 (예: <code>Limits;Derivatives;Integrals</code>). AI가 개념마다 다뤘는지 비교해요.</li>
+      <li>level(선택): 과목 수준 설명. 수준 차이 판단에 써요.</li>
+    </ul>
+    <a href="/static/samples/courses.csv" download class="btn-text w-fit text-sm">예시 파일 받기</a>
+    {{ file_field(".csv,text/csv") }}
+    <button class="btn-primary w-fit">과목 가져오기</button>
+    {% if course_errors %}{{ errors_box(course_errors) }}{% endif %}
+  </form>
+
+  <form method="post" action="/admin/data/accounts" enctype="multipart/form-data" class="card grid content-start gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h2 class="font-semibold">③ 계정 CSV 가져오기</h2>
+    <p class="text-sm text-muted">첫 줄 열 이름: <code class="rounded bg-parchment px-1">{{ account_columns | join(',') }}</code></p>
+    <ul class="list-disc pl-5 text-sm text-muted">
+      <li>role: student·evaluator·professor·admin (또는 학생·심사관·교수·관리자)</li>
+      <li>교수는 <strong class="text-ink">department</strong>가 필수예요. 과목 CSV의 학과명과 똑같이 적어야 그 학과 과목이 배정돼요.</li>
+      <li>비밀번호 열은 없어요. 새 계정마다 임시 비밀번호를 만들어 가져온 직후 한 번만 보여드려요. 이미 있는 이메일은 건너뛰어요.</li>
+    </ul>
+    <a href="/static/samples/accounts.csv" download class="btn-text w-fit text-sm">예시 파일 받기</a>
+    {{ file_field(".csv,text/csv") }}
+    <button class="btn-primary w-fit">계정 가져오기</button>
+    {% if account_errors %}{{ errors_box(account_errors) }}{% endif %}
+  </form>
+</section>
+
+<section id="courses" class="mt-10 grid scroll-mt-20 gap-3">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="section-title">② 과목별 기준 강의계획서</h2>
+    <span class="text-xs text-muted">기준 강의계획서가 없는 과목은 AI 비교 후보에서 빠져요 · PDF·JPG·PNG, 파일당 20MB</span>
+  </div>
+  <div class="card overflow-x-auto p-0">
+    <table class="w-full min-w-[900px] text-sm">
+      <thead class="bg-pearl text-left text-xs text-muted">
+        <tr><th class="px-5 py-3 font-normal">과목</th><th class="px-3 py-3 font-normal">학과</th><th class="px-3 py-3 font-normal">학점</th><th class="px-3 py-3 font-normal">필수 개념</th><th class="px-3 py-3 font-normal">기준 강의계획서</th><th class="px-5 py-3 font-normal">올리기</th></tr>
+      </thead>
+      <tbody>
+      {% for r in o.courses %}
+        {% set c = r.course %}
+        {% set st = r.reference_status %}
+        <tr class="border-t border-divider align-middle">
+          <td class="px-5 py-3"><span class="font-mono text-[13px] font-semibold">{{ c.code }}</span><div class="text-xs text-ink-80">{{ c.title }}</div></td>
+          <td class="px-3 py-3">{{ c.department }}</td>
+          <td class="px-3 py-3 tabular-nums">{{ c.credits }}</td>
+          <td class="px-3 py-3">{% if r.concepts %}<span title="{{ r.concepts | join(', ') }}">{{ r.concepts | length }}개</span>{% else %}<span class="text-muted">기준 강의계획서 기준</span>{% endif %}</td>
+          <td class="px-3 py-3">
+            {% if st == 'ready' %}<span class="badge-approve">등록됨</span>
+            {% elif st == 'processing' %}<span class="badge">읽는 중</span>
+            {% elif st == 'failed' %}<span class="badge-reject" title="{{ r.latest_upload.error_message or '' }}">읽기 실패</span>{% if c.reference_syllabus_id %}<div class="mt-1 text-xs text-muted">이전 것을 계속 써요</div>{% endif %}
+            {% else %}<span class="badge-reject">없음</span>{% endif %}
+          </td>
+          <td class="px-5 py-3">
+            <form method="post" action="/admin/data/courses/{{ c.id }}/reference" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <label class="sr-only" for="ref-{{ c.id }}">{{ c.code }} 기준 강의계획서</label>
+              <input id="ref-{{ c.id }}" type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="max-w-[220px] text-xs file:mr-2 file:rounded-full file:border-0 file:bg-parchment file:px-3 file:py-1.5 file:text-primary">
+              <button class="btn-secondary btn-sm">{{ '바꾸기' if c.reference_syllabus_id else '올리기' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="px-5 py-10 text-center text-muted">아직 과목이 없어요. 위에서 과목 CSV를 먼저 가져와 주세요.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+  <div class="grid gap-3">
+    <h2 class="section-title">④ 출신 대학</h2>
+    <p class="text-sm text-muted">학생이 편입 요청을 만들 때 고르는 대학 목록이에요. 기존 동등 과목표 CSV의 출신 대학 이름도 여기 등록된 이름과 똑같아야 해요.</p>
+    <ul class="card grid gap-0 p-0 text-sm">
+      {% for i in o.source_institutions %}<li class="flex justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0"><span>{{ i.name }}</span><span class="font-mono text-xs text-muted">{{ i.country }}</span></li>
+      {% else %}<li class="px-5 py-6 text-center text-muted">아직 등록된 출신 대학이 없어요.</li>{% endfor %}
+    </ul>
+  </div>
+  <form method="post" action="/admin/data/institutions" class="card grid gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p class="font-semibold">출신 대학 추가</p>
+    <label class="field"><span>대학 이름</span><input class="input" name="name" required maxlength="200" placeholder="예: Hankuk University (한국대학교)"></label>
+    <label class="field"><span>국가 코드</span><input class="input uppercase" name="country" required maxlength="2" pattern="[A-Za-z]{2}" placeholder="KR"></label>
+    <button class="btn-primary w-fit">추가</button>
+  </form>
+</section>
+{% endblock %}

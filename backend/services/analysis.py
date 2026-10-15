@@ -203,7 +203,8 @@ def _references(
                 level=course.level,
                 syllabus_id=ref_syllabus.id,
                 text=ref_syllabus.raw_text,
-                concepts=[c.concept for c in concepts.get(course.id, [])],
+                # 학과가 과목 CSV로 정한 필수 개념이 먼저, 없으면 기준 강의계획서 청크의 개념
+                concepts=list(course.concepts or []) or [c.concept for c in concepts.get(course.id, [])],
             )
         )
     return refs

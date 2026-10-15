@@ -78,3 +78,13 @@ def analyzed_with_hash(session: Session, content_hash: str, exclude_id: int) -> 
         .limit(1)
     )
     return session.scalars(stmt).first()
+
+
+def latest_reference_uploads(session: Session, institution_id: int) -> dict[str, Syllabus]:
+    """과목 코드별 가장 최근에 올린 기준 강의계획서 (학생 문서는 요청에 묶여 있어 제외된다)."""
+    stmt = (
+        select(Syllabus)
+        .where(Syllabus.institution_id == institution_id, Syllabus.transfer_request_id.is_(None))
+        .order_by(Syllabus.id)
+    )
+    return {s.course_code: s for s in session.scalars(stmt)}

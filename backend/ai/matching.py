@@ -50,7 +50,9 @@ def build_prompt(
             },
             ensure_ascii=False,
         )
-        blocks.append(f"<candidate>\n{header}\n<reference_syllabus>\n{ref.text}\n</reference_syllabus>\n</candidate>")
+        # 기관이 올린 기준 강의계획서도 문서 속 지시 문구는 데이터로만 다룬다 (근거 검증은 원문 기준)
+        ref_text = injection.sanitize(ref.text, injection.detect(ref.text))
+        blocks.append(f"<candidate>\n{header}\n<reference_syllabus>\n{ref_text}\n</reference_syllabus>\n</candidate>")
     prompt = load_prompt("evaluation")
     rendered = prompt.render(
         target_institution=target_institution,

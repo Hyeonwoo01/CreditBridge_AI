@@ -43,6 +43,8 @@ def login(
     auth_session.login(request, user)
     audit.record(session, user, "auth.login", "user", str(user.id))
     session.commit()
+    if user.must_change_password:
+        return RedirectResponse(auth_session.PASSWORD_PAGE, status_code=303)
     return RedirectResponse(HOME.get(user.role, "/"), status_code=303)
 
 

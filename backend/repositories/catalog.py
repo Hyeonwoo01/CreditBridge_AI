@@ -50,3 +50,20 @@ def source_institution_by_name(session: Session, name: str) -> Institution | Non
 def institution_by_token_hash(session: Session, token_hash: str) -> Institution | None:
     stmt = select(Institution).where(Institution.is_target.is_(True), Institution.sis_token_hash == token_hash)
     return session.scalars(stmt).first()
+
+
+def add_course(session: Session, course: Course) -> Course:
+    session.add(course)
+    session.flush()
+    return course
+
+
+def add_institution(session: Session, institution: Institution) -> Institution:
+    session.add(institution)
+    session.flush()
+    return institution
+
+
+def target_institution_by_name(session: Session, name: str) -> Institution | None:
+    stmt = select(Institution).where(Institution.is_target.is_(True), Institution.name == name.strip())
+    return session.scalars(stmt).first()

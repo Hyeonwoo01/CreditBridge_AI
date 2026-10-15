@@ -14,11 +14,21 @@ class LoginRequired(Exception):
     pass
 
 
+class PasswordChangeRequired(Exception):
+    """임시 비밀번호 계정은 비밀번호를 바꾸기 전까지 다른 화면을 쓸 수 없다."""
+
+
+PASSWORD_PAGE = "/account/password"
+_ALLOWED_BEFORE_CHANGE = {PASSWORD_PAGE, "/logout"}
+
+
 def current_user(request: Request, session: Session = Depends(get_db)) -> User:
     user_id = request.session.get("user_id")
     user = user_repo.get_by_id(session, int(user_id)) if user_id else None
     if user is None:
         raise LoginRequired
+    if user.must_change_password and request.url.path not in _ALLOWED_BEFORE_CHANGE:
+        raise PasswordChangeRequired
     return user
 
 

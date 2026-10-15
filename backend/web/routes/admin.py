@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, Form, Request
+import base64
+import csv
+import io
+
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
@@ -10,12 +14,13 @@ from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
+from backend.services import institution_data, views
 from backend.services import privacy as privacy_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
-from backend.services import views
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
+from backend.workers import tasks
 
 router = APIRouter(prefix="/admin")
 Admin = Depends(require(Role.ADMIN))
@@ -86,3 +91,129 @@ def sis_token(
         return RedirectResponse("/admin/sis", status_code=303)
     token = sis_service.issue_token(session, user)
     return render(request, "admin/sis.html", user=user, has_token=True, token=token)
+
+
+# ---------- 기관 데이터: 계정·과목 CSV, 출신 대학, 기준 강의계획서 ----------
+
+
+def _data_page(request: Request, user: User, session: Session, status_code: int = 200, **context: object) -> Response:
+    return render(
+        request,
+        "admin/data.html",
+        status_code=status_code,
+        user=user,
+        o=institution_data.overview(session, user),
+        account_columns=institution_data.ACCOUNT_COLUMNS,
+        course_columns=institution_data.COURSE_COLUMNS,
+        **context,
+    )
+
+
+@router.get("/data")
+def data(request: Request, user: User = Admin, session: Session = Depends(get_db)) -> Response:
+    return _data_page(request, user, session)
+
+
+def _password_sheet(created: list[institution_data.CreatedAccount]) -> str:
+    """임시 비밀번호 목록 CSV(엑셀용 BOM 포함)를 data URI로. 서버에는 남기지 않는다."""
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["email", "name", "role", "temporary_password"])
+    for a in created:
+        writer.writerow([a.email, a.name, a.role, a.temporary_password])
+    encoded = base64.b64encode(("\ufeff" + out.getvalue()).encode()).decode()
+    return f"data:text/csv;charset=utf-8;base64,{encoded}"
+
+
+@router.post("/data/accounts")
+def import_accounts(
+    request: Request,
+    file: UploadFile = File(...),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        result = institution_data.import_accounts(session, user, file.filename or "", file.file.read())
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse("/admin/data", status_code=303)
+    if result.errors:
+        return _data_page(request, user, session, status_code=422, account_errors=result.errors)
+    # 임시 비밀번호는 이 응답에서 한 번만 보여준다. 브라우저·프록시에 남지 않게 캐시를 막는다
+    response = _data_page(
+        request,
+        user,
+        session,
+        created=result.created,
+        skipped=result.skipped,
+        sheet=_password_sheet(result.created) if result.created else None,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/data/courses")
+def import_courses(
+    request: Request,
+    file: UploadFile = File(...),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        result = institution_data.import_courses(session, user, file.filename or "", file.file.read())
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse("/admin/data", status_code=303)
+    if result.errors:
+        return _data_page(request, user, session, status_code=422, course_errors=result.errors)
+    flash(request, f"과목 {result.created}건을 새로 만들고 {result.updated}건을 고쳤어요.")
+    return RedirectResponse("/admin/data#courses", status_code=303)
+
+
+@router.post("/data/institutions")
+def add_institution(
+    request: Request,
+    name: str = Form(...),
+    country: str = Form(...),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        institution_data.add_source_institution(session, user, name, country)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        flash(request, "출신 대학을 등록했어요. 학생이 편입 요청을 만들 때 고를 수 있어요.")
+    return RedirectResponse("/admin/data#institutions", status_code=303)
+
+
+@router.post("/data/courses/{course_id}/reference")
+def upload_reference(
+    request: Request,
+    course_id: int,
+    file: UploadFile = File(...),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        syllabus, course = institution_data.upload_reference(
+            session, get_storage(), user, course_id, file.filename or "", file.file.read()
+        )
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        tasks.process_reference.delay(syllabus.id, course.id)
+        flash(request, f"{course.code} 기준 강의계획서를 받았어요. 글자를 읽으면 AI 비교에 쓰여요.")
+    return RedirectResponse("/admin/data#courses", status_code=303)

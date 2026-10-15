@@ -27,9 +27,9 @@
       <div class="flex items-center gap-1 md:gap-3">
         <a href="/notifications" class="relative flex size-11 items-center justify-center text-white/80 hover:text-white" aria-label="알림">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-          <span hx-get="/notifications/count" hx-trigger="load, every 60s" hx-swap="innerHTML"></span>
+          {% if not user.must_change_password %}<span hx-get="/notifications/count" hx-trigger="load, every 60s" hx-swap="innerHTML"></span>{% endif %}
         </a>
-        <span class="hidden text-xs tracking-[-0.12px] text-white/70 lg:inline">{{ user.name }} · {{ role_label[user.role] }}</span>
+        <a href="/account/password" class="hidden text-xs tracking-[-0.12px] text-white/70 hover:text-white lg:inline" title="비밀번호 변경">{{ user.name }} · {{ role_label[user.role] }}</a>
         <form method="post" action="/logout" class="hidden md:block">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="flex h-11 items-center text-xs tracking-[-0.12px] text-white/70 hover:text-white">로그아웃</button>
@@ -42,7 +42,7 @@
           <div class="absolute inset-x-0 top-11 border-t border-white/10 bg-black px-4 pb-4">
             <nav class="grid [&>a]:h-12 [&>a]:border-b [&>a]:border-white/10 [&>a]:text-[15px]" aria-label="메인(모바일)">{{ self.nav() }}</nav>
             <div class="flex items-center justify-between pt-3 text-xs text-white/70">
-              <span>{{ user.name }} · {{ role_label[user.role] }}</span>
+              <a href="/account/password" class="underline-offset-2 hover:underline">{{ user.name }} · {{ role_label[user.role] }} · 비밀번호 변경</a>
               <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="h-11 text-white">로그아웃</button></form>
             </div>
           </div>
@@ -51,7 +51,7 @@
       {% endif %}
     </div>
   </header>
-  {% if user and user.role != 'student' %}
+  {% if user and user.role != 'student' and not user.must_change_password %}
   {# 보조 바: 소속 기관과 심사 집계 (HTMX로 불러온다) #}
   <div class="border-b border-hairline bg-white">
     <div class="mx-auto flex {{ self.width() }} flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5 md:px-10">

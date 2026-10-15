@@ -6,7 +6,7 @@ import pytest
 from backend.config import Settings
 from backend.db.base import utcnow
 from backend.models import Notification, PrivacyRequest, User
-from backend.services import equivalencies, notifications
+from backend.services import csv_import, equivalencies, notifications
 from backend.services.privacy import is_overdue
 from backend.web.templating import highlight
 
@@ -27,7 +27,7 @@ def test_privacy_overdue_only_until_completed() -> None:
 
 def test_equivalency_course_key_matches_decision_key() -> None:
     assert equivalencies.course_key("MATH 101 ") == "math101"
-    assert equivalencies._decode("과목".encode("cp949")) == "과목"
+    assert csv_import._decode("과목".encode("cp949")) == "과목"
 
 
 class FakeSMTP:

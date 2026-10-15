@@ -1,11 +1,9 @@
 """기존 동등 과목표 가져오기 (FR-26). 기관이 보유한 판정 이력을 CSV로 올려 과거 판정 이력에 함께 보여준다.
 
-엑셀 파일은 'CSV UTF-8'로 저장해 올린다(엑셀 라이브러리를 추가하지 않는다). 한 줄이라도 틀리면 아무것도 저장하지 않는다.
+파일 검사·인코딩은 services/csv_import.py. 한 줄이라도 틀리면 아무것도 저장하지 않는다.
 열: source_institution, source_course, target_course, result, decided_on, note
 """
 
-import csv
-import io
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -16,7 +14,7 @@ from backend.models import Equivalency, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import equivalencies as equivalency_repo
-from backend.services import audit
+from backend.services import audit, csv_import
 
 COLUMNS = ["source_institution", "source_course", "target_course", "result", "decided_on", "note"]
 RESULTS = {
@@ -28,7 +26,6 @@ RESULTS = {
     "불인정": "none",
 }
 MAX_ROWS = 5000
-MAX_BYTES = 5 * 1024 * 1024
 
 
 @dataclass
@@ -42,38 +39,12 @@ def course_key(label: str) -> str:
     return label.lower().replace(" ", "")
 
 
-def _decode(data: bytes) -> str:
-    for encoding in ("utf-8-sig", "cp949"):  # 한국어 엑셀의 기본 CSV 인코딩까지
-        try:
-            return data.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    raise CreditBridgeError("CSV 파일의 인코딩을 읽을 수 없어요. 'CSV UTF-8'로 저장해 올려 주세요.")
-
-
 def import_csv(session: Session, evaluator: User, filename: str, data: bytes) -> ImportResult:
     if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
         raise PermissionDeniedError("심사관 계정만 동등 과목표를 가져올 수 있어요.")
-    if not filename.lower().endswith(".csv"):
-        raise CreditBridgeError("CSV 파일만 올릴 수 있어요. 엑셀에서 '다른 이름으로 저장 → CSV UTF-8'을 골라 주세요.")
-    if not data.strip():
-        raise CreditBridgeError("빈 파일이에요.")
-    if len(data) > MAX_BYTES:
-        raise CreditBridgeError("파일이 5MB를 넘어요. 나눠서 올려 주세요.")
-    reader = csv.DictReader(io.StringIO(_decode(data)))
-    missing = [c for c in COLUMNS[:4] if c not in (reader.fieldnames or [])]
-    if missing:
-        raise CreditBridgeError(f"필수 열이 없어요: {', '.join(missing)}. 첫 줄은 {', '.join(COLUMNS)} 이어야 해요.")
-
     result = ImportResult()
     rows: list[Equivalency] = []
-    for line_no, raw in enumerate(reader, start=2):
-        if line_no - 1 > MAX_ROWS:
-            result.errors.append(f"한 번에 {MAX_ROWS}줄까지만 가져올 수 있어요.")
-            break
-        row = {k: (v or "").strip() for k, v in raw.items() if k}
-        if not any(row.values()):
-            continue
+    for line_no, row in csv_import.read_rows(filename, data, COLUMNS, COLUMNS[:4], MAX_ROWS):
         problems = []
         source = catalog_repo.source_institution_by_name(session, row.get("source_institution", ""))
         if source is None:
