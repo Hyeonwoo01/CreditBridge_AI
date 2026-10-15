@@ -25,7 +25,7 @@ from backend.repositories import catalog as catalog_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import analysis, audit, csv_import
-from backend.services.auth import hash_password, temporary_password
+from backend.services.auth import RESET_AFTER, hash_password, temporary_password
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,7 @@ class Overview:
     institution: Institution
     role_counts: dict[str, int]
     pending_password: int
+    locked_out: int  # 로그인 실패가 이어져 비밀번호가 초기화된 계정
     courses: list[CourseRow]
     departments_without_professor: list[str]
     source_institutions: list[Institution]
@@ -122,6 +123,7 @@ def overview(session: Session, admin: User) -> Overview:
         institution=institution,
         role_counts=user_repo.role_counts(session, institution_id),
         pending_password=user_repo.pending_password_change(session, institution_id),
+        locked_out=user_repo.locked_out_count(session, institution_id, RESET_AFTER),
         courses=[CourseRow(c, uploads.get(c.code)) for c in courses],
         departments_without_professor=[d for d in departments if d not in staffed],
         source_institutions=catalog_repo.source_institutions(session),

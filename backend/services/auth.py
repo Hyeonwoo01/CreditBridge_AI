@@ -1,11 +1,16 @@
-"""로그인, 비밀번호 변경·재설정.
+"""로그인, 비밀번호 변경·재설정, 로그인 실패 잠금.
+
+로그인 실패: 연속 5번 틀리면 1분 동안 잠그고, 그 뒤로도 틀려 연속 10번이 되면 비밀번호를 아무도 모르는 값으로
+바꿔(다른 기기 로그인도 끊김) 메일 재설정 링크로만 새 비밀번호를 정하게 한다. 성공·재설정하면 횟수는 0이 된다.
 
 재설정 링크는 서버에 저장하지 않는 서명 토큰이다(itsdangerous). 30분 동안 유효하고, 토큰에 비밀번호 해시의
 지문을 넣어 비밀번호가 바뀌면(재설정 완료 포함) 더는 쓸 수 없다 — 한 번만 쓸 수 있는 링크.
 """
 
+import math
 import secrets
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from argon2 import PasswordHasher
@@ -30,16 +35,80 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
-def authenticate(session: Session, email: str, password: str) -> User | None:
+LOCK_AFTER = 5  # 연속 실패가 이 횟수가 되면
+LOCK_FOR = timedelta(minutes=1)  # 이만큼 로그인을 막는다
+RESET_AFTER = 10  # 연속 실패가 이 횟수가 되면 비밀번호를 무효로 하고 메일 재설정만 허용
+WRONG_PASSWORD = "이메일 또는 비밀번호가 맞지 않아요."
+
+
+@dataclass(frozen=True)
+class LoginAttempt:
+    user: User | None = None  # 성공했을 때만
+    error: str = ""
+    status_code: int = 200
+    send_reset_to: int | None = None  # 이번 실패로 비밀번호를 초기화해 재설정 메일을 보낼 사용자
+
+
+def lockout_message(settings: Settings | None = None) -> str:
+    how = (
+        "가입한 이메일로 보낸 링크에서 새 비밀번호를 정해 주세요."
+        if notifications.email_enabled(settings)
+        else "기관 관리자에게 임시 비밀번호 발급을 요청해 주세요."
+    )
+    return f"로그인 실패가 {RESET_AFTER}번 이어져 보안을 위해 비밀번호를 초기화했어요. {how}"
+
+
+def login_attempt(session: Session, email: str, password: str) -> LoginAttempt:
     user = user_repo.get_by_email(session, email)
     if user is None:
         _hasher.hash(password)  # 존재하지 않는 계정도 같은 시간이 걸리게
-        return None
+        return LoginAttempt(error=WRONG_PASSWORD, status_code=401)
+    if user.failed_logins >= RESET_AFTER:
+        _hasher.hash(password)
+        return LoginAttempt(error=lockout_message(), status_code=423)
+    now = utcnow()
+    if user.locked_until is not None and user.locked_until > now:
+        _hasher.hash(password)
+        seconds = math.ceil((user.locked_until - now).total_seconds())
+        return LoginAttempt(
+            error=f"비밀번호를 {LOCK_AFTER}번 틀려 로그인이 잠겼어요. {seconds}초 뒤에 다시 시도해 주세요.",
+            status_code=429,
+        )
     try:
         _hasher.verify(user.password_hash, password)
     except (VerificationError, InvalidHashError):
-        return None
-    return user
+        return _failed(session, user, now)
+    user.failed_logins = 0
+    user.locked_until = None
+    return LoginAttempt(user=user)
+
+
+def _failed(session: Session, user: User, now: datetime) -> LoginAttempt:
+    count = user_repo.add_failed_login(session, user.id)
+    session.refresh(user)
+    if count >= RESET_AFTER:
+        # 아무도 모르는 값으로 바꾼다: 비밀번호 지문이 바뀌어 이전 세션·재설정 링크도 모두 무효가 된다
+        user.password_hash = _hasher.hash(secrets.token_urlsafe(32))
+        user.locked_until = None
+        audit.record(session, user, "auth.lockout_reset", "user", str(user.id), failed=count)
+        session.commit()
+        return LoginAttempt(error=lockout_message(), status_code=423, send_reset_to=user.id)
+    if count == LOCK_AFTER:
+        user.locked_until = now + LOCK_FOR
+        audit.record(session, user, "auth.lockout", "user", str(user.id), failed=count)
+        session.commit()
+        return LoginAttempt(
+            error=f"비밀번호를 {LOCK_AFTER}번 틀려 1분 동안 로그인할 수 없어요. "
+            f"그 뒤로도 {RESET_AFTER - LOCK_AFTER}번 더 틀리면 비밀번호가 초기화돼요.",
+            status_code=429,
+        )
+    session.commit()
+    if count < LOCK_AFTER:
+        left = LOCK_AFTER - count
+        hint = f" {left}번 더 틀리면 1분 동안 로그인할 수 없어요." if left <= 2 else ""
+    else:
+        hint = f" {RESET_AFTER - count}번 더 틀리면 비밀번호가 초기화돼요."
+    return LoginAttempt(error=WRONG_PASSWORD + hint, status_code=401)
 
 
 # 헷갈리는 글자(0·O·1·l·I)를 뺀 임시 비밀번호 글자
@@ -114,18 +183,28 @@ def request_reset(session: Session, email: str) -> int | None:
     return user.id
 
 
-def send_reset_email(session: Session, user_id: int, settings: Settings | None = None) -> bool:
+def send_reset_email(session: Session, user_id: int, settings: Settings | None = None, lockout: bool = False) -> bool:
     """작업 큐에서 부른다. 토큰은 여기서 만들어 메일로만 보낸다(DB·작업 큐·로그에 남기지 않는다)."""
     settings = settings or get_settings()
     user = user_repo.get_by_id(session, user_id)
     if user is None:
         return False
     link = f"{settings.app_base_url.rstrip('/')}/account/reset?token={quote(reset_token(user, settings))}"
+    intro = (
+        f"로그인 실패가 {RESET_AFTER}번 이어져 보안을 위해 CreditBridge AI 비밀번호를 초기화했어요.\n"
+        if lockout
+        else "CreditBridge AI 비밀번호 재설정 요청을 받았어요.\n"
+    )
+    ignore = (
+        "본인이 시도한 것이 아니라면 누군가 비밀번호를 추측하려 한 것일 수 있어요. 기관 관리자에게도 알려 주세요.\n"
+        if lockout
+        else "요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요.\n"
+    )
     body = (
-        "CreditBridge AI 비밀번호 재설정 요청을 받았어요.\n"
-        f"아래 링크에서 {RESET_MAX_AGE // 60}분 안에 새 비밀번호를 정해 주세요. 링크는 한 번만 쓸 수 있어요.\n"
-        "요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요.\n\n"
-        f"{link}\n"
+        intro
+        + f"아래 링크에서 {RESET_MAX_AGE // 60}분 안에 새 비밀번호를 정해 주세요. 링크는 한 번만 쓸 수 있어요.\n"
+        + ignore
+        + f"\n{link}\n"
     )
     return notifications.send_email(user.email, "[CreditBridge] 비밀번호 재설정", body, settings)
 
@@ -137,6 +216,7 @@ def reset_password(session: Session, token: str, new: str, confirm: str) -> User
     _check_new(new, confirm)
     user.password_hash = _hasher.hash(new)
     user.must_change_password = False
+    user.failed_logins, user.locked_until = 0, None
     audit.record(session, user, "auth.password_reset", "user", str(user.id))
     session.commit()
     return user
@@ -154,6 +234,7 @@ def admin_reset_password(session: Session, admin: User, email: str) -> tuple[Use
     password = temporary_password()
     user.password_hash = _hasher.hash(password)
     user.must_change_password = True
+    user.failed_logins, user.locked_until = 0, None
     audit.record(session, admin, "account.password_reset_by_admin", "user", str(user.id))
     session.commit()
     return user, password

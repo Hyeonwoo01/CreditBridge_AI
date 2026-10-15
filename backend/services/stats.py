@@ -210,6 +210,8 @@ ACTION_LABELS = {
     "auth.password_change": ("비밀번호 변경", "neutral"),
     "auth.password_reset_request": ("비밀번호 재설정 요청", "neutral"),
     "auth.password_reset": ("비밀번호 재설정", "neutral"),
+    "auth.lockout": ("로그인 1분 잠금", "elective"),
+    "auth.lockout_reset": ("로그인 실패로 비밀번호 초기화", "reject"),
     "account.password_reset_by_admin": ("임시 비밀번호 재발급", "elective"),
     "account.import": ("계정 가져오기", "neutral"),
     "account.bootstrap": ("첫 관리자 생성", "neutral"),

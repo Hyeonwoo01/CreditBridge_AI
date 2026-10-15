@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from backend.db.session import get_db
 from backend.security import session as auth_session
 from backend.security.csrf import check_csrf
-from backend.services import audit
-from backend.services.auth import authenticate
+from backend.services import audit, notifications
+from backend.services.auth import login_attempt
 from backend.web.templating import render
+from backend.workers import tasks
 
 router = APIRouter()
 
@@ -37,9 +38,12 @@ def login(
     session: Session = Depends(get_db),
 ) -> Response:
     check_csrf(request, csrf_token)
-    user = authenticate(session, email, password)
+    attempt = login_attempt(session, email, password)
+    if attempt.send_reset_to is not None and notifications.email_enabled():
+        tasks.send_password_reset.delay(attempt.send_reset_to, lockout=True)
+    user = attempt.user
     if user is None:
-        return render(request, "login.html", status_code=401, error="이메일 또는 비밀번호가 맞지 않아요.", email=email)
+        return render(request, "login.html", status_code=attempt.status_code, error=attempt.error, email=email)
     auth_session.login(request, user)
     audit.record(session, user, "auth.login", "user", str(user.id))
     session.commit()

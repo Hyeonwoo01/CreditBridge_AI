@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, false
+from sqlalchemy import Boolean, ForeignKey, Integer, String, false, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
@@ -21,6 +21,9 @@ class User(IdMixin, CreatedAtMixin, Base):
     away_until: Mapped[date | None] = mapped_column(default=None)
     # 관리자가 CSV로 만든 계정은 임시 비밀번호로 첫 로그인한 뒤 바로 바꿔야 한다
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # 연속 로그인 실패 (성공·재설정하면 0). 5번이면 1분 잠금, 10번이면 비밀번호를 무효로 하고 재설정 메일
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    locked_until: Mapped[datetime | None] = mapped_column(default=None)
 
     institution: Mapped[Institution | None] = relationship(lazy="joined")
 

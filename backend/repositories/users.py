@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from backend.models import User
@@ -47,3 +47,14 @@ def professor_departments(session: Session, institution_id: int) -> set[str]:
         User.institution_id == institution_id, User.role == "professor", User.department.is_not(None)
     )
     return {d for d in session.scalars(stmt) if d}
+
+
+def add_failed_login(session: Session, user_id: int) -> int:
+    """연속 로그인 실패를 1 늘리고 새 값을 돌려준다 (동시에 들어온 시도도 빠짐없이 센다)."""
+    session.execute(update(User).where(User.id == user_id).values(failed_logins=User.failed_logins + 1))
+    return session.scalar(select(User.failed_logins).where(User.id == user_id)) or 0
+
+
+def locked_out_count(session: Session, institution_id: int, threshold: int) -> int:
+    stmt = select(func.count()).where(User.institution_id == institution_id, User.failed_logins >= threshold)
+    return session.scalar(stmt) or 0

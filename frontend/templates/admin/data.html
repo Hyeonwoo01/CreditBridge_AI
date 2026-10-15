@@ -35,6 +35,7 @@
     <span class="text-sm text-muted">첫 비밀번호 변경 대기</span>
     <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.pending_password }}<span class="text-base font-normal text-muted"> 명</span></span>
     <span class="text-xs text-muted">임시 비밀번호로 아직 로그인하지 않은 계정</span>
+    {% if o.locked_out %}<span class="text-xs text-reject">로그인 실패로 비밀번호가 초기화된 계정 {{ o.locked_out }}명 · 메일 재설정 또는 아래 비밀번호 초기화</span>{% endif %}
   </div>
   <div class="card grid content-start gap-1 p-5">
     <span class="text-sm text-muted">출신 대학</span>
