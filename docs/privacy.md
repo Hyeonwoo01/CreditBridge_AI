@@ -56,7 +56,8 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 | 화면 | 보는 사람 | 학생 신원 | 성적 | 비고 |
 | --- | --- | --- | --- | --- |
-| 학생 홈 대시보드·메뉴 배지 (`/student`, 학생 화면 상단 메뉴) | 학생 본인 | 없음 | 없음 | 본인 요청의 할 일·서류 준비율·예상 인정 학점, 채워야 할 서류·이의 신청할 수 있는 과목·안 읽은 결과의 개수만 (`test_dashboard_lists_todos_and_readiness`, `test_nav_badges_for_new_results_clear_when_viewed`) |
+| 학생 홈 대시보드 (`/student`) | 학생 본인 | 없음 | 없음 | 본인 요청의 할 일·서류 준비율·예상 인정 학점·판정 확정 수만 (`test_dashboard_lists_todos_and_readiness`) |
+| 학생 상단 메뉴 "내 편입 요청 · 이의 신청 · 인정 사례"와 숫자 배지 (모든 학생 화면, 학생이 보는 알림·비밀번호 변경·판정 근거 리포트 포함) | 학생 본인 | 없음 | 없음 | 본인 데이터의 개수만 숫자로: 채워야 할 서류 수, 새 판정 결과 수, 이의 신청할 수 있는 과목 수, 새 이의 신청 결과 수. 과목 이름은 배지에 넣지 않음. 교직원 화면에는 이 배지가 없음 (`test_nav_badges_for_new_results_clear_when_viewed`) |
 | 편입 학점 시뮬레이션 리포트·과목 분석 결과 (`/student/requests/…`, `/student/evaluations/…`) | 학생 본인 | 본인 이름(리포트 제목) | 본인 성적표 성적 | 남의 요청은 403 |
 | 이의 신청 목록·작성 (`/student/appeals`, `/student/evaluations/{id}/appeal`) | 학생 본인 | 없음 | 없음 | 본인 과목·본인 이의 신청만. 다른 학생의 과목은 작성 화면도 열리지 않음 (`test_appeal_form_with_evidence_files`) |
 | 심사 큐 (`/review`) | 소속 기관 심사관 | 이름, 출신 대학 (이름으로 검색 가능) | 없음 | 학사처가 접수 건을 학생 단위로 확인하는 업무라 표시. 검색어는 저장하지 않고, 접근 로그에서도 쿼리 문자열을 지움 |
@@ -78,4 +79,7 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 - 화면 알림과 메일(`SMTP_HOST`를 설정한 경우)에는 과목 코드와 처리 내용만 넣고 이름·학번·성적은 넣지 않아요.
 - 메일은 받는 사람 본인의 계정 이메일로만 보내요.
-- 학생 메뉴 배지는 본인 알림 중 판정 결과(`decision.created`)와 이의 신청 결과(`appeal.accepted`·`appeal.dismissed`·`decision.redecided`)의 안 읽은 개수만 세요. 해당 과목 화면이나 이의 신청 화면을 열면 그 알림을 읽음으로 바꿔요(`notifications.mark_seen`).
+- 학생 메뉴의 숫자 배지는 화면을 그릴 때마다 본인 데이터로 다시 세고 따로 저장하지 않아요(`views.student_badges`, `web/nav.py`).
+  - 채워야 할 서류 수: 본인 편입 요청의 보완 자료 요청·성적표·강의계획서·과목 연결 상태
+  - 이의 신청할 수 있는 과목 수: 본인 과목 중 판정이 확정됐고 처리 중인 이의 신청이 없는 과목
+  - 새 판정·이의 신청 결과 수: 본인 알림 중 판정 결과(`decision.created`)와 이의 신청 결과(`appeal.accepted`·`appeal.dismissed`·`decision.redecided`)의 안 읽은 개수. 해당 과목 화면이나 이의 신청 화면을 열면 그 알림을 읽음으로 바꿔요(`notifications.mark_seen`).
