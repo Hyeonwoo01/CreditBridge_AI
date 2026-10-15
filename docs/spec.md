@@ -419,7 +419,7 @@ CreditBridge AI는 Python 3.12와 MariaDB 11.8 LTS를 기반으로, 계층마다
 | 파일 저장 | S3 호환 객체 스토리지 + boto3 | 개발 MinIO, 운영 AWS S3 | 원본 성적표·강의계획서 암호화 저장 | DB BLOB 저장, 서버 로컬 디스크 |
 | 테스트 | pytest + pytest-cov | 8.x | 단위·통합 테스트, 골든셋 평가 | unittest 스타일 클래스 |
 | 린트·포맷 | Ruff | 최신 안정판 | 린트와 포맷 단일 도구 | Black, Flake8, isort 조합 |
-| 타입 검사 | mypy | 최신 안정판 | app 디렉터리 일반 모드 검사(app/workers 제외, MVP 기준) | 타입 힌트 없는 함수 |
+| 타입 검사 | mypy | 최신 안정판 | backend 디렉터리 일반 모드 검사(backend/workers 제외, MVP 기준) | 타입 힌트 없는 함수 |
 | 실행 환경 | Docker + Docker Compose v2 | docker compose 명령 | 로컬 인프라(MariaDB, Redis, MinIO)와 배포 이미지 | docker-compose v1 명령 |
 
 ## 3. 아키텍처
@@ -453,7 +453,7 @@ DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법�
 | 테이블·컬럼 명명 | snake\_case, 테이블은 복수형(syllabi, decisions), 외래키는 단수형\_id |
 | 기본키 | id BIGINT UNSIGNED AUTO\_INCREMENT 하나만 사용. 외부 노출 시 보호는 권한 검사(FR-12)가 담당 |
 | JSON | MariaDB의 JSON은 LONGTEXT 별칭이므로 구조 검증은 Pydantic이 담당하고 DB는 JSON\_VALID 체크만 둔다. 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 뺀다 |
-| 벡터 | MVP는 사용하지 않음. 파일럿에서 도입할 때 VECTOR(1024) 컬럼과 VECTOR INDEX(DISTANCE=cosine)를 쓰고, SQLAlchemy용 타입은 app/db/types.py 한 곳에서만 정의 |
+| 벡터 | MVP는 사용하지 않음. 파일럿에서 도입할 때 VECTOR(1024) 컬럼과 VECTOR INDEX(DISTANCE=cosine)를 쓰고, SQLAlchemy용 타입은 backend/db/types.py 한 곳에서만 정의 |
 | 마이그레이션 | Alembic으로만 변경. autogenerate 결과는 사람이 검토 |
 | 추가 전용 테이블 | decisions, audit\_logs는 INSERT만 허용. 앱 DB 계정에 UPDATE·DELETE 권한을 주지 않음 |
 | 개인정보 | 원본 성적표는 객체 스토리지에 암호화 저장, DB에는 마스킹된 값과 파일 키만 저장 |
@@ -477,7 +477,7 @@ DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법�
 
 ## 5. 디렉터리 구조와 코딩 규칙
 
-코드는 web → services → repositories → models 한 방향으로만 의존한다. SQL은 repositories에만, LLM 호출은 app/ai/llm\_client.py에만 둔다.
+코드는 web → services → repositories → models 한 방향으로만 의존한다. SQL은 repositories에만, LLM 호출은 backend/ai/llm\_client.py에만 둔다.
 
 ```text
 creditbridge/
@@ -488,8 +488,8 @@ creditbridge/
 ├── .env.example
 ├── alembic/
 │   └── versions/
-├── app/
-│   ├── main.py             # FastAPI 앱 생성, 라우터 등록
+├── backend/                # 백엔드 (Python 패키지, import backend.*)
+│   ├── main.py             # FastAPI 앱 생성, 라우터 등록, /static 마운트
 │   ├── config.py           # pydantic-settings, 환경변수는 여기서만 읽음
 │   ├── errors.py           # 사용자 정의 예외
 │   ├── db/
@@ -513,8 +513,11 @@ creditbridge/
 │   └── web/
 │       ├── routes/         # 화면 라우트
 │       ├── api/            # JSON API
-│       ├── templates/      # Jinja2
-│       └── static/
+│       └── templating.py   # Jinja2 환경 (frontend/templates 사용)
+├── frontend/               # 프론트엔드 (서버가 그려 보내는 화면 파일)
+│   ├── templates/          # Jinja2 + HTMX
+│   ├── static/             # css(빌드 결과)·js·img
+│   └── tailwind/           # input.css (DESIGN.md 토큰)
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -526,13 +529,13 @@ creditbridge/
 
 | 항목 | 규칙 |
 | --- | --- |
-| 타입 힌트 | 모든 함수의 인자와 반환값에 타입 힌트, app 디렉터리는 mypy 일반 모드 통과(app/workers 제외) |
+| 타입 힌트 | 모든 함수의 인자와 반환값에 타입 힌트, backend 디렉터리는 mypy 일반 모드 통과(backend/workers 제외) |
 | 엔드포인트 | def로 작성(async def 금지), 30초 이상 걸릴 수 있는 작업은 Celery 작업으로 위임 |
 | DB 세션 | 요청당 세션 하나를 FastAPI 의존성으로 주입, 워커는 작업당 세션 하나 |
 | LLM 출력 | 반드시 Pydantic 모델로 검증. 검증 실패 시 1회 재시도 후 정보 부족으로 처리. 같은 content\_hash 문서는 LLM을 다시 호출하지 않고 저장된 결과를 반환 |
 | 근거 구절 | evidence.py에서 원문 문자열 일치를 확인한 구절만 저장. 불일치 구절은 폐기하고 로그 기록 |
 | 모델 ID | 코드에 쓰지 않고 환경변수 CLAUDE\_MODEL에서만 읽음 |
-| 프롬프트 | 코드 안 문자열 금지, app/ai/prompts의 .md 파일로 관리하고 변경 시 버전 번호 갱신 |
+| 프롬프트 | 코드 안 문자열 금지, backend/ai/prompts의 .md 파일로 관리하고 변경 시 버전 번호 갱신 |
 | 로깅 | 표준 logging과 JSON 포맷, 이름·학번·성적 등 개인정보 출력 금지 |
 | 설정 | os.environ 직접 접근 금지, config.py의 Settings 객체만 사용 |
 | 테스트 | 새 서비스 함수에는 단위 테스트 필수. 외부 API 호출은 테스트에서 모킹, 실제 호출은 tests/eval에서만 |
@@ -562,14 +565,14 @@ AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한�
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
 - PDF: PyMuPDF만 사용
 - 화면: Jinja2 + HTMX + Tailwind, React/Vue 금지
-- 린트/포맷: Ruff, 타입: mypy 일반 모드(app/workers 제외)
+- 린트/포맷: Ruff, 타입: mypy 일반 모드(backend/workers 제외)
 
 ## 구조 규칙
 - 의존 방향: web -> services -> repositories -> models
-- SQL은 app/repositories에만 작성
-- LLM 호출은 app/ai/llm_client.py를 통해서만
-- 프롬프트는 app/ai/prompts/*.md 파일로 관리
-- 환경변수는 app/config.py의 Settings로만 읽기
+- SQL은 backend/repositories에만 작성
+- LLM 호출은 backend/ai/llm_client.py를 통해서만
+- 프롬프트는 backend/ai/prompts/*.md 파일로 관리
+- 환경변수는 backend/config.py의 Settings로만 읽기
 - 모델 ID는 Settings.claude_model 사용, 하드코딩 금지
 
 ## 반드시 지킬 것
@@ -577,7 +580,7 @@ AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한�
 - 같은 content_hash 문서는 LLM 재호출 없이 저장된 결과 반환
 - 교수 판정 사유는 reason_codes(선택형)로 저장, 기타일 때만 reason_memo 필수
 - 판정 확률(%)은 MVP에서 계산·저장·표시하지 않음 (커버리지, 3단계 추천, 신뢰도만)
-- 근거 구절은 원문 문자열과 일치할 때만 저장 (app/ai/evidence.py)
+- 근거 구절은 원문 문자열과 일치할 때만 저장 (backend/ai/evidence.py)
 - decisions, audit_logs 테이블은 INSERT만, UPDATE/DELETE 코드 작성 금지
 - 확정 판정 저장 시 decided_by(사람 사용자 id) 필수
 - 로그와 예외 메시지에 이름, 학번, 성적 출력 금지
@@ -585,7 +588,7 @@ AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한�
 
 ## 작업 완료 전 확인
 - uv run ruff check . && uv run ruff format --check .
-- uv run mypy app
+- uv run mypy backend
 - uv run pytest tests/unit tests/integration
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
 - 새 의존성이 필요하면 추가하지 말고 먼저 사람에게 물어볼 것
@@ -609,14 +612,14 @@ docker compose up -d db redis minio
 uv run alembic upgrade head
 
 # 5. 개발 서버
-uv run fastapi dev app/main.py
+uv run fastapi dev backend/main.py
 
 # 6. 워커 (별도 터미널)
-uv run celery -A app.workers.celery_app worker --loglevel=info
+uv run celery -A backend.workers.celery_app worker --loglevel=info
 
 # 7. 품질 검사
 uv run ruff check . && uv run ruff format --check .
-uv run mypy app
+uv run mypy backend
 uv run pytest tests/unit tests/integration
 
 # 8. 골든셋 AI 품질 평가 (실제 API 호출, 비용 발생)

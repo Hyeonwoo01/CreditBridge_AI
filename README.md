@@ -17,7 +17,7 @@
 2. **후보 선정**: 추출한 학문 분야로 대상 대학 카탈로그를 학과 단위로 걸러 최대 30개 과목을 후보로 고릅니다. MVP는 임베딩·벡터 검색을 쓰지 않습니다.
 3. **개념별 판단**: Claude가 후보 과목의 필수 개념마다 실제로 가르쳤는지(다룸/부분/없음/판단 불가), 수준이 같은지 판단하고 양쪽 원문 구절을 인용합니다.
 4. **근거 검증**: 인용 구절이 원문에 그대로 있는지 코드로 확인하고, 없으면 버립니다. 근거 없이 매긴 커버리지는 40%를 넘지 못합니다.
-5. **추천 계산**: 개념 커버리지, 추천 등급(직접 인정/선택 인정/불인정, 근거가 모자라면 정보 부족), 신뢰도(상·중·하)를 `app/services/scoring.py`의 고정 규칙으로 계산합니다. 판정 확률(%)은 MVP에서 계산하지 않습니다. 같은 입력은 저장된 결과를 재사용해 반복 실행해도 결과가 같습니다.
+5. **추천 계산**: 개념 커버리지, 추천 등급(직접 인정/선택 인정/불인정, 근거가 모자라면 정보 부족), 신뢰도(상·중·하)를 `backend/services/scoring.py`의 고정 규칙으로 계산합니다. 판정 확률(%)은 MVP에서 계산하지 않습니다. 같은 입력은 저장된 결과를 재사용해 반복 실행해도 결과가 같습니다.
 
 교수는 승인·수정·반려할 수 있고, 반려하거나 AI 추천과 다르게 판정할 때는 확정 전에 열리는 사유 선택 창에서 선택형 사유(주차 범위 부족·수준 차이·실험·실습 미포함·선수과목 차이·기타)를 고릅니다. '기타'만 메모(최대 500자)가 필수입니다. 같은 출신 과목·같은 대상 과목을 두고 내용이 거의 같은 강의계획서(유사도 80% 이상)에 다른 결과가 나와 있으면 확정 전에 경보를 띄웁니다. 강의계획서가 개편됐으면 이력은 보여 주되 경보는 띄우지 않습니다.
 
@@ -65,8 +65,8 @@ docker compose up -d db redis minio       # MariaDB 11.8, Redis 7, MinIO
 uv run alembic upgrade head
 uv run python -m scripts.create_bucket
 uv run python -m scripts.seed_demo        # 데모 카탈로그·계정
-uv run fastapi dev app/main.py            # http://localhost:8000
-uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미널 (Windows는 --pool=solo 추가)
+uv run fastapi dev backend/main.py        # http://localhost:8000
+uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 터미널 (Windows는 --pool=solo 추가)
 ```
 
 데모 계정 (비밀번호 모두 `demo1234`, 로컬 전용)
@@ -89,7 +89,7 @@ uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미
 코드를 고치기 전에 [CLAUDE.md](CLAUDE.md)를 먼저 읽어 주세요. 사람과 Claude Code가 함께 따르는 규칙이며, Claude Code는 이 파일을 자동으로 읽습니다. 핵심만 옮기면:
 
 - **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, MariaDB + PyMySQL, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
-- **구조**: web → services → repositories → models. SQL은 `app/repositories`에만, LLM 호출은 `app/ai/llm_client.py`로만, 프롬프트는 `app/ai/prompts/*.md`(바꾸면 버전 올림), 추천 규칙은 `app/services/scoring.py` 한 곳(바꾸면 `RULES_VERSION` 올림).
+- **구조**: web → services → repositories → models. SQL은 `backend/repositories`에만, LLM 호출은 `backend/ai/llm_client.py`로만, 프롬프트는 `backend/ai/prompts/*.md`(바꾸면 버전 올림), 추천 규칙은 `backend/services/scoring.py` 한 곳(바꾸면 `RULES_VERSION` 올림).
 - **사람이 최종 판정**: AI는 추천만 합니다. 판정 확률(%)은 계산·표시하지 않고, 확정 판정에는 `decided_by`가 필수이며, `decisions`·`audit_logs`는 INSERT만 합니다(재판정도 새 행).
 - **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.
 - **작업 완료 전**: 아래 품질 검사를 모두 통과시키고, 스키마를 바꾸면 Alembic 마이그레이션을, 새 Tailwind 클래스를 쓰면 `app.css` 재빌드를 함께 커밋합니다.
@@ -98,7 +98,7 @@ uv run celery -A app.workers.celery_app worker --loglevel=info   # 별도 터미
 
 ```bash
 uv run ruff check . && uv run ruff format --check .
-uv run mypy app
+uv run mypy backend
 uv run pytest tests/unit tests/integration   # 통합 테스트는 MariaDB 필요 (TEST_DATABASE_URL, 기본 creditbridge_test)
 uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 Claude API 호출, 비용 발생
 ```
@@ -108,7 +108,8 @@ uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 Claude A
 ## 구조
 
 ```
-app/
+backend/         ← 백엔드 (Python, import 이름도 backend)
+  main.py        FastAPI 앱, /static 마운트(frontend/static)
   ai/            llm_client.py(SDK 단일 진입점) · prompts/*.md · extraction · candidates · matching · evidence · injection
   documents/     PyMuPDF 텍스트 추출(PDF·JPG·PNG), S3 저장
   services/      analysis(파이프라인) · scoring(추천 규칙) · student · review(심사 대기열) · decisions(판정·경보)
@@ -117,12 +118,19 @@ app/
   models/        SQLAlchemy 2.0, 테이블당 1파일
   workers/       Celery 작업
   security/      세션·권한·CSRF·개인정보 마스킹
-  web/           라우트, JSON API, Jinja2 + HTMX 템플릿(templates/: base · student · review · professor · admin · stats), Tailwind
+  web/           라우트(routes/), JSON API(api/), 템플릿 렌더링(templating.py: frontend/templates 사용)
+frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
+  templates/     Jinja2 + HTMX 템플릿: base · student · review · professor · admin · partials · stats · report
+  static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘)
+  tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (MySQL 8.0 호환 문법만)
+scripts/         start.sh · build_css.sh · seed_demo · create_bucket · demo_data/
 tests/           unit · integration(MariaDB) · eval(골든셋)
 ```
 
-화면 CSS는 `app/web/static/css/input.css`(DESIGN.md 토큰)에서 Tailwind standalone CLI로 빌드합니다(`scripts/build_css.sh`). 빌드된 `app.css`가 커밋되어 있어 CLI 없이도 실행됩니다. 템플릿에 새 Tailwind 클래스를 쓰면 `scripts/build_css.sh`로 다시 빌드해 함께 커밋하세요.
+백엔드와 프론트엔드는 폴더만 나뉘어 있고 하나의 앱으로 함께 실행됩니다. FastAPI가 `frontend/templates`로 HTML을 그려 보내고 `frontend/static`을 `/static`으로 내보냅니다.
+
+화면 CSS는 `frontend/tailwind/input.css`(DESIGN.md 토큰)에서 Tailwind standalone CLI로 빌드합니다(`scripts/build_css.sh`). 빌드된 `frontend/static/css/app.css`가 커밋되어 있어 CLI 없이도 실행됩니다. 템플릿에 새 Tailwind 클래스를 쓰면 `scripts/build_css.sh`로 다시 빌드해 함께 커밋하세요.
 
 ## 운영 시 확인할 것
 

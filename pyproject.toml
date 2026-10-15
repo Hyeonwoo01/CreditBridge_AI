@@ -44,12 +44,12 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Form", "fastapi.File", "fastapi.Query"]
 
-# 기술스택 정의서: app 디렉터리 일반 모드 검사(app/workers 제외), 모든 함수에 타입 힌트
+# 기술스택 정의서: backend 디렉터리 일반 모드 검사(backend/workers 제외), 모든 함수에 타입 힌트
 [tool.mypy]
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
-files = ["app"]
-exclude = ["^app/workers/"]
+files = ["backend"]
+exclude = ["^backend/workers/"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 warn_unused_ignores = true
@@ -60,7 +60,7 @@ ignore_missing_imports = true
 
 # PyMuPDF는 타입 힌트가 부분적이라 문서 추출 모듈에서만 미타입 호출을 허용한다
 [[tool.mypy.overrides]]
-module = ["app.documents.text"]
+module = ["backend.documents.text"]
 disallow_untyped_calls = false
 
 [tool.pytest.ini_options]

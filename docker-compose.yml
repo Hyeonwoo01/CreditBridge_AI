@@ -55,7 +55,7 @@ services:
       DATABASE_URL: mysql+pymysql://creditbridge:change-me@db:3306/creditbridge?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
-    command: ["uv", "run", "--no-group", "dev", "celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]
     depends_on: [db, redis, minio]
     restart: on-failure
 

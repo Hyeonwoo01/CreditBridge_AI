@@ -4,6 +4,8 @@
 
 상태: ✅ 구현·테스트 / 🟡 부분 구현 / ⬜ 미구현
 
+경로 기준: 코드는 `backend/`(예: `services/review.py` = `backend/services/review.py`), 템플릿은 `frontend/templates/`(예: `review/queue.html`), 테스트는 `tests/`.
+
 ## P1 필수 (MVP)
 
 | 기능 | 상태 | 구현 위치 | 테스트 |
@@ -49,7 +51,7 @@
 
 ## 화면 ↔ 기능
 
-화면 디자인 기준은 [DESIGN.md](DESIGN.md) 1.1.0. 폭은 기본 1280px, 심사 큐·원문 대조 화면만 1440px(`base.html` `{% block width %}`).
+화면 디자인 기준은 [DESIGN.md](DESIGN.md) 1.1.0. 폭은 기본 1280px, 심사 큐·원문 대조 화면만 1440px(`frontend/templates/base.html` `{% block width %}`). 템플릿 열의 경로는 `frontend/templates/` 기준.
 
 | 화면 | URL | 템플릿 | 기능 | 화면 테스트 |
 | --- | --- | --- | --- | --- |

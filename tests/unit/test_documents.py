@@ -1,8 +1,8 @@
 import pymupdf
 import pytest
 
-from app.documents.text import extract, validate_upload
-from app.errors import UploadRejectedError
+from backend.documents.text import extract, validate_upload
+from backend.errors import UploadRejectedError
 
 
 def make_pdf(pages: list[str], password: str | None = None) -> bytes:

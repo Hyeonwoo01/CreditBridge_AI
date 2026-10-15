@@ -2,10 +2,10 @@ from logging.config import fileConfig
 
 from sqlalchemy import create_engine
 
-import app.models  # noqa: F401  (모델 등록)
+import backend.models  # noqa: F401  (모델 등록)
 from alembic import context
-from app.config import get_settings
-from app.db.base import Base
+from backend.config import get_settings
+from backend.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:

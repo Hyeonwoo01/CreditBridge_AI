@@ -28,7 +28,7 @@ def migrated() -> None:
     from alembic.config import Config
 
     from alembic import command
-    from app.db.session import engine
+    from backend.db.session import engine
 
     with engine.begin() as conn:
         conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
@@ -42,7 +42,7 @@ def migrated() -> None:
 
 @pytest.fixture
 def db(migrated: None) -> Iterator[Session]:
-    from app.db.session import SessionLocal, engine
+    from backend.db.session import SessionLocal, engine
 
     with engine.begin() as conn:
         conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
@@ -80,10 +80,10 @@ def client(
     fake_storage: FakeStorage,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
-    from app.main import app
-    from app.web.routes import admin as admin_routes
-    from app.web.routes import student as student_routes
-    from app.workers import tasks
+    from backend.main import app
+    from backend.web.routes import admin as admin_routes
+    from backend.web.routes import student as student_routes
+    from backend.workers import tasks
 
     monkeypatch.setattr(tasks, "get_llm", lambda: fake_llm)
     monkeypatch.setattr(tasks, "get_storage", lambda: fake_storage)

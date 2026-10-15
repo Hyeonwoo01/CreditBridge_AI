@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Course, CourseEvaluation, EvidenceSpan, Institution, Syllabus, TransferRequest, User
+from backend.models import Course, CourseEvaluation, EvidenceSpan, Institution, Syllabus, TransferRequest, User
 from tests.conftest import DEMO
 
 pytestmark = [
@@ -34,9 +34,9 @@ def real_seeded(db: Session) -> Session:
 
 
 def test_golden_set(real_seeded: Session) -> None:
-    from app.ai.llm_client import LLMClient
-    from app.config import Settings
-    from app.services import analysis
+    from backend.ai.llm_client import LLMClient
+    from backend.config import Settings
+    from backend.services import analysis
 
     os.environ["CLAUDE_MODEL"] = os.environ.get("EVAL_CLAUDE_MODEL", os.environ["CLAUDE_MODEL"])
     llm = LLMClient(Settings())

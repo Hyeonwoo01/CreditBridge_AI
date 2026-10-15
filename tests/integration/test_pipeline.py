@@ -4,7 +4,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Course, CourseEvaluation, EvidenceSpan, Institution, Syllabus, TranscriptEntry, TransferRequest
+from backend.models import (
+    Course,
+    CourseEvaluation,
+    EvidenceSpan,
+    Institution,
+    Syllabus,
+    TranscriptEntry,
+    TransferRequest,
+)
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import demo_pdf, demo_text, login
 from tests.fakes import FABRICATED_QUOTE, FakeLLM, FakeStorage

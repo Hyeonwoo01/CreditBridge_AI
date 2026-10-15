@@ -1,9 +1,9 @@
 from types import SimpleNamespace
 from typing import Any
 
-from app.ai.prompts_loader import load_prompt
-from app.services.analysis import link_score
-from app.services.student import CourseRow, simulate
+from backend.ai.prompts_loader import load_prompt
+from backend.services.analysis import link_score
+from backend.services.student import CourseRow, simulate
 
 
 def row(

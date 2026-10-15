@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import (
+from backend.models import (
     Appeal,
     Assignment,
     CourseEvaluation,
@@ -382,7 +382,7 @@ def test_stats_page_counts_decisions_and_disagreement(client: TestClient, seeded
 
 def test_history_is_scoped_to_target_institution(client: TestClient, seeded: Session) -> None:
     """다른 대상 대학이 내린 판정은 과거 이력·경보에 섞이지 않는다."""
-    from app.models import Institution, TransferRequest
+    from backend.models import Institution, TransferRequest
 
     other = Institution(name="Other State", country="US", is_target=True)
     seeded.add(other)

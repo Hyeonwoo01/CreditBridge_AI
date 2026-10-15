@@ -3,12 +3,12 @@ from typing import Any, ClassVar
 
 import pytest
 
-from app.config import Settings
-from app.db.base import utcnow
-from app.models import Notification, PrivacyRequest, User
-from app.services import equivalencies, notifications
-from app.services.privacy import is_overdue
-from app.web.templating import highlight
+from backend.config import Settings
+from backend.db.base import utcnow
+from backend.models import Notification, PrivacyRequest, User
+from backend.services import equivalencies, notifications
+from backend.services.privacy import is_overdue
+from backend.web.templating import highlight
 
 
 def test_highlight_escapes_and_anchors_overlapping_spans() -> None:

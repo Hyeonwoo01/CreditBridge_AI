@@ -2,8 +2,8 @@ from datetime import datetime
 
 import pytest
 
-from app.errors import DecisionValidationError
-from app.services.decisions import SIMILARITY_MIN, HistoryItem, _validate_reasons, conflicts, similarity
+from backend.errors import DecisionValidationError
+from backend.services.decisions import SIMILARITY_MIN, HistoryItem, _validate_reasons, conflicts, similarity
 
 
 def item(result: str, sim: float, same_target: bool = True) -> HistoryItem:

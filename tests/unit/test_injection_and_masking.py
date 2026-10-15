@@ -1,8 +1,8 @@
 import logging
 
-from app.ai import injection
-from app.logging_setup import configure_logging
-from app.security.masking import mask_pii
+from backend.ai import injection
+from backend.logging_setup import configure_logging
+from backend.security.masking import mask_pii
 
 
 def test_detects_instructions_in_english_and_korean() -> None:

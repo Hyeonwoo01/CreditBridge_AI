@@ -10,12 +10,21 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.evidence import locate
-from app.db.base import utcnow
-from app.db.session import SessionLocal
-from app.models import Course, CourseEvaluation, Decision, Institution, Syllabus, SyllabusChunk, TransferRequest, User
-from app.services.analysis import content_hash
-from app.services.auth import hash_password
+from backend.ai.evidence import locate
+from backend.db.base import utcnow
+from backend.db.session import SessionLocal
+from backend.models import (
+    Course,
+    CourseEvaluation,
+    Decision,
+    Institution,
+    Syllabus,
+    SyllabusChunk,
+    TransferRequest,
+    User,
+)
+from backend.services.analysis import content_hash
+from backend.services.auth import hash_password
 from scripts.catalog_data import MSU_COURSES, reference_syllabus_text
 
 DEMO_PASSWORD = "demo1234"

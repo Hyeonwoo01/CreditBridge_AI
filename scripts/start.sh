@@ -10,4 +10,4 @@ done
 if [ "${SEED_DEMO:-false}" = "true" ]; then
   uv run --no-group dev python -m scripts.seed_demo
 fi
-exec uv run --no-group dev fastapi run app/main.py --host 0.0.0.0 --port 8000
+exec uv run --no-group dev fastapi run backend/main.py --host 0.0.0.0 --port 8000

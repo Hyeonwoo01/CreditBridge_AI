@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.ai.candidates import MAX_CANDIDATES, matches, select
+from backend.ai.candidates import MAX_CANDIDATES, matches, select
 
 
 @dataclass(frozen=True)

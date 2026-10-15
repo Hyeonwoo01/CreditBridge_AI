@@ -4,8 +4,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.models import Assignment, AuditLog, CourseEvaluation, Decision, TransferRequest, User
-from app.services.decisions import SIMILARITY_MIN, similarity
+from backend.models import Assignment, AuditLog, CourseEvaluation, Decision, TransferRequest, User
+from backend.services.decisions import SIMILARITY_MIN, similarity
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import demo_text, login
 from tests.integration.test_pipeline import latest, new_request, upload
@@ -295,7 +295,7 @@ def test_decisions_table_has_no_update_path(seeded: Session) -> None:
     """decisions·audit_logs 저장소 코드에는 UPDATE/DELETE가 없다 (추가 전용)."""
     import inspect
 
-    from app.repositories import audit, decisions
+    from backend.repositories import audit, decisions
 
     for module in (audit, decisions):
         source = inspect.getsource(module)

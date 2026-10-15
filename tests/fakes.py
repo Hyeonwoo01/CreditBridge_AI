@@ -7,11 +7,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from app.ai.llm_client import LLMResult
-from app.schemas.evaluation import CandidateJudgment, ConceptJudgment, EvaluationOutput
-from app.schemas.extraction import SyllabusExtraction, WeeklyTopic
-from app.schemas.transcript import TranscriptExtraction, TranscriptLine
-from app.schemas.transcription import PageTranscription
+from backend.ai.llm_client import LLMResult
+from backend.schemas.evaluation import CandidateJudgment, ConceptJudgment, EvaluationOutput
+from backend.schemas.extraction import SyllabusExtraction, WeeklyTopic
+from backend.schemas.transcript import TranscriptExtraction, TranscriptLine
+from backend.schemas.transcription import PageTranscription
 
 STOP = {
     "the",

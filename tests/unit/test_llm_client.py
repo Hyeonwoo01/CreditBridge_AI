@@ -4,10 +4,10 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from app.ai.llm_client import FALLBACK_BETA, LLMClient, strict_schema
-from app.config import Settings
-from app.errors import ConfigurationError, LLMError, LLMRefusalError
-from app.schemas.transcript import TranscriptExtraction
+from backend.ai.llm_client import FALLBACK_BETA, LLMClient, strict_schema
+from backend.config import Settings
+from backend.errors import ConfigurationError, LLMError, LLMRefusalError
+from backend.schemas.transcript import TranscriptExtraction
 
 
 class Out(BaseModel):
@@ -72,7 +72,7 @@ def test_strict_schema_keeps_property_named_title() -> None:
 
 
 def test_stripped_constraints_are_written_into_description() -> None:
-    from app.schemas.evaluation import ConceptJudgment
+    from backend.schemas.evaluation import ConceptJudgment
 
     coverage = strict_schema(ConceptJudgment)["properties"]["coverage"]
     assert "minimum" not in coverage and "maximum" not in coverage  # 구조화 출력이 지원하지 않는 키워드

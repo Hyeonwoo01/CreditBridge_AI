@@ -1,6 +1,6 @@
-from app.models.enums import Confidence, Recommendation
-from app.schemas.results import ConceptResult
-from app.services.scoring import apply_verification, is_sparse, score_candidate
+from backend.models.enums import Confidence, Recommendation
+from backend.schemas.results import ConceptResult
+from backend.services.scoring import apply_verification, is_sparse, score_candidate
 
 
 def concept(status: str, coverage: int, verified: bool = True) -> ConceptResult:

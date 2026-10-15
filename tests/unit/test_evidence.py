@@ -1,4 +1,4 @@
-from app.ai.evidence import locate, verify_quotes
+from backend.ai.evidence import locate, verify_quotes
 
 TEXT = (
     "Week 5: Differentiation rules:  product rule and\nquotient rule\nWeek 6: The chain rule, implicit differentiation"
