@@ -19,10 +19,11 @@ from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
 from backend.services import views
+from backend.web.nav import nav_badges
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
 
-router = APIRouter(prefix="/review")
+router = APIRouter(prefix="/review", dependencies=[Depends(nav_badges)])
 Evaluator = Depends(require(Role.EVALUATOR))
 
 

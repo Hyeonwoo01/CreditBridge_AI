@@ -326,3 +326,14 @@ def file_for_download(session: Session, user: User, file_id: int) -> AppealFile:
     if file.file_key is None:
         raise NotFoundError("개인정보 삭제 요청으로 지워진 파일이에요.")
     return file
+
+
+def submitted_count(session: Session, evaluator: User) -> int:
+    """심사관 메뉴 배지: 접수돼 처리를 기다리는 이의 신청 수."""
+    if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
+        raise PermissionDeniedError("심사관 계정만 사용할 수 있어요.")
+    return sum(
+        1
+        for appeal, _, _, _ in appeal_repo.of_institution(session, evaluator.institution_id)
+        if appeal.status == AppealStatus.SUBMITTED
+    )

@@ -12,10 +12,11 @@ from backend.services import decisions as decision_service
 from backend.services import materials as material_service
 from backend.services import review as review_service
 from backend.services import views
+from backend.web.nav import nav_badges
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
 
-router = APIRouter(prefix="/professor")
+router = APIRouter(prefix="/professor", dependencies=[Depends(nav_badges)])
 Professor = Depends(require(Role.PROFESSOR))
 
 

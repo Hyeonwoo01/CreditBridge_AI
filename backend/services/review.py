@@ -64,6 +64,16 @@ def ensure_evaluator(user: User) -> int:
     return user.institution_id
 
 
+def unassigned_count(session: Session, evaluator: User) -> int:
+    """심사관 메뉴 배지: 판정 전인데 담당 교수가 아직 없는 과목 수."""
+    institution_id = ensure_evaluator(evaluator)
+    return sum(
+        1
+        for evaluation, _, _ in evaluation_repo.review_queue(session, institution_id)
+        if evaluation_repo.active_assignment(session, evaluation.id) is None
+    )
+
+
 def _matches(row: QueueRow, q: str) -> bool:
     haystack = " ".join(
         [

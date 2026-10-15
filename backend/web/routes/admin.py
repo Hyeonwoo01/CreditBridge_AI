@@ -19,11 +19,12 @@ from backend.services import institution_data, notifications, views
 from backend.services import privacy as privacy_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
+from backend.web.nav import nav_badges
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
 from backend.workers import tasks
 
-router = APIRouter(prefix="/admin")
+router = APIRouter(prefix="/admin", dependencies=[Depends(nav_badges)])
 Admin = Depends(require(Role.ADMIN))
 
 

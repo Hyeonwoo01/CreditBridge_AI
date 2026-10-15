@@ -172,3 +172,11 @@ def rows(session: Session, user: User) -> list[PrivacyRow]:
     # 처리할 것(기한 임박 순)을 위로, 끝난 것은 아래로
     out.sort(key=lambda r: (r.privacy.status == PrivacyStatus.COMPLETED, r.privacy.due_at))
     return out
+
+
+def pending_count(session: Session, user: User) -> int:
+    """메뉴 배지: 심사관은 처리할 요청(requested), 기관 관리자는 승인할 요청(reviewed) 수."""
+    if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
+        raise PermissionDeniedError("심사관과 기관 관리자만 볼 수 있어요.")
+    waiting = PrivacyStatus.REQUESTED if user.role == Role.EVALUATOR else PrivacyStatus.REVIEWED
+    return sum(1 for p, _ in privacy_repo.of_institution(session, user.institution_id) if p.status == waiting)

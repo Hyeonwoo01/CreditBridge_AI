@@ -10,13 +10,13 @@ from backend.models import User
 from backend.security.session import current_user
 from backend.services import appeals as appeal_service
 from backend.services import views
-from backend.web.nav import student_badges
+from backend.web.nav import nav_badges
 from backend.web.templating import render
 
 router = APIRouter()
 
 
-@router.get("/evaluations/{evaluation_id}/report", dependencies=[Depends(student_badges)])
+@router.get("/evaluations/{evaluation_id}/report", dependencies=[Depends(nav_badges)])
 def report(
     request: Request, evaluation_id: int, user: User = Depends(current_user), session: Session = Depends(get_db)
 ) -> Response:

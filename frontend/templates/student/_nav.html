@@ -1,7 +1,6 @@
 {% from "partials/macros.html" import nav_link with context %}
 {% set path = request.url.path %}
 {% set in_appeals = path.startswith("/student/appeals") or path.endswith("/appeal") %}
-{% set b = request.state.student_badges() if request.state.student_badges is defined else none %}
-{{ nav_link("/student", "내 편입 요청", current=false if (in_appeals or path.startswith("/student/precedents")) else none, badges=[(b.missing, 'missing', '채워야 할 서류 ' ~ b.missing ~ '건'), (b.results, 'new', '새 판정 결과 ' ~ b.results ~ '건')] if b else []) }}
-{{ nav_link("/student/appeals", "이의 신청", current=in_appeals, badges=[(b.appealable, 'count', '이의 신청할 수 있는 과목 ' ~ b.appealable ~ '개'), (b.appeal_results, 'new', '새 이의 신청 결과 ' ~ b.appeal_results ~ '건')] if b else []) }}
+{{ nav_link("/student", "내 편입 요청", current=false if (in_appeals or path.startswith("/student/precedents")) else none) }}
+{{ nav_link("/student/appeals", "이의 신청", current=in_appeals) }}
 {{ nav_link("/student/precedents", "인정 사례") }}

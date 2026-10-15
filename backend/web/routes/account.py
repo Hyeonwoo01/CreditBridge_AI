@@ -9,7 +9,7 @@ from backend.security import session as auth_session
 from backend.security.csrf import check_csrf
 from backend.security.session import current_user
 from backend.services import auth, notifications
-from backend.web.nav import student_badges
+from backend.web.nav import nav_badges
 from backend.web.routes.auth import HOME
 from backend.web.templating import flash, render
 from backend.workers import tasks
@@ -17,7 +17,7 @@ from backend.workers import tasks
 router = APIRouter(prefix="/account")
 
 
-@router.get("/password", dependencies=[Depends(student_badges)])
+@router.get("/password", dependencies=[Depends(nav_badges)])
 def password_form(request: Request, user: User = Depends(current_user)) -> Response:
     return render(request, "account/password.html", user=user, min_length=auth.MIN_PASSWORD_LENGTH)
 

@@ -23,6 +23,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
+from backend.models.enums import Role
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -34,9 +35,11 @@ from backend.schemas.extraction import SyllabusExtraction
 from backend.schemas.results import CandidateResult, EvaluationResult
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import appeals as appeal_service
+from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
 from backend.services import notifications as notification_service
 from backend.services import privacy as privacy_service
+from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import student as student_service
 from backend.services.decisions import HistoryItem, history
@@ -363,3 +366,53 @@ def request_id_of(session: Session, syllabus: Syllabus) -> int:
     if request is None:
         raise NotFoundError("편입 요청을 찾을 수 없어요.")
     return request.id
+
+
+# ---------- 메뉴 배지 ----------
+
+# (숫자, 톤, 화면 읽기 프로그램용 설명). 톤: todo(앰버, 처리할 일) / new(파랑, 새 결과) / count(중립, 참고 개수)
+Badge = tuple[int, str, str]
+
+
+def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
+    """역할별 상단 메뉴 숫자 배지 (메뉴 주소 → 배지). 기관 전체 집계가 아니라 그 사람이 처리할 일만 센다."""
+    if user.role == Role.STUDENT:
+        b = student_badges(session, user)
+        return {
+            "/student": [
+                (b.missing, "todo", f"채워야 할 서류 {b.missing}건"),
+                (b.results, "new", f"새 판정 결과 {b.results}건"),
+            ],
+            "/student/appeals": [
+                (b.appealable, "count", f"이의 신청할 수 있는 과목 {b.appealable}개"),
+                (b.appeal_results, "new", f"새 이의 신청 결과 {b.appeal_results}건"),
+            ],
+        }
+    if user.role == Role.EVALUATOR:
+        unassigned = review_service.unassigned_count(session, user)
+        appeals = appeal_service.submitted_count(session, user)
+        privacy = privacy_service.pending_count(session, user)
+        return {
+            "/review": [(unassigned, "todo", f"교수 배정이 필요한 과목 {unassigned}개")],
+            "/review/appeals": [(appeals, "todo", f"처리할 이의 신청 {appeals}건")],
+            "/review/privacy": [(privacy, "todo", f"처리할 삭제 요청 {privacy}건")],
+        }
+    if user.role == Role.PROFESSOR:
+        pending = len(professor_items(session, user))
+        return {"/professor": [(pending, "todo", f"판정할 심사 {pending}건")]}
+    if user.role == Role.ADMIN and user.institution_id is not None:
+        overview = institution_service.overview(session, user)
+        setup = overview.missing_reference + len(overview.departments_without_professor)
+        privacy = privacy_service.pending_count(session, user)
+        return {
+            "/admin/data": [
+                (
+                    setup,
+                    "todo",
+                    f"준비가 필요한 항목 {setup}건 (기준 강의계획서 없는 과목 {overview.missing_reference}개, "
+                    f"교수가 없는 학과 {len(overview.departments_without_professor)}개)",
+                )
+            ],
+            "/admin/privacy": [(privacy, "todo", f"승인할 삭제 요청 {privacy}건")],
+        }
+    return {}

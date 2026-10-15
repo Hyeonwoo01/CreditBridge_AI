@@ -15,12 +15,12 @@ from backend.services import precedents as precedent_service
 from backend.services import privacy as privacy_service
 from backend.services import student as student_service
 from backend.services import views
-from backend.web.nav import student_badges
+from backend.web.nav import nav_badges
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
 from backend.workers import tasks
 
-router = APIRouter(prefix="/student", dependencies=[Depends(student_badges)])
+router = APIRouter(prefix="/student", dependencies=[Depends(nav_badges)])
 Student = Depends(require(Role.STUDENT))
 
 

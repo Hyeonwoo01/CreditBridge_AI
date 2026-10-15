@@ -1,4 +1,4 @@
-"""학생 대시보드(할 일·서류 준비율), 메뉴 상태 배지, 선배 인정 사례."""
+"""학생 대시보드(할 일·서류 준비율), 역할별 메뉴 숫자 배지, 선배 인정 사례."""
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from backend.models import Appeal
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import login
-from tests.integration.test_pipeline import new_request, upload
+from tests.integration.test_pipeline import latest, new_request, upload
 from tests.integration.test_review_extras import approve
-from tests.integration.test_workflow import professor_for
+from tests.integration.test_workflow import assign, professor_for, reviewer_of, submitted_request
 
 TRANSCRIPT = (
     "Hankuk University Official Transcript\nName: Lee Jiwon\nStudent ID: 2022104455\n"
@@ -109,3 +109,44 @@ def test_precedents_show_only_institution_equivalency_table(client: TestClient, 
     assert "MATH 1151" not in page  # 확정 판정에서 온 행 없음
     page = client.get("/student/precedents?q=chem").text
     assert "CHEM 110" in page and ">MATH 101<" not in page
+
+
+def test_staff_nav_badges_count_their_own_work(client: TestClient, seeded: Session) -> None:
+    """교수·심사관·관리자 메뉴 숫자 배지: 기관 전체가 아니라 그 사람이 처리할 일만."""
+    from backend.models import PrivacyRequest, User
+    from backend.services import institution_data
+
+    rid = submitted_request(client, seeded, "calculus.txt")
+    ev = latest(seeded, "calculus.txt", rid)
+    token = login(client, "rachel@msu.example")
+    page = client.get("/review").text
+    assert "교수 배정이 필요한 과목 1개" in page
+    assert "교수 배정이 필요한 과목 1개" in client.get("/notifications").text  # 공용 화면의 메뉴에도
+    assign(client, ev)
+    assert "교수 배정이 필요한 과목" not in client.get("/review").text
+
+    prof = reviewer_of(seeded, ev)
+    token = login(client, prof.email)
+    assert "판정할 심사 1건" in client.get("/professor").text
+    approve(client, ev, token)
+    assert "판정할 심사" not in client.get("/professor").text
+
+    token = login(client, "jiwon@student.example")
+    reason = "미분과 적분의 응용까지 15주 동안 배웠고 강의 노트와 시험지로 증명할 수 있어요."
+    client.post(f"/student/evaluations/{ev.id}/appeal", data={"reason": reason, "csrf_token": token})
+    client.post(f"/student/requests/{rid}/delete-documents", data={"csrf_token": token})
+
+    token = login(client, "rachel@msu.example")
+    page = client.get("/review").text
+    assert "처리할 이의 신청 1건" in page and "처리할 삭제 요청 1건" in page
+    privacy = seeded.scalars(select(PrivacyRequest).where(PrivacyRequest.transfer_request_id == rid)).one()
+    client.post(f"/review/privacy/{privacy.id}", data={"csrf_token": token})
+    assert "처리할 삭제 요청" not in client.get("/review").text
+
+    login(client, "admin@msu.example")
+    page = client.get("/admin/stats").text
+    assert "승인할 삭제 요청 1건" in page
+    admin = seeded.scalars(select(User).where(User.email == "admin@msu.example")).one()
+    overview = institution_data.overview(seeded, admin)
+    setup = overview.missing_reference + len(overview.departments_without_professor)
+    assert (f"준비가 필요한 항목 {setup}건" in page) == (setup > 0)
