@@ -23,8 +23,8 @@
 {%- endmacro %}
 
 {# 상단 검정 글로벌 내비게이션 링크 (12px) #}
-{% macro nav_link(href, label, exact=False) -%}
+{% macro nav_link(href, label, exact=False, unless='') -%}
 {% set path = request.url.path %}
-{% set active = path == href or (not exact and path.startswith(href + '/')) %}
+{% set active = (path == href or (not exact and path.startswith(href + '/'))) and not (unless and path.startswith(unless)) %}
 <a href="{{ href }}" class="flex h-11 items-center text-xs tracking-[-0.12px] {{ 'text-white' if active else 'text-white/70 hover:text-white' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
 {%- endmacro %}

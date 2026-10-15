@@ -37,7 +37,7 @@
 | FR-20 모바일 승인 | 🟡 | 근거 우선 모바일 화면, 모바일 메뉴, 하단 고정 판정 바, 화면 폭 - 32px로 뜨는 사유 선택 창, 화면·메일 알림. 웹 푸시는 없음(서비스 워커·추가 라이브러리 필요) | 수동 확인 |
 | FR-21 진행 상황 포털 | ✅ | 과목별 접수→AI 분석→교수 검토→확정, 예상 완료일, 보완 요청·이의 신청 상태. 요청 단위 "심사 진행 현황" 4단계(서류 접수 → AI 구조화·근거 추출 → 학과 교수 심사(확정 수/전체) → 최종 확정, `RequestView.analysis_done`·`decided_count`) | `test_professor_decision_rules_and_portal`, `test_student_report_filters_courses` |
 | FR-22 보완 자료 요청 | ✅ | 심사관·배정 교수가 항목·메모 지정해 요청 → 학생 알림 → 제출 시 처리됨·요청자 알림, 재분석 결과에 교수 배정 이어짐 `services/materials.py`. 학생 리포트의 보완 필요 과목에 정보 부족 진단(요청 항목·부족 개념·필요 자료)과 "보완 서류 제출하기", 심사 큐에 "보완 요청 발송"·"보완 대기" 표시 | `test_material_request_flow_keeps_assignment`, `test_evaluator_can_request_materials_but_not_after_decision` |
-| FR-23 이의 신청·근거 리포트 | ✅ | 학생 신청 → 심사관 받아들임(재판정 교수 배정)·기각(사유 필수) → 교수 재판정(새 판정 행, 원 판정 보존). 리포트에 경과 표시 `services/appeals.py` | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_dismiss_requires_note` |
+| FR-23 이의 신청·근거 리포트 | ✅ | 학생 신청 → 심사관 받아들임(재판정 교수 배정)·기각(사유 필수) → 교수 재판정(새 판정 행, 원 판정 보존). 리포트에 경과 표시 `services/appeals.py`. 학생 메뉴 "이의 신청"(`/student/appeals`, `appeals.student_rows`)에서 본인 이의 신청의 상태·재판정 결과·기각 사유를 모아 보기. 판정 근거 리포트에 역할별 "돌아가기"(교수 판정 화면·심사관 심사 건·학생 과목 결과) | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_dismiss_requires_note`, `test_student_sees_own_appeals_and_report_links_back` |
 | FR-24 학사정보시스템 내보내기 | ✅ | CSV + 토큰 인증 JSON API `GET /api/sis/decisions` (관리자 발급·폐기, 재판정은 최신만 + 대체 판정 번호) `services/sis.py`. 심사 큐 "SIS CSV 내보내기", 관리자 콘솔 SIS 연동 카드(토큰 상태·확정 과목 수) | `test_sis_api_requires_admin_issued_token`, 이의 신청 테스트의 CSV 확인 |
 
 ## P3 선택
@@ -72,6 +72,7 @@
 | 공통 레이아웃 | 모든 화면 | `base.html` (기관 보조 바·집계 칩, Human-in-the-Loop 푸터) | FR-12, FR-19 알림 | `test_queue_search_and_conflict_filter`(집계 칩, 학생에게 숨김) |
 | 학생 홈 | `/student` | `student/index.html` | FR-15 요청 만들기 | `test_request_needs_affiliated_student_and_valid_major` |
 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | `student/request.html`, `partials/course_list.html` | FR-01·02·15·21·22, FR-13 삭제 요청 | `test_request_page_shows_simulation_and_stage`, `test_student_report_filters_courses` |
+| 이의 신청(학생) | `/student/appeals` | `student/appeals.html` | FR-23 | `test_student_sees_own_appeals_and_report_links_back` |
 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | `student/evaluation.html`, `partials/evaluation.html` | FR-05~08·22·23·25 | `test_material_request_flow_keeps_assignment`, `test_evidence_links_jump_to_source_positions` |
 | 심사 큐 | `/review` | `review/queue.html` | FR-11·17·18·24 | `test_queue_tabs_and_department_assignment`, `test_queue_search_and_conflict_filter` |
 | 심사 건 상세 | `/review/evaluations/{id}` | `review/evaluation.html`, `partials/history.html`(`#history`), `partials/material_request_form.html`(`#materials`) | FR-11·22 | `test_evaluator_can_request_materials_but_not_after_decision` |

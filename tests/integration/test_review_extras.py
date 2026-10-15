@@ -451,3 +451,37 @@ def test_admin_console_shows_recent_audit_without_student_names(client: TestClie
     login(client, "rachel@msu.example")
     page = client.get("/review/stats").text
     assert "운영 통계" in page and "최근 감사 로그" not in page
+
+
+# ---------- 학생 이의 신청 목록, 리포트에서 돌아가기 ----------
+
+
+def test_student_sees_own_appeals_and_report_links_back(client: TestClient, seeded: Session) -> None:
+    ev, _, token = professor_for(client, seeded, "calculus.txt")
+    approve(client, ev, token)
+    report = f"/evaluations/{ev.id}/report"
+    assert f'href="/professor/evaluations/{ev.id}"' in client.get(report).text  # 교수 → 판정 화면
+
+    student_token = login(client, "jiwon@student.example")
+    page = client.get("/student/appeals").text
+    assert "아직 이의 신청한 과목이 없어요" in page and 'href="/student/appeals"' in page  # 학생 메뉴에 있다
+    reason = "학점 차이를 고려해 다시 검토해 주시면 좋겠습니다. 실험 보고서가 있어요."
+    client.post(f"/student/evaluations/{ev.id}/appeal", data={"reason": reason, "csrf_token": student_token})
+    page = client.get("/student/appeals").text
+    assert "MATH 101" in page and "접수됨" in page and "학사처가 검토하고 있어요" in page
+    assert f'href="/student/evaluations/{ev.id}"' in client.get(report).text  # 학생 → 과목 결과
+
+    appeal = seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).one()
+    token = login(client, "rachel@msu.example")
+    assert f'href="/review/evaluations/{ev.id}"' in client.get(report).text  # 심사관 → 심사 건
+    client.post(
+        f"/review/appeals/{appeal.id}",
+        data={"action": "dismiss", "note": "원 판정의 근거가 충분해요", "csrf_token": token},
+    )
+    login(client, "jiwon@student.example")
+    page = client.get("/student/appeals").text
+    assert "기각" in page and "원 판정의 근거가 충분해요" in page and "원 판정이 그대로 유지돼요" in page
+    login(client, "senior@student.example")  # 다른 학생에게는 보이지 않는다
+    assert "MATH 101 Calculus" not in client.get("/student/appeals").text
+    login(client, "rachel@msu.example")
+    assert client.get("/student/appeals").status_code == 403

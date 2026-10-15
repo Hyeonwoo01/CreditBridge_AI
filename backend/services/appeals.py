@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import utcnow
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
-from backend.models import Appeal, Assignment, CourseEvaluation, Syllabus, TransferRequest, User
+from backend.models import Appeal, Assignment, CourseEvaluation, Decision, Syllabus, TransferRequest, User
 from backend.models.enums import AppealStatus, Role
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
@@ -206,4 +206,34 @@ def rows(session: Session, evaluator: User) -> list[AppealRow]:
             )
         )
     out.sort(key=lambda r: (r.appeal.status != AppealStatus.SUBMITTED, -r.appeal.id))
+    return out
+
+
+@dataclass(frozen=True)
+class StudentAppealRow:
+    appeal: Appeal
+    evaluation: CourseEvaluation
+    syllabus: Syllabus
+    request: TransferRequest
+    appealed: Decision | None  # 이의를 신청한 원 판정
+    redecided: Decision | None  # 재판정이 끝났으면 새 판정
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.appealed and self.redecided and self.redecided.result != self.appealed.result)
+
+
+def student_rows(session: Session, student: User) -> list[StudentAppealRow]:
+    """학생 본인이 낸 이의 신청 (최근 순)."""
+    if student.role != Role.STUDENT:
+        raise PermissionDeniedError("학생 계정만 사용할 수 있어요.")
+    out = []
+    for appeal, evaluation, syllabus, request in appeal_repo.of_student(session, student.id):
+        current = decision_repo.for_evaluation(session, evaluation.id)
+        redecided = current if current is not None and current.appeal_id == appeal.id else None
+        out.append(
+            StudentAppealRow(
+                appeal, evaluation, syllabus, request, decision_repo.get(session, appeal.decision_id), redecided
+            )
+        )
     return out

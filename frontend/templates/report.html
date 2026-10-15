@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import time %}
 {% block title %}판정 근거 리포트 · CreditBridge AI{% endblock %}
+{% block nav %}{% include "partials/role_nav.html" %}{% endblock %}
 {% block content %}
 {% set ev = v.evaluation %}
+{# 역할별로 이 심사 건을 보던 화면으로 돌아간다 (인쇄할 때는 숨김) #}
+{% set back = {'student': ('/student/evaluations/', '과목 결과로'), 'evaluator': ('/review/evaluations/', '심사 건으로'), 'professor': ('/professor/evaluations/', '판정 화면으로')}.get(user.role) %}
+{% if back %}<p class="mb-4 print:hidden"><a href="{{ back[0] }}{{ ev.id }}" class="btn-text text-sm">← {{ back[1] }} 돌아가기</a></p>{% endif %}
 <article class="grid gap-6 text-sm">
   <header class="grid gap-1">
     <img src="/static/img/logo.png" alt="CreditBridge AI" width="120" height="66" class="h-auto w-[120px]">
@@ -46,6 +50,9 @@
   {% if v.audit %}
   <section class="grid gap-1"><h2 class="font-semibold">감사 로그</h2>{% for a in v.audit %}<p>{{ time(a.created_at) }} · {{ a.action }} · {{ a.payload_json }}</p>{% endfor %}</section>
   {% endif %}
-  <button class="btn-secondary w-fit print:hidden" onclick="window.print()">인쇄 / PDF 저장</button>
+  <div class="flex flex-wrap gap-2 print:hidden">
+    {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-primary">{{ back[1] }} 돌아가기</a>{% endif %}
+    <button class="btn-secondary w-fit" onclick="window.print()">인쇄 / PDF 저장</button>
+  </div>
 </article>
 {% endblock %}

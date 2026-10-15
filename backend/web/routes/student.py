@@ -230,3 +230,9 @@ def appeal(
         send_emails()
         flash(request, "이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요.")
     return RedirectResponse(f"/student/evaluations/{evaluation_id}", status_code=303)
+
+
+@router.get("/appeals")
+def appeals(request: Request, user: User = Student, session: Session = Depends(get_db)) -> Response:
+    """내 이의 신청: 처리 상태, 재판정 결과, 기각 사유 (FR-23)."""
+    return render(request, "student/appeals.html", user=user, rows=appeal_service.student_rows(session, user))

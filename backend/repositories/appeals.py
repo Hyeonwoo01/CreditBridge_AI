@@ -38,3 +38,15 @@ def of_institution(
         .order_by(Appeal.id.desc())
     )
     return [(a, e, s, r) for a, e, s, r in session.execute(stmt)]
+
+
+def of_student(session: Session, student_id: int) -> list[tuple[Appeal, CourseEvaluation, Syllabus, TransferRequest]]:
+    stmt = (
+        select(Appeal, CourseEvaluation, Syllabus, TransferRequest)
+        .join(CourseEvaluation, CourseEvaluation.id == Appeal.course_evaluation_id)
+        .join(Syllabus, Syllabus.id == CourseEvaluation.syllabus_id)
+        .join(TransferRequest, TransferRequest.id == CourseEvaluation.transfer_request_id)
+        .where(Appeal.student_id == student_id)
+        .order_by(Appeal.id.desc())
+    )
+    return [(a, e, s, r) for a, e, s, r in session.execute(stmt)]
