@@ -280,11 +280,13 @@ def student_home(session: Session, student: User) -> StudentHome:
 
 @dataclass(frozen=True)
 class StudentBadges:
-    """학생 메뉴 배지. missing: 채워야 할 서류(앰버), results·appeal_results: 새로 도착한 결과(파랑)."""
+    """학생 메뉴 배지. missing: 채워야 할 서류(앰버), results·appeal_results: 새로 도착한 결과(파랑),
+    appealable: 이의 신청할 수 있는 과목 수(중립)."""
 
     missing: int
     results: int
     appeal_results: int
+    appealable: int
 
 
 def student_badges(session: Session, student: User) -> StudentBadges:
@@ -293,6 +295,7 @@ def student_badges(session: Session, student: User) -> StudentBadges:
         missing,
         notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
         notification_service.unread_of_kinds(session, student, notification_service.APPEAL_RESULT_KINDS),
+        len(appeal_service.appealable(session, student)),
     )
 
 

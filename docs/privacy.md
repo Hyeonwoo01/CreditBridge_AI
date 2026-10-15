@@ -6,11 +6,13 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 | 데이터 | 저장 위치 | 비고 |
 | --- | --- | --- |
-| 원본 강의계획서·성적표 파일 | 객체 스토리지(S3 호환) | 운영은 `S3_SERVER_SIDE_ENCRYPTION=AES256` 또는 `aws:kms`로 저장 암호화. DB에는 파일 키만 |
+| 원본 강의계획서·성적표·보완 자료·이의 신청 근거 자료 파일 | 객체 스토리지(S3 호환) | 운영은 `S3_SERVER_SIDE_ENCRYPTION=AES256` 또는 `aws:kms`로 저장 암호화. DB에는 파일 키만(`supplement_files`, `appeal_files`는 파일 키·원래 파일 이름·형식·크기) |
 | 강의계획서 추출 텍스트·구조화 결과 | `syllabi.raw_text`, `syllabi.extracted_json` | 강의 내용이며 학생 개인정보는 아님 |
 | 성적표 과목·학점·성적 | `transcript_entries` | 이름·학번·생년월일은 저장하지 않고, 이름은 마스킹 값(`L** J****`)만 |
 | AI 분석 결과·근거 구절 | `course_evaluations`, `evidence_spans` | 강의계획서 구절과 원문 위치 |
-| 교수 판정·감사 로그 | `decisions`, `audit_logs` | 추가 전용. 사용자 id와 행위만 기록하고 이름·학번·성적은 넣지 않음 |
+| 이의 신청 사유 | `appeals.reason` | 학생이 쓴 글(20~3000자). 작성 화면에 "이름·학번은 적지 마세요"를 안내하고, 근거 자료도 이름·학번을 가리고 올리도록 안내 |
+| 화면 알림 | `notifications` | 과목 코드와 처리 내용만. 읽음 시각(`read_at`)은 학생 메뉴 배지 계산에 씀 |
+| 교수 판정·감사 로그 | `decisions`, `audit_logs` | 추가 전용. 사용자 id와 행위만 기록하고 이름·학번·성적은 넣지 않음. 이의 신청은 첨부 파일 수만 기록(`appeal.submit`의 `files`) |
 
 ## 모델 입력과 로그
 
@@ -54,10 +56,14 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 | 화면 | 보는 사람 | 학생 신원 | 성적 | 비고 |
 | --- | --- | --- | --- | --- |
-| 편입 학점 시뮬레이션 리포트·과목 분석 결과 (`/student/...`) | 학생 본인 | 본인 이름(리포트 제목) | 본인 성적표 성적 | 남의 요청은 403 |
+| 학생 홈 대시보드·메뉴 배지 (`/student`, 학생 화면 상단 메뉴) | 학생 본인 | 없음 | 없음 | 본인 요청의 할 일·서류 준비율·예상 인정 학점, 채워야 할 서류·이의 신청할 수 있는 과목·안 읽은 결과의 개수만 (`test_dashboard_lists_todos_and_readiness`, `test_nav_badges_for_new_results_clear_when_viewed`) |
+| 편입 학점 시뮬레이션 리포트·과목 분석 결과 (`/student/requests/…`, `/student/evaluations/…`) | 학생 본인 | 본인 이름(리포트 제목) | 본인 성적표 성적 | 남의 요청은 403 |
+| 이의 신청 목록·작성 (`/student/appeals`, `/student/evaluations/{id}/appeal`) | 학생 본인 | 없음 | 없음 | 본인 과목·본인 이의 신청만. 다른 학생의 과목은 작성 화면도 열리지 않음 (`test_appeal_form_with_evidence_files`) |
 | 심사 큐 (`/review`) | 소속 기관 심사관 | 이름, 출신 대학 (이름으로 검색 가능) | 없음 | 학사처가 접수 건을 학생 단위로 확인하는 업무라 표시. 검색어는 저장하지 않고, 접근 로그에서도 쿼리 문자열을 지움 |
 | 문서 삭제 요청 처리 (`/review/privacy`, `/admin/privacy`) | 심사관, 기관 관리자 | 학생 계정 이메일 | 없음 | 요청한 본인인지 확인하는 용도 |
-| 교수 홈·판정 화면 (`/professor/...`) | 배정된 교수 | 없음 | 없음 | 강의계획서와 과목 정보만 보고 판정 (학생을 모르는 상태로 심사) |
+| 이의 신청 처리 (`/review/appeals`) | 소속 기관 심사관 | 없음 (과목·출신 대학만) | 없음 | 학생이 쓴 이의 사유와 근거 자료 파일 이름. 처리 메모는 학생에게 그대로 전달됨 |
+| 교수 홈·판정 화면 (`/professor/...`) | 배정된 교수 | 없음 | 없음 | 강의계획서와 과목 정보만 보고 판정 (학생을 모르는 상태로 심사). 이의 신청 재판정 건은 사유와 근거 자료 파일 이름도 보임 |
+| 이의 신청 근거 자료 내려받기 (`/appeal-files/{id}`) | 학생 본인, 소속 기관 심사관, 배정된 교수·그 과목을 판정한 교수 (기관 관리자는 불가) | 파일 내용에 따라 다름 | 파일 내용에 따라 다름 | 화면에 띄우지 않고 내려받기만(`Content-Disposition: attachment`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`). 교수가 학생을 모르는 상태로 심사하도록 학생에게 이름·학번을 가리고 올리게 안내. 삭제 요청이 승인되면 원본을 지우고 이름만 "(삭제됨)" (`appeals.file_for_download`) |
 | 판정 근거 리포트 (`/evaluations/{id}/report`) | 학생 본인, 심사관, 담당 교수 | 없음 | 없음 | 판정 교수 이름, 선택형 사유, 소명 메모가 나옴 |
 | 관리자 콘솔·운영 통계 (`/admin/stats`, `/review/stats`) | 기관 관리자, 심사관 | 없음 | 없음 | 기관·학과 단위 집계만. 교수 개인별 지표는 만들지 않음. 최근 감사 로그의 처리자는 교직원만 이름·역할로, 학생은 "학생"으로 표시 (`test_admin_console_shows_recent_audit_without_student_names`) |
 | 전체 감사 로그 (`/admin/audit`) | 기관 관리자 | 없음 (사용자 id) | 없음 | 기록 내용은 id·행위·결과·사유 코드뿐, 소명 메모는 감사 로그에 넣지 않음 |
@@ -72,3 +78,4 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 - 화면 알림과 메일(`SMTP_HOST`를 설정한 경우)에는 과목 코드와 처리 내용만 넣고 이름·학번·성적은 넣지 않아요.
 - 메일은 받는 사람 본인의 계정 이메일로만 보내요.
+- 학생 메뉴 배지는 본인 알림 중 판정 결과(`decision.created`)와 이의 신청 결과(`appeal.accepted`·`appeal.dismissed`·`decision.redecided`)의 안 읽은 개수만 세요. 해당 과목 화면이나 이의 신청 화면을 열면 그 알림을 읽음으로 바꿔요(`notifications.mark_seen`).

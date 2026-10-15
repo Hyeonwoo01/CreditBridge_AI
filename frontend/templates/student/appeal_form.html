@@ -66,7 +66,7 @@
       <span class="font-semibold">이의 사유</span>
       <textarea class="textarea" name="reason" rows="9" minlength="{{ limits.min }}" maxlength="{{ limits.max }}" required data-count="reason-count" aria-describedby="reason-help reason-count">{{ reason or '' }}</textarea>
       <span class="flex flex-wrap justify-between gap-2 text-xs text-muted">
-        <span id="reason-help">어떤 개념을 실제로 배웠는지, 판정의 어느 부분이 사실과 다른지 구체적으로 적어 주세요 ({{ limits.min }}자 이상).</span>
+        <span id="reason-help">어떤 개념을 실제로 배웠는지, 판정의 어느 부분이 사실과 다른지 구체적으로 적어 주세요 ({{ limits.min }}자 이상). 이름·학번은 적지 마세요.</span>
         <span id="reason-count" class="tabular-nums" aria-live="polite">{{ (reason or '') | length }} / {{ limits.max }}</span>
       </span>
     </label>

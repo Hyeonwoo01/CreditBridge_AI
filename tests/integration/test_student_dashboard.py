@@ -63,10 +63,13 @@ def test_nav_badges_for_new_results_clear_when_viewed(client: TestClient, seeded
     assert "새 판정 결과 1건" in home and "새 판정 결과 확인" in home
     assert "새 판정 결과 1건" in client.get("/student/appeals").text  # 모든 학생 화면의 메뉴에
     client.get(f"/student/evaluations/{ev.id}")  # 결과를 열어 보면 배지가 사라진다
-    assert "새 판정 결과" not in client.get("/student").text
+    home = client.get("/student").text
+    assert "새 판정 결과" not in home
+    assert "이의 신청할 수 있는 과목 1개" in home  # 이의 신청 메뉴의 중립 숫자 배지
 
     reason = "미분과 적분의 응용까지 15주 동안 배웠고 강의 노트와 시험지로 증명할 수 있어요."
     client.post(f"/student/evaluations/{ev.id}/appeal", data={"reason": reason, "csrf_token": token})
+    assert "이의 신청할 수 있는 과목" not in client.get("/student").text  # 처리 중이면 셀 대상이 아님
     appeal = seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).one()
     token = login(client, "rachel@msu.example")
     client.post(f"/review/appeals/{appeal.id}", data={"action": "dismiss", "note": "근거 충분", "csrf_token": token})
