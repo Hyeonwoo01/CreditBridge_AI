@@ -4,12 +4,14 @@
 import csv
 import io
 
+import pymupdf
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.models import (
     Appeal,
+    AppealFile,
     Assignment,
     CourseEvaluation,
     Decision,
@@ -464,11 +466,13 @@ def test_student_sees_own_appeals_and_report_links_back(client: TestClient, seed
 
     student_token = login(client, "jiwon@student.example")
     page = client.get("/student/appeals").text
-    assert "아직 이의 신청한 과목이 없어요" in page and 'href="/student/appeals"' in page  # 학생 메뉴에 있다
+    assert "아직 낸 이의 신청이 없어요" in page and 'href="/student/appeals"' in page  # 학생 메뉴에 있다
+    assert "이의 신청할 수 있는 과목" in page and f'href="/student/evaluations/{ev.id}/appeal"' in page
     reason = "학점 차이를 고려해 다시 검토해 주시면 좋겠습니다. 실험 보고서가 있어요."
     client.post(f"/student/evaluations/{ev.id}/appeal", data={"reason": reason, "csrf_token": student_token})
     page = client.get("/student/appeals").text
     assert "MATH 101" in page and "접수됨" in page and "학사처가 검토하고 있어요" in page
+    assert "이의 신청할 수 있는 과목" not in page  # 처리 중이면 다시 낼 수 없다
     assert f'href="/student/evaluations/{ev.id}"' in client.get(report).text  # 학생 → 과목 결과
 
     appeal = seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).one()
@@ -485,3 +489,85 @@ def test_student_sees_own_appeals_and_report_links_back(client: TestClient, seed
     assert "MATH 101 Calculus" not in client.get("/student/appeals").text
     login(client, "rachel@msu.example")
     assert client.get("/student/appeals").status_code == 403
+
+
+def test_appeal_form_with_evidence_files(client: TestClient, seeded: Session, fake_storage: FakeStorage) -> None:
+    """이의 신청 작성 화면: 원 판정 요약, 근거 자료 첨부, 내려받기 권한, 삭제 요청 시 함께 삭제 (FR-23·FR-13)."""
+    ev, prof, token = professor_for(client, seeded, "calculus.txt")
+    approve(client, ev, token)
+
+    token = login(client, "jiwon@student.example")
+    form = f"/student/evaluations/{ev.id}/appeal"
+    assert form in client.get(f"/student/evaluations/{ev.id}").text  # 과목 결과에서 작성 화면으로
+    page = client.get(form).text
+    assert "이의 신청 작성" in page and "이의를 신청할 판정" in page and "직접 인정" in page
+    assert 'name="files"' in page and 'enctype="multipart/form-data"' in page
+
+    reason = "미분과 적분의 응용까지 15주 동안 배웠고 강의 노트와 시험지로 증명할 수 있어요."
+    pdf = demo_pdf("calculus.txt")
+    png = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 8, 8), False).tobytes("png")
+    r = client.post(
+        form,
+        data={"reason": reason, "csrf_token": token},
+        files=[("files", ("notes.exe", b"MZ", "application/octet-stream"))],
+    )
+    assert r.status_code == 422 and reason in r.text  # 실패해도 적은 사유가 남는다
+    assert not seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).all()
+    r = client.post(
+        form,
+        data={"reason": reason, "csrf_token": token},
+        files=[("files", (f"note{i}.pdf", pdf, "application/pdf")) for i in range(4)],
+    )
+    assert r.status_code == 422 and "3개까지" in r.text
+
+    r = client.post(
+        form,
+        data={"reason": reason, "csrf_token": token},
+        files=[
+            ("files", ("강의노트.pdf", pdf, "application/pdf")),
+            ("files", ("시험지.png", png, "image/png")),
+        ],
+        follow_redirects=False,
+    )
+    assert r.status_code == 303 and r.headers["location"] == "/student/appeals"
+    seeded.expire_all()
+    appeal = seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).one()
+    files = seeded.scalars(select(AppealFile).where(AppealFile.appeal_id == appeal.id).order_by(AppealFile.id)).all()
+    assert [f.original_filename for f in files] == ["강의노트.pdf", "시험지.png"]
+    assert all(f.file_key and f.file_key.startswith("appeals/") for f in files)
+    page = client.get("/student/appeals").text
+    assert "이의 신청을 접수했어요" in page and "강의노트.pdf" in page
+    assert "이미 처리 중인 이의 신청" in client.get(form).text  # 작성 화면 대신 안내
+
+    url = f"/appeal-files/{files[0].id}"
+    r = client.get(url)
+    assert r.status_code == 200 and r.content == pdf
+    assert r.headers["content-type"] == "application/pdf" and "attachment" in r.headers["content-disposition"]
+    assert r.headers["cache-control"] == "no-store"
+
+    login(client, "rachel@msu.example")
+    assert url in client.get("/review/appeals").text
+    assert client.get(url).status_code == 200
+    login(client, prof.email)
+    assert url in client.get(f"/professor/evaluations/{ev.id}").text
+    assert client.get(url).status_code == 200
+    login(client, "senior@student.example")
+    assert client.get(url).status_code == 403  # 다른 학생
+    assert client.get(f"/student/evaluations/{ev.id}/appeal").status_code in (403, 404)
+
+    # 개인정보 삭제 요청이 승인되면 근거 자료 원본도 지운다
+    token = login(client, "jiwon@student.example")
+    client.post(f"/student/requests/{ev.transfer_request_id}/delete-documents", data={"csrf_token": token})
+    privacy = seeded.scalars(
+        select(PrivacyRequest).where(PrivacyRequest.transfer_request_id == ev.transfer_request_id)
+    ).one()
+    token = login(client, "rachel@msu.example")
+    client.post(f"/review/privacy/{privacy.id}", data={"csrf_token": token})
+    token = login(client, "admin@msu.example")
+    client.post(f"/admin/privacy/{privacy.id}", data={"csrf_token": token})
+    assert not any(k.startswith("appeals/") for k in fake_storage.objects)
+    seeded.expire_all()
+    assert all(f.file_key is None for f in seeded.scalars(select(AppealFile)).all())
+    login(client, "jiwon@student.example")
+    assert client.get(url).status_code == 404
+    assert "(삭제됨)" in client.get("/student/appeals").text

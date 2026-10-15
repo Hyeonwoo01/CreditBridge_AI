@@ -15,6 +15,7 @@ from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
 from backend.models import PrivacyRequest, TransferRequest, User
 from backend.models.enums import PrivacyStatus, Role, SyllabusStatus
+from backend.repositories import appeals as appeal_repo
 from backend.repositories import materials as material_repo
 from backend.repositories import privacy as privacy_repo
 from backend.repositories import requests as request_repo
@@ -132,8 +133,12 @@ def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: i
 
 
 def _delete_documents(session: Session, storage: ObjectStorage, request: TransferRequest) -> None:
-    """원본 파일(강의계획서·보완 자료·성적표)과 추출 텍스트를 지운다."""
+    """원본 파일(강의계획서·보완 자료·성적표·이의 신청 근거 자료)과 추출 텍스트를 지운다."""
     syllabi = syllabus_repo.of_request(session, request.id)
+    for appeal_file in appeal_repo.files_of_request(session, request.id):
+        if appeal_file.file_key:
+            storage.delete(appeal_file.file_key)
+        appeal_file.file_key = None
     for f in material_repo.files_of(session, [s.id for s in syllabi]):
         if f.file_key:
             storage.delete(f.file_key)

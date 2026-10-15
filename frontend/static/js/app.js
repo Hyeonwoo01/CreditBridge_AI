@@ -92,3 +92,21 @@ document.querySelectorAll("[data-decision-form]").forEach((form) => {
   if (memo && count) memo.addEventListener("input", () => { count.textContent = memo.value.length; });
   if (dialog.hasAttribute("data-autoopen")) open(plan());
 });
+
+// 글자 수 표시: textarea[data-count]가 가리키는 요소에 "현재 / 최대"를 보여준다.
+document.querySelectorAll("textarea[data-count]").forEach((el) => {
+  const out = document.getElementById(el.dataset.count);
+  if (!out) return;
+  const update = () => { out.textContent = `${el.value.length} / ${el.maxLength}`; };
+  el.addEventListener("input", update);
+  update();
+});
+
+// 여러 파일 선택 칸의 개수 제한: 넘치면 제출 전에 알려 준다 (서버도 다시 검사한다).
+document.querySelectorAll("input[type=file][data-max-files]").forEach((el) => {
+  el.addEventListener("change", () => {
+    const max = Number(el.dataset.maxFiles);
+    el.setCustomValidity(el.files.length > max ? `파일은 ${max}개까지 올릴 수 있어요.` : "");
+    el.reportValidity();
+  });
+});

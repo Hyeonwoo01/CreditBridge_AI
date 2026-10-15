@@ -19,6 +19,7 @@ GRANT SELECT, INSERT, UPDATE         ON creditbridge.notifications      TO 'cred
 GRANT SELECT, INSERT, UPDATE         ON creditbridge.material_requests  TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON creditbridge.supplement_files   TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON creditbridge.appeals            TO 'creditbridge_app'@'%';
+GRANT SELECT, INSERT, UPDATE         ON creditbridge.appeal_files       TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON creditbridge.privacy_requests   TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT                 ON creditbridge.equivalencies      TO 'creditbridge_app'@'%';
 GRANT SELECT                         ON creditbridge.alembic_version    TO 'creditbridge_app'@'%';

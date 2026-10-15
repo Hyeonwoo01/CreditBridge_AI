@@ -16,6 +16,7 @@
     </div>
     <p class="text-sm text-muted">{{ row.request.source_institution.name }} · 신청 {{ time(a.created_at) }} · <a class="underline" href="/evaluations/{{ row.evaluation.id }}/report">판정 근거 리포트</a></p>
     <blockquote class="rounded-sm bg-parchment p-3 text-sm whitespace-pre-line">{{ a.reason }}</blockquote>
+    {% if row.files %}<div class="-mt-1 flex flex-wrap items-center gap-2 text-sm"><span class="text-muted">근거 자료</span><ul class="flex flex-wrap gap-2">{% for f in row.files %}<li>{% if f.file_key %}<a class="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1 text-sm hover:border-primary hover:text-primary" href="/appeal-files/{{ f.id }}">{{ f.original_filename }}</a>{% else %}<span class="inline-flex items-center rounded-full border border-hairline px-3 py-1 text-sm text-muted">{{ f.original_filename }} (삭제됨)</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
     {% if a.handler_note %}<p class="text-sm"><span class="text-muted">처리 메모:</span> {{ a.handler_note }}</p>{% endif %}
     {% if a.status == 'submitted' %}
     <form method="post" action="/review/appeals/{{ a.id }}" class="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">

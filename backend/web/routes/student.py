@@ -210,29 +210,63 @@ def supplement(
     return RedirectResponse(f"/student/requests/{views.request_id_of(session, syllabus)}", status_code=303)
 
 
+@router.get("/evaluations/{evaluation_id}/appeal")
+def appeal_form(
+    request: Request, evaluation_id: int, user: User = Student, session: Session = Depends(get_db)
+) -> Response:
+    """이의 신청 작성 (FR-23): 원 판정 요약, 사유, 근거 자료."""
+    view = views.evaluation_view(session, user, evaluation_id)
+    return render(request, "student/appeal_form.html", user=user, v=view, limits=_appeal_limits())
+
+
+def _appeal_limits() -> dict[str, int]:
+    return {
+        "min": appeal_service.MIN_REASON_CHARS,
+        "max": appeal_service.MAX_REASON_CHARS,
+        "files": appeal_service.MAX_FILES,
+    }
+
+
 @router.post("/evaluations/{evaluation_id}/appeal")
 def appeal(
     request: Request,
     evaluation_id: int,
     reason: str = Form(""),
+    files: list[UploadFile] = File([]),
     csrf_token: str = Form(""),
     user: User = Student,
     session: Session = Depends(get_db),
 ) -> Response:
-    """이의 신청 (FR-23)."""
+    """이의 신청 (FR-23). 실패하면 적은 사유를 그대로 둔 채 작성 화면을 다시 보여 준다."""
     check_csrf(request, csrf_token)
+    uploaded = _read(files)
     try:
-        appeal_service.file_appeal(session, user, evaluation_id, reason)
+        appeal_service.file_appeal(session, user, evaluation_id, reason, uploaded, get_storage() if uploaded else None)
     except CreditBridgeError as exc:
         session.rollback()
-        flash(request, str(exc), "error")
-    else:
-        send_emails()
-        flash(request, "이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요.")
-    return RedirectResponse(f"/student/evaluations/{evaluation_id}", status_code=303)
+        view = views.evaluation_view(session, user, evaluation_id)
+        return render(
+            request,
+            "student/appeal_form.html",
+            status_code=422,
+            user=user,
+            v=view,
+            limits=_appeal_limits(),
+            error=str(exc),
+            reason=reason,
+        )
+    send_emails()
+    flash(request, "이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요.")
+    return RedirectResponse("/student/appeals", status_code=303)
 
 
 @router.get("/appeals")
 def appeals(request: Request, user: User = Student, session: Session = Depends(get_db)) -> Response:
-    """내 이의 신청: 처리 상태, 재판정 결과, 기각 사유 (FR-23)."""
-    return render(request, "student/appeals.html", user=user, rows=appeal_service.student_rows(session, user))
+    """내 이의 신청: 신청할 수 있는 과목, 처리 상태, 재판정 결과, 기각 사유 (FR-23)."""
+    return render(
+        request,
+        "student/appeals.html",
+        user=user,
+        rows=appeal_service.student_rows(session, user),
+        appealable=appeal_service.appealable(session, user),
+    )

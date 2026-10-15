@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from backend.errors import NotFoundError
 from backend.models import (
     Appeal,
+    AppealFile,
     Assignment,
     AuditLog,
     Course,
@@ -59,6 +60,7 @@ class EvaluationView:
     target_courses: list[Course] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)  # 원 판정과 이의 신청 재판정, 오래된 순
     appeals: list[Appeal] = field(default_factory=list)
+    appeal_files: dict[int, list[AppealFile]] = field(default_factory=dict)  # 이의 신청 id -> 근거 자료
     material_requests: list[MaterialRequest] = field(default_factory=list)
     suggested_materials: list[str] = field(default_factory=list)
     target_text: str = ""  # 1순위 후보의 기준 강의계획서 원문 (근거 위치 이동, FR-25)
@@ -132,6 +134,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.target_courses = catalog_repo.courses_of(session, request.target_institution_id)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
     view.appeals = appeal_service.for_evaluation(session, evaluation.id)
+    view.appeal_files = appeal_service.files_for(session, [a.id for a in view.appeals])
     view.material_requests = material_service.for_syllabi(session, [syllabus.id])
     suggested = view.result.missing_materials if view.result else []
     view.suggested_materials = list(dict.fromkeys([*suggested, *material_service.STANDARD_ITEMS]))

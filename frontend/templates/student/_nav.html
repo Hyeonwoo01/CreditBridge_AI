@@ -1,3 +1,4 @@
 {% from "partials/macros.html" import nav_link with context %}
-{{ nav_link("/student", "내 편입 요청", unless="/student/appeals") }}
-{{ nav_link("/student/appeals", "이의 신청") }}
+{% set in_appeals = request.url.path.startswith("/student/appeals") or request.url.path.endswith("/appeal") %}
+{{ nav_link("/student", "내 편입 요청", current=false if in_appeals else none) }}
+{{ nav_link("/student/appeals", "이의 신청", current=in_appeals) }}
