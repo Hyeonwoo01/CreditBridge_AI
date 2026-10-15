@@ -56,6 +56,7 @@
 | 첫 기관·관리자 생성 | ✅ | `scripts/create_admin.py` → `services/institution_data.py::bootstrap_admin` (임시 비밀번호 한 번 출력) | `test_bootstrap_admin_starts_without_demo_data` |
 | 계정 CSV 가져오기 | ✅ | `institution_data.import_accounts` (역할·학과 검증, 이미 있는 이메일 건너뜀, 한 줄이라도 틀리면 저장 안 함, 임시 비밀번호 한 번만 표시·해시만 저장) | `test_account_import_gives_one_time_passwords_and_forces_change`, `test_account_import_rejects_bad_rows_without_saving` |
 | 첫 로그인 비밀번호 변경 | ✅ | `users.must_change_password`, `security/session.py::PasswordChangeRequired`, `/account/password`(`services/auth.py::change_password`, 10자 이상) | 같은 테스트 |
+| 비밀번호 재설정 | ✅ | 메일 링크: `/account/forgot`·`/account/reset`, `services/auth.py`(itsdangerous 서명 토큰 30분·비밀번호 지문으로 한 번만, 5분 재요청 제한, 계정 존재 여부 비공개), Celery `auth.password_reset_email`. 관리자 재발급: `/admin/data/password-reset`. 비밀번호가 바뀌면 다른 세션 종료(`security/session.py::password_fingerprint`) | `test_password_reset.py` 전체 |
 | 과목 CSV 가져오기 | ✅ | `institution_data.import_courses` (과목 코드 기준 생성·수정, 학과가 정한 필수 개념 `courses.concepts` → AI 비교 프롬프트에 사용) | `test_course_import_and_reference_upload_feed_ai_comparison` |
 | 과목별 기준 강의계획서 | ✅ | `institution_data.upload_reference` → Celery `reference.process`(스캔은 Claude 전사, 실패 시 이전 것 유지). 없으면 AI 비교 후보에서 빠짐 | 같은 테스트 |
 | 출신 대학 등록 | ✅ | `institution_data.add_source_institution` | `test_source_institution_registration` |
@@ -77,7 +78,7 @@
 | 관리자 콘솔 · 운영 통계 | `/admin/stats`, `/review/stats` | `stats.html` | FR-27·10·13·24 | `test_stats_page_counts_decisions_and_disagreement`, `test_admin_console_shows_recent_audit_without_student_names` |
 | 교수 판정 화면 | `/professor/evaluations/{id}` | `professor/evaluation.html` (사유 선택 창, 하단 판정 바) | FR-09·11·20·22·23 | `test_professor_decision_rules_and_portal`, `test_reason_dialog_reopens_on_validation_error` |
 | 판정 근거 리포트 | `/evaluations/{id}/report` | `report.html` | FR-10·23 | `test_consistency_alert_for_conflicting_past_decision` |
-| 계정·과목 관리 | `/admin/data`, `/account/password` | `admin/data.html`, `account/password.html` | 운영 데이터 준비 | `test_institution_data.py` 전체 |
+| 계정·과목 관리 | `/admin/data`, `/account/password`, `/account/forgot`, `/account/reset` | `admin/data.html`, `account/password.html`, `account/forgot.html`, `account/reset.html` | 운영 데이터 준비 | `test_institution_data.py` 전체 |
 | 학사정보 연동·감사 로그 | `/admin/sis`, `/admin/audit` | `admin/sis.html`, `admin/audit.html` | FR-24·10 | `test_sis_api_requires_admin_issued_token` |
 
 화면에 넣지 않은 것: 판정 확률(%), 실제 데이터가 없는 인증 배지·전주 대비 증감·해시 체인·상담 담당자 카드, 교수·관리자 화면의 학생 이름.

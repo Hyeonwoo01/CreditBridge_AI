@@ -47,6 +47,14 @@
 <p class="mt-4 rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">교수 계정이 없는 학과: <strong>{{ o.departments_without_professor | join(', ') }}</strong>. 이 학과 과목은 자동 배정되지 않아요. 계정 CSV에서 교수의 department를 과목의 학과명과 똑같이 적어 주세요.</p>
 {% endif %}
 
+{% if reset is defined %}
+<section class="mt-6 grid gap-2 rounded-lg border border-ink p-5" role="status" aria-label="임시 비밀번호 재발급">
+  <p class="font-semibold">{{ reset.email }} ({{ role_names.get(reset.role, reset.role) }}) 계정에 임시 비밀번호를 다시 발급했어요</p>
+  <p class="text-sm text-muted">지금 한 번만 보여드려요. 본인에게만 전달해 주세요. 이전 비밀번호와 로그인돼 있던 기기는 더 이상 쓸 수 없고, 다음 로그인 때 새 비밀번호로 바꿔야 해요.</p>
+  <code class="w-fit rounded-sm bg-parchment px-3 py-2 font-mono text-[17px]">{{ reset.temporary_password }}</code>
+</section>
+{% endif %}
+
 {% if created is defined %}
 <section class="mt-6 grid gap-4 rounded-lg border border-ink p-5" role="status" aria-label="새로 만든 계정">
   <div class="flex flex-wrap items-start justify-between gap-3">
@@ -139,6 +147,18 @@
       </tbody>
     </table>
   </div>
+</section>
+
+<section id="password-reset" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+  <div class="grid gap-2">
+    <h2 class="section-title">비밀번호 초기화</h2>
+    <p class="text-sm text-muted">비밀번호를 잊었는데 메일로 재설정할 수 없는 사용자에게 임시 비밀번호를 다시 발급해요. 사용자는 로그인 화면의 "비밀번호를 잊으셨나요?"에서 메일로 직접 재설정할 수도 있어요{% if not email_enabled %}(지금은 메일 발송이 설정되지 않아 이 방법만 쓸 수 있어요){% endif %}.</p>
+  </div>
+  <form method="post" action="/admin/data/password-reset" class="card grid gap-3" onsubmit="return confirm('이 계정의 지금 비밀번호를 무효로 하고 임시 비밀번호를 발급할까요?')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="field"><span>사용자 이메일</span><input class="input" type="email" name="email" required></label>
+    <button class="btn-secondary w-fit">임시 비밀번호 발급</button>
+  </form>
 </section>
 
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">

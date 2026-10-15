@@ -6,6 +6,8 @@
 
 import logging
 import smtplib
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import timedelta
 from email.message import EmailMessage
 
@@ -53,6 +55,35 @@ def email_enabled(settings: Settings | None = None) -> bool:
     return bool((settings or get_settings()).smtp_host)
 
 
+@contextmanager
+def _smtp(settings: Settings) -> Iterator[smtplib.SMTP]:
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+        if settings.smtp_starttls:
+            smtp.starttls()
+        if settings.smtp_user:
+            smtp.login(settings.smtp_user, settings.smtp_password)
+        yield smtp
+
+
+def send_email(to: str, subject: str, body: str, settings: Settings | None = None) -> bool:
+    """알림함에 남기지 않는 메일 한 통 (비밀번호 재설정 링크처럼 DB에 저장하면 안 되는 내용). 보냈으면 True."""
+    settings = settings or get_settings()
+    if not email_enabled(settings):
+        return False
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_from
+    msg["To"] = to
+    msg.set_content(body)
+    try:
+        with _smtp(settings) as smtp:
+            smtp.send_message(msg)
+    except (smtplib.SMTPException, OSError) as exc:
+        logger.warning("email failed", extra={"error": type(exc).__name__})
+        return False
+    return True
+
+
 def deliver_pending(session: Session, settings: Settings | None = None) -> int:
     """아직 메일로 보내지 않은 알림을 보낸다. SMTP 설정이 없으면 아무것도 하지 않는다."""
     settings = settings or get_settings()
@@ -63,11 +94,7 @@ def deliver_pending(session: Session, settings: Settings | None = None) -> int:
     if not pending:
         return 0
     sent = 0
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
-        if settings.smtp_starttls:
-            smtp.starttls()
-        if settings.smtp_user:
-            smtp.login(settings.smtp_user, settings.smtp_password)
+    with _smtp(settings) as smtp:
         for notification, user in pending:
             msg = EmailMessage()
             msg["Subject"] = "[CreditBridge] " + notification.message[:80]

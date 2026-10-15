@@ -1,8 +1,9 @@
 """audit_logs는 추가 전용 테이블: INSERT와 SELECT만 둔다."""
 
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.models import AuditLog
@@ -28,3 +29,8 @@ def for_target(session: Session, target_type: str, target_id: str) -> list[Audit
         .order_by(AuditLog.id)
     )
     return list(session.scalars(stmt))
+
+
+def last_at(session: Session, actor_id: int, action: str) -> datetime | None:
+    stmt = select(func.max(AuditLog.created_at)).where(AuditLog.actor_id == actor_id, AuditLog.action == action)
+    return session.scalar(stmt)

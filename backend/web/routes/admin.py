@@ -14,7 +14,8 @@ from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
-from backend.services import institution_data, views
+from backend.services import auth as auth_service
+from backend.services import institution_data, notifications, views
 from backend.services import privacy as privacy_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
@@ -105,6 +106,7 @@ def _data_page(request: Request, user: User, session: Session, status_code: int 
         o=institution_data.overview(session, user),
         account_columns=institution_data.ACCOUNT_COLUMNS,
         course_columns=institution_data.COURSE_COLUMNS,
+        email_enabled=notifications.email_enabled(),
         **context,
     )
 
@@ -217,3 +219,25 @@ def upload_reference(
         tasks.process_reference.delay(syllabus.id, course.id)
         flash(request, f"{course.code} 기준 강의계획서를 받았어요. 글자를 읽으면 AI 비교에 쓰여요.")
     return RedirectResponse("/admin/data#courses", status_code=303)
+
+
+@router.post("/data/password-reset")
+def reset_password(
+    request: Request,
+    email: str = Form(...),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """메일을 쓸 수 없는 사용자에게 임시 비밀번호를 다시 발급한다. 이 응답에서 한 번만 보여준다."""
+    check_csrf(request, csrf_token)
+    try:
+        target, password = auth_service.admin_reset_password(session, user, email)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse("/admin/data#password-reset", status_code=303)
+    reset = institution_data.CreatedAccount(target.email, target.name, target.role, password)
+    response = _data_page(request, user, session, reset=reset)
+    response.headers["Cache-Control"] = "no-store"
+    return response

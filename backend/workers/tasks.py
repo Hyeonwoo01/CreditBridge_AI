@@ -6,7 +6,7 @@ from backend.ai.llm_client import get_llm
 from backend.db.session import SessionLocal
 from backend.documents.storage import get_storage
 from backend.errors import LLMError
-from backend.services import analysis, institution_data, notifications
+from backend.services import analysis, auth, institution_data, notifications
 from backend.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -51,3 +51,10 @@ def deliver_notifications() -> None:
 def process_reference(syllabus_id: int, course_id: int) -> None:
     with SessionLocal() as session:
         institution_data.process_reference(session, syllabus_id, course_id, llm=get_llm(), storage=get_storage())
+
+
+@celery_app.task(name="auth.password_reset_email")
+def send_password_reset(user_id: int) -> None:
+    # 토큰은 작업 안에서 만든다: 작업 큐(Redis)에는 사용자 id만 지나간다
+    with SessionLocal() as session:
+        auth.send_reset_email(session, user_id)

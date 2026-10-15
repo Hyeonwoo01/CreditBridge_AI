@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}비밀번호 찾기 · CreditBridge AI{% endblock %}
+{% block content %}
+<div class="mx-auto grid max-w-[480px] gap-6">
+  <header class="grid gap-2">
+    <h1 class="page-title">비밀번호를 잊으셨나요?</h1>
+    {% if email_enabled %}
+    <p class="text-muted">가입한 이메일을 적으면 비밀번호를 다시 정할 수 있는 링크를 보내드려요. 링크는 30분 동안, 한 번만 쓸 수 있어요.</p>
+    {% else %}
+    <p class="text-muted">이 서비스는 메일 발송이 설정되어 있지 않아요. <strong class="text-ink">소속 기관 관리자</strong>에게 비밀번호 초기화를 요청해 주세요. 임시 비밀번호를 받아 로그인한 뒤 새 비밀번호로 바꾸면 돼요.</p>
+    {% endif %}
+  </header>
+  {% if sent %}
+  <p class="rounded-md border border-hairline bg-parchment px-4 py-3 text-sm" role="status">등록된 이메일이면 재설정 링크를 보냈어요. 몇 분 안에 메일이 오지 않으면 스팸함을 확인하거나 잠시 뒤 다시 요청해 주세요.</p>
+  {% endif %}
+  {% if email_enabled %}
+  <form method="post" action="/account/forgot" class="card grid gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="field"><span>이메일</span><input class="input" type="email" name="email" required autocomplete="username"></label>
+    <button class="btn-primary w-full">재설정 링크 받기</button>
+  </form>
+  {% endif %}
+  <p class="text-center text-sm"><a href="/login" class="btn-text">로그인으로 돌아가기</a></p>
+</div>
+{% endblock %}
