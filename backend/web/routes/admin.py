@@ -30,7 +30,7 @@ Admin = Depends(require(Role.ADMIN))
 
 @router.get("/audit")
 def audit_log(request: Request, user: User = Admin, session: Session = Depends(get_db)) -> Response:
-    return render(request, "admin/audit.html", user=user, logs=views.recent_audit(session))
+    return render(request, "admin/audit.html", user=user, logs=views.recent_audit(session, user))
 
 
 @router.get("/stats")

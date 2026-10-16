@@ -90,3 +90,27 @@ def test_deactivating_professor_hands_over_reviews(client: TestClient, seeded: S
     client.post("/review/assign", data={"evaluation_ids": [other.id], "csrf_token": token})
     seeded.expire_all()
     assert not seeded.scalars(select(Assignment).where(Assignment.course_evaluation_id == other.id)).all()
+
+
+def test_audit_log_page_shows_only_own_institution(client: TestClient, seeded: Session) -> None:
+    """여러 대학이 함께 쓰므로 전체 감사 로그도 관리자 소속 기관 사용자의 기록만 보여 준다."""
+    from backend.services import audit, views
+    from backend.services.institution_data import bootstrap_admin
+
+    bootstrap_admin(seeded, "Other State University", "US", "admin@osu.edu", "OSU 관리자")
+    osu = seeded.scalars(select(User).where(User.email == "admin@osu.edu")).one()
+    msu = seeded.scalars(select(User).where(User.email == "admin@msu.example")).one()
+    audit.record(seeded, osu, "institution.create", "institution", "999", country="KR")
+    seeded.commit()
+    login(client, "rachel@msu.example")  # MSU 기록 하나 (로그인)
+
+    mine = views.recent_audit(seeded, msu)
+    assert mine and all(log.actor_id is not None for log in mine)
+    actors = {u.id: u for u in seeded.scalars(select(User).where(User.id.in_({log.actor_id for log in mine})))}
+    assert all(a.institution_id == msu.institution_id for a in actors.values())
+    assert not any(log.actor_id == osu.id for log in mine)
+    assert {log.actor_id for log in views.recent_audit(seeded, osu)} == {osu.id}
+
+    login(client, msu.email)
+    page = client.get("/admin/audit").text
+    assert '"999"' not in page and "institution.create" not in page

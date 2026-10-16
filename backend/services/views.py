@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.errors import NotFoundError
+from backend.errors import NotFoundError, PermissionDeniedError
 from backend.models import (
     Appeal,
     AppealFile,
@@ -352,8 +352,11 @@ def colleagues(session: Session, professor: User) -> list[User]:
     ]
 
 
-def recent_audit(session: Session) -> list[AuditLog]:
-    return audit_repo.recent(session)
+def recent_audit(session: Session, admin: User) -> list[AuditLog]:
+    """전체 감사 로그 화면: 관리자 소속 기관 사용자의 기록만 (다른 기관 기록은 보이지 않는다)."""
+    if admin.role != Role.ADMIN or admin.institution_id is None:
+        raise PermissionDeniedError("기관 관리자만 볼 수 있어요.")
+    return audit_repo.recent_for_institution(session, admin.institution_id)
 
 
 def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:

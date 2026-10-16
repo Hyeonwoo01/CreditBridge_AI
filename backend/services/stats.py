@@ -241,14 +241,12 @@ def recent_audit(session: Session, user: User, limit: int = 8) -> list[AuditRow]
         raise PermissionDeniedError("기관 관리자만 볼 수 있어요.")
     out: list[AuditRow] = []
     actors: dict[int, User | None] = {}
-    for log in audit_repo.recent(session, limit=300):
-        if log.action == "auth.login":
-            continue
+    for log in audit_repo.recent_for_institution(
+        session, user.institution_id, limit=limit, exclude_actions=("auth.login",)
+    ):
         if log.actor_id is not None and log.actor_id not in actors:
             actors[log.actor_id] = user_repo.get_by_id(session, log.actor_id)
         actor = actors.get(log.actor_id) if log.actor_id is not None else None
-        if actor is None or actor.institution_id != user.institution_id:
-            continue
         label, tone = ACTION_LABELS.get(log.action, (log.action, "neutral"))
         payload = log.payload_json or {}
         out.append(
