@@ -4,7 +4,8 @@
 편입 학점 심사 자동화 SaaS. 강의계획서를 분석해 대상 대학 과목과의 매핑, 근거 구절, 인정 추천을 제공한다.
 AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한다.
 기준 문서: docs/spec.md(페르소나·테스트 명세·기술스택·기능 명세 통합본), docs/DESIGN.md(화면 디자인 시스템: 단일 Action Blue, 1px 헤어라인, 그림자 없음),
-docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개인정보 처리).
+docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개인정보 처리),
+docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문구).
 
 ## 고정 스택 (이 목록 밖의 라이브러리를 추가하지 말 것)
 - Python 3.12 / uv (pip install 금지, uv add 사용)
@@ -53,5 +54,6 @@ docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개�
 - uv run mypy backend
 - uv run pytest tests/unit tests/integration   (통합 테스트는 MariaDB 필요: TEST_DATABASE_URL)
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
+- 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
 - 템플릿에 새 Tailwind 클래스를 썼다면 scripts/build_css.sh로 frontend/static/css/app.css를 다시 빌드
 - 새 의존성이 필요하면 추가하지 말고 먼저 사람에게 물어볼 것

@@ -1,0 +1,78 @@
+# CreditBridge AI 화면 명세서
+
+편입 학점 심사 자동화 SaaS **CreditBridge AI**의 화면별 명세서입니다. 화면마다 **위치(URL·영역 배치), 컴포넌트, 디자인 토큰**을 적었습니다.
+
+- 디자인 기준: `docs/DESIGN.md` (Apple 갤러리형: 단일 Action Blue `#0066cc`, 1px 헤어라인, 그림자 없음)
+- 기능 기준: `docs/spec.md` 4장 기능 명세 (FR-01~FR-28)
+- 구현 위치: `frontend/templates/`(화면), `frontend/static/`(CSS·JS·이미지), 라우트는 `backend/web/routes/` (Jinja2 + HTMX + Tailwind 4)
+- 토큰 표기: `{colors.primary}`처럼 DESIGN.md 토큰을 쓰고, 괄호 안에 실제 Tailwind 클래스(`bg-primary`)를 함께 적었습니다.
+
+## 화면 목록
+
+| ID | 화면 | URL | 역할 | 주요 기능 | 파일 |
+| --- | --- | --- | --- | --- | --- |
+| P00 | 공통 레이아웃 | 모든 화면 | 전체 | 글로벌 내비게이션, 기관 보조 바·집계 칩, 알림, Human-in-the-Loop 푸터, 화면 폭 | [00-common-layout.md](pages/00-common-layout.md) |
+| P01 | 로그인 | `/login` | 비로그인 | 역할별 홈으로 이동, 비밀번호 찾기 링크, 실패 5회 1분 잠금·10회 비밀번호 초기화 | [01-login.md](pages/01-login.md) |
+| P02 | 학생 홈(대시보드) | `/student` | 학생 | 편입 요청 만들기, 할 일, 요청별 예상 인정 학점·서류 준비율 | [02-student-home.md](pages/02-student-home.md) |
+| P03 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | FR-01·02·15·21 다크 히어로 예상치, 과목 필터, 정보 부족 진단, 심사 진행 단계 | [03-student-request.md](pages/03-student-request.md) |
+| P04 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | 학생 | FR-05~08 추천·근거, FR-22 보완 제출, FR-23 이의 신청 작성(P22)으로 이동 | [04-student-evaluation.md](pages/04-student-evaluation.md) |
+| P05 | 심사 큐 | `/review` | 심사관 | FR-17 검색·신뢰도·일관성 경보·학과 필터, FR-18 일괄 배정, 커버리지 링, 경보 행 | [05-review-queue.md](pages/05-review-queue.md) |
+| P06 | 심사 건 상세(심사관) | `/review/evaluations/{id}` | 심사관 | 근거 확인, 보완 자료 요청, 처리 기록 | [06-review-evaluation.md](pages/06-review-evaluation.md) |
+| P07 | 이의 신청 처리 | `/review/appeals` | 심사관 | FR-23 받아들임·기각, 학생 근거 자료 내려받기 | [07-review-appeals.md](pages/07-review-appeals.md) |
+| P08 | 문서 삭제 요청 | `/review/privacy`, `/admin/privacy` | 심사관·관리자 | FR-13 처리·승인, 기한 관리 | [08-privacy-requests.md](pages/08-privacy-requests.md) |
+| P09 | 기존 동등 과목표 | `/review/equivalencies` | 심사관 | FR-26 CSV 가져오기 | [09-review-equivalencies.md](pages/09-review-equivalencies.md) |
+| P10 | 관리자 콘솔 · 운영 통계 | `/admin/stats`, `/review/stats` | 관리자·심사관 | FR-27 수용률·학과별 지표, 오늘 기한 알림 대상, 최근 감사 로그, 보존·파기 정책 | [10-stats.md](pages/10-stats.md) |
+| P11 | 배정된 심사(교수 홈) | `/professor` | 교수 | 배정 목록, FR-19 부재 설정 | [11-professor-home.md](pages/11-professor-home.md) |
+| P12 | 판정 화면(교수) | `/professor/evaluations/{id}` | 교수 | FR-09 판정·불인정 사유 선택 창, FR-11 일관성 경보, FR-20 모바일 승인 | [12-professor-evaluation.md](pages/12-professor-evaluation.md) |
+| P13 | 판정 근거 리포트 | `/evaluations/{id}/report` | 학생·심사관·교수 | FR-10·23 감사용 리포트, 역할별 돌아가기 | [13-report.md](pages/13-report.md) |
+| P14 | 알림 | `/notifications` | 전체 | FR-19·20 알림함, 매일 기한 알림 | [14-notifications.md](pages/14-notifications.md) |
+| P15 | 학사정보 연동 | `/admin/sis` | 관리자 | FR-24 토큰 발급·폐기 | [15-admin-sis.md](pages/15-admin-sis.md) |
+| P16 | 감사 로그 | `/admin/audit` | 관리자 | FR-10 추가 전용 기록(소속 기관만, 근거 자료 열람 포함) | [16-admin-audit.md](pages/16-admin-audit.md) |
+| P17 | 오류 | 모든 화면 | 전체 | 403·404·400 안내 | [17-error.md](pages/17-error.md) |
+| P18 | 계정·과목 관리 | `/admin/data` | 관리자 | 단계 순서(①~④) 배치, 과목·계정 CSV, 기준 강의계획서, 출신 대학, 비밀번호 초기화(메일 링크 자동/메일 없으면 임시 비밀번호), 계정 비활성화·다시 활성화 | [18-admin-data.md](pages/18-admin-data.md) |
+| P19 | 비밀번호 변경 | `/account/password` | 전체 | 첫 로그인 강제 변경 포함 | [19-account-password.md](pages/19-account-password.md) |
+| P20 | 비밀번호 찾기·재설정 | `/account/forgot`, `/account/reset` | 비로그인 | 메일 링크(30분·한 번만), 메일 미설정 시 관리자 안내 | [20-account-reset.md](pages/20-account-reset.md) |
+| P21 | 이의 신청(학생) | `/student/appeals` | 학생 | FR-23 이의 신청할 수 있는 과목, 본인 이의 신청 처리 상황·재판정 결과·기각 사유·근거 자료 | [21-student-appeals.md](pages/21-student-appeals.md) |
+| P22 | 이의 신청 작성(학생) | `/student/evaluations/{id}/appeal` | 학생 | FR-23 원 판정 요약·근거가 약한 개념, 사유(20~3000자), 근거 자료 PDF·JPG·PNG 최대 3개 | [22-student-appeal-form.md](pages/22-student-appeal-form.md) |
+| P23 | 선배 인정 사례(학생) | `/student/precedents` | 학생 | FR-26 기관 동등 과목표 검색(다른 학생의 판정은 보이지 않음) | [23-student-precedents.md](pages/23-student-precedents.md) |
+
+## 역할별 흐름
+
+```
+학생    P01 → P02 대시보드(할 일) → P03 리포트 ──(과목 카드·보완 서류 제출하기)──→ P04 ──(보완 자료 제출 / 이의 신청 작성 → P22 → P21에서 처리 상황 확인)
+        P21 "이의 신청할 수 있는 과목" → P22 → P21,  메뉴 "인정 사례" → P23
+심사관  P01 → P05 ──(원문 대조 확인 / 충돌 내역 확인 / 보완 요청 발송)──→ P06,  P05에서 일괄 배정
+        P07 이의 신청 · P08 삭제 요청 · P09 동등 과목표 · P10 운영 통계
+교수    P01 → P11 → P12 ──(판정 확정 → 반려·변경·경보면 사유 선택 창)──→ 학생 P03·P04에 반영
+관리자  P01 → P10 관리자 콘솔 → P18 계정·과목 · P08 삭제 승인 · P15 연동 토큰 · P16 전체 감사 로그
+새 계정  메일 O: 설정 링크 메일 → P20 → P01 / 메일 X: P01(임시 비밀번호) → P19 → 역할 홈
+잊었을 때 P01 → P20 메일 링크 → 새 비밀번호 → P01   (메일 미설정: 관리자가 P18에서 재발급 → P19)
+실패 잠금 P01 5번 틀림 → 1분 잠금 → 다시 5번 틀림(누적 10번) → 비밀번호 초기화 + 재설정 메일 자동 → P20 → P01
+```
+
+## 공통 원칙 (DESIGN.md 요약)
+
+- 클릭할 수 있는 요소(버튼·링크·포커스·선택 칩)는 `{colors.primary}` 하나만 쓴다. 판정 의미 색은 배지·게이지·하이라이트에만 쓴다.
+- 카드·버튼·배지에 그림자를 넣지 않는다. 영역 구분은 흰 카드 + `1px {colors.hairline}`으로 한다.
+- 본문 17px(행간 1.47), 굵기는 300·400·600만 쓴다(500 금지). 숫자에는 `tabular-nums`를 쓴다.
+- AI 추천은 항상 "추천이며 확정이 아님"을 함께 보여 주고, 최종 판정 버튼은 교수 화면에만 있다.
+- 화면 폭은 기본 1280px, 정보가 빽빽한 심사 큐(P05)와 원문 대조 화면(P06·P12)만 1440px.
+- 목록 필터 칩은 선택 시 잉크(검정) 채움, 판정 칩은 파란 2px 테두리로 구분한다.
+- 실제 데이터가 없는 장식(인증 배지, 전주 대비 증감, 판정 확률 %, 해시 체인, 상담 담당자 카드)은 넣지 않는다. 교수·관리자 화면에 학생 이름을 보여 주지 않는다.
+- 비밀번호·재설정 링크처럼 한 번만 보여 주는 값은 화면을 캐시하지 않고(`no-store`) 서버에 원문을 남기지 않는다.
+
+## 변경 이력
+
+| 날짜 | 내용 |
+| --- | --- |
+| 2026-10-16 | P10 "기한 알림" 카드(오늘 자동 발송 대상 5칸, 관리자·심사관), P14 기한 알림 종류, P18 계정 비활성화 폼·계정 수에서 비활성 제외, P01 비활성 계정 로그인 상태, P16 소속 기관 기록만 표시·근거 자료 열람 기록, P10 감사 로그 배지(계정 비활성화·다시 활성화·근거 자료 열람) |
+| 2026-10-15 | 모든 화면의 상단 메뉴 스케치를 역할별 메뉴 + 숫자 배지로 통일(P04·P06·P07·P08·P09·P10·P13·P14·P15·P16·P17·P18·P19), P00 역할별 메뉴 표에 숫자 배지 열 추가 |
+| 2026-10-15 | P00 교직원 메뉴 숫자 배지(심사관: 교수 배정·이의 신청·삭제 요청, 교수: 판정할 심사, 관리자: 준비 항목·삭제 승인), P05·P07·P08·P10·P11·P12·P15·P18 메뉴 스케치 갱신 |
+| 2026-10-15 | P00 학생 메뉴 배지를 숫자만(색으로 구분)으로 변경, "이의 신청"에 신청할 수 있는 과목 수(중립) 추가, 학생 화면 메뉴 스케치 갱신 |
+| 2026-10-15 | P02 학생 홈 대시보드(할 일·요약 수치·서류 준비율), P00 학생 메뉴 배지·"인정 사례" 메뉴, P23 선배 인정 사례(기관 동등 과목표만) 추가 |
+| 2026-10-15 | P22 학생 이의 신청 작성 화면(원 판정 요약·근거 자료 최대 3개) 추가, P21 "이의 신청할 수 있는 과목"·근거 자료, P04 작성 버튼, P07 근거 자료 |
+| 2026-10-15 | P21 학생 이의 신청 목록 추가, P13 리포트 역할별 돌아가기·메뉴, P00 학생 메뉴, P04 갱신 |
+| 2026-10-15 | P18 단계 번호 순서 배치·바로가기, 메일이 있으면 새 계정·관리자 초기화를 72시간 설정 링크로 자동 발송(P18·P20) |
+| 2026-10-15 | 로그인 실패 잠금 반영: P01 상태(5회 1분 잠금, 10회 비밀번호 초기화), P18 초기화된 계정 수, P20 자동 재설정 메일, P00·P10 갱신 |
+| 2026-10-15 | 폴더 분리(backend/·frontend/) 경로 반영, P18 계정·과목 관리, P19 비밀번호 변경, P20 비밀번호 찾기·재설정 추가, P00·P01·P10·P15 갱신 |
+| 2026-10-14 | 화면 목업 반영: P00 기관 보조 바·푸터·화면 폭, P03 시뮬레이션 리포트, P05 심사 대기열, P06 확장 폭, P10 관리자 콘솔, P12 사유 선택 창 (DESIGN.md 1.1.0) |

@@ -9,7 +9,7 @@
 
 심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청(근거 자료 첨부)과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`).
 
-기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
+기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
 
 ## AI가 판정을 추천하는 방식
 
