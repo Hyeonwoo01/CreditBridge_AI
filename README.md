@@ -82,6 +82,7 @@ uv run python -m scripts.create_bucket
 uv run python -m scripts.seed_demo        # 데모 카탈로그·계정
 uv run fastapi dev backend/main.py        # http://localhost:8000
 uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 터미널 (Windows는 --pool=solo 추가)
+uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 터미널: 매일 기한 알림 (하나만 띄움)
 ```
 
 데모 계정 (비밀번호 모두 `demo1234`, 로컬 전용)
@@ -179,6 +180,7 @@ tests/           unit · integration(MariaDB) · eval(골든셋)
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.
+- 기한 알림은 `beat` 서비스(개발 환경은 `celery beat`)가 매일 `REMINDER_HOUR_UTC`시(기본 13시 UTC = 미국 동부 오전 9시)에 보내요. 판정 기한이 지났거나 하루 남은 심사(교수·심사관), 교수 배정이 밀린 과목(심사관), 처리 기한이 다가온 삭제 요청(심사관·관리자), 답이 없는 보완 자료 요청(학생)을 알려요. beat는 반드시 하나만 띄우세요(여러 개면 알림이 겹쳐 쌓여요). 오늘 대상 건수는 운영 통계의 "기한 알림" 카드에서 볼 수 있어요.
 - 알림 메일과 비밀번호 재설정 메일을 보내려면 `SMTP_HOST` 등과 `APP_BASE_URL`(메일 속 링크 주소)을 설정하세요. 비워 두면 화면 알림만 쓰고, 비밀번호는 관리자가 초기화합니다.
 - `SESSION_SECRET`은 길고 무작위인 값으로 정하고 바꾸지 마세요. 바꾸면 모든 로그인과 아직 쓰지 않은 재설정 링크가 무효가 됩니다.
 - 웹 서버 접근 로그는 쿼리 문자열을 지우고 경로만 남깁니다(심사 대기열 검색어에 학생 이름이 들어갈 수 있음). 앞에 리버스 프록시를 둘 때도 접근 로그에서 쿼리 문자열을 빼세요.

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
 from backend.db.session import get_db
 from backend.errors import CreditBridgeError
 from backend.models import User
@@ -221,4 +222,11 @@ def import_equivalencies(
 
 @router.get("/stats")
 def stats(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
-    return render(request, "stats.html", user=user, s=stats_service.institution_stats(session, user))
+    return render(
+        request,
+        "stats.html",
+        user=user,
+        s=stats_service.institution_stats(session, user),
+        reminders=views.reminder_preview(session, user),
+        reminder_hour=get_settings().reminder_hour_utc,
+    )

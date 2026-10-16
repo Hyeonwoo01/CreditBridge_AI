@@ -57,6 +57,28 @@
   {% endfor %}
 </section>
 
+{% if reminders is defined %}
+<section class="mt-10 card grid gap-4 p-5" aria-labelledby="reminder-title">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="reminder-title" class="font-semibold">기한 알림</h2>
+    <span class="text-xs text-muted">매일 {{ '%02d' % reminder_hour }}:00 (UTC) 자동 발송 · 같은 알림은 하루 한 번</span>
+  </div>
+  {% if reminders.empty %}
+  <p class="text-sm text-muted">오늘은 기한 알림을 받을 일이 없어요.</p>
+  {% else %}
+  <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    {% for label, value, who in [('판정 기한 지난 심사', reminders.overdue_total, '담당 교수·심사관'), ('내일 판정 기한', reminders.due_soon.values() | sum, '담당 교수'), ('교수 배정 대기', reminders.unassigned, '심사관'), ('삭제 요청 기한 임박', reminders.privacy_review | length + reminders.privacy_approve | length, '심사관·관리자'), ('보완 자료 미제출', reminders.materials_total, '학생')] %}
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3">
+      <dt class="text-xs text-muted">{{ label }}</dt>
+      <dd class="text-[22px] leading-tight font-semibold tabular-nums {{ 'text-elective' if value else '' }}">{{ value }}</dd>
+      <dd class="text-xs text-muted">→ {{ who }}</dd>
+    </div>
+    {% endfor %}
+  </dl>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="mt-10 grid gap-4" aria-label="학과별 심사 처리 지표">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 class="section-title">학과별 심사 처리 지표</h2>

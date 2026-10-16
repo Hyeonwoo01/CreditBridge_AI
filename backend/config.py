@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     review_sla_days: int = 5
     # 개인정보 삭제 요청 처리 기한 (FR-13)
     privacy_deletion_days: int = 30
+    # 기한 알림 (매일 한 번, Celery beat): 보내는 시각(UTC, 0~23)과 기준 일수
+    reminder_hour_utc: int = 13
+    reminder_privacy_days: int = 3  # 삭제 요청 처리 기한이 이만큼 남으면
+    reminder_material_days: int = 3  # 보완 자료 요청에 이만큼 답이 없으면
+    reminder_unassigned_days: int = 2  # 교수 배정 없이 이만큼 지나면
 
     # 알림 메일 (비우면 화면 알림만). 메일 본문에는 개인정보를 넣지 않는다
     smtp_host: str = ""

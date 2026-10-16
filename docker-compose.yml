@@ -59,6 +59,18 @@ services:
     depends_on: [db, redis, minio]
     restart: on-failure
 
+  # 기한 알림을 매일 정해진 시각(REMINDER_HOUR_UTC)에 작업 큐에 넣는다. 반드시 하나만 띄운다
+  beat:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql+pymysql://creditbridge:change-me@db:3306/creditbridge?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+    command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "beat", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
+    depends_on: [redis]
+    restart: on-failure
+
 volumes:
   db-data:
   minio-data:

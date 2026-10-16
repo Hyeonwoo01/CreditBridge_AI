@@ -60,3 +60,12 @@ def pending_email(session: Session, since: datetime, limit: int = 100) -> list[t
         .limit(limit)
     )
     return [(n, u) for n, u in session.execute(stmt)]
+
+
+def sent_since(session: Session, user_id: int, kind: str, since: datetime) -> bool:
+    stmt = (
+        select(func.count())
+        .select_from(Notification)
+        .where(Notification.user_id == user_id, Notification.kind == kind, Notification.created_at >= since)
+    )
+    return bool(session.scalar(stmt))

@@ -410,7 +410,7 @@ CreditBridge AI는 Python 3.12와 MariaDB 11.8 LTS를 기반으로, 계층마다
 | 마이그레이션 | Alembic | 1.x | 모든 스키마 변경 | 수기 DDL, 운영 환경 create\_all |
 | 데이터베이스 | MariaDB | 11.8 LTS | 업무 데이터, 판정 이력(벡터 검색은 파일럿 이후) | MySQL 서버, PostgreSQL, 별도 벡터 DB(Pinecone, Chroma 등) |
 | 캐시·메시지 브로커 | Redis | 7.x | Celery 브로커, 단기 캐시 | RabbitMQ |
-| 백그라운드 작업 | Celery | 5.x | 문서 추출, 후보 과목 비교·판정 추천, 기준 강의계획서 처리, 알림·비밀번호 재설정 메일 | FastAPI BackgroundTasks(긴 작업), RQ, 스레드 직접 생성 |
+| 백그라운드 작업 | Celery (+ beat 스케줄러) | 5.x | 문서 추출, 후보 과목 비교·판정 추천, 기준 강의계획서 처리, 알림·비밀번호 재설정 메일, 매일 기한 알림 | FastAPI BackgroundTasks(긴 작업), RQ, 스레드 직접 생성 |
 | LLM | Anthropic Claude API, 공식 anthropic Python SDK | SDK 최신 안정판 고정 | 구조화 추출, 후보 과목 비교·판정 추론, 스캔본 전사 | LangChain, LlamaIndex, 모델 ID 하드코딩 |
 | 임베딩 | MVP 미사용 (파일럿에서 sentence-transformers + BAAI/bge-m3 도입) | 파일럿 도입 시 1024차원 고정 | MVP는 학과로 후보 과목 20~30개를 거른 뒤 Claude가 직접 비교 | MVP 단계의 임베딩 모델·벡터 DB 도입 |
 | PDF 처리 | PyMuPDF | 1.x | 텍스트 레이어 추출, 페이지 이미지 변환 | PyPDF2, pdfminer, Tesseract |
@@ -510,7 +510,7 @@ creditbridge/
 │   ├── schemas/            # Pydantic 스키마 (LLM 출력 검증 포함)
 │   ├── repositories/       # DB 접근, SQL은 여기만
 │   ├── services/           # 업무 로직: analysis · scoring · student · review · decisions · materials
-│   │                       #   appeals · privacy · notifications · sis · equivalencies · precedents · stats
+│   │                       #   appeals · privacy · notifications · reminders(기한 알림) · sis · equivalencies · precedents · stats
 │   │                       #   auth · institution_data · csv_import · audit · views(화면 조회)
 │   ├── ai/
 │   │   ├── llm_client.py   # Anthropic SDK 호출 단일 진입점
@@ -639,8 +639,9 @@ uv run alembic upgrade head
 # 5. 개발 서버
 uv run fastapi dev backend/main.py
 
-# 6. 워커 (별도 터미널)
+# 6. 워커와 기한 알림 스케줄러 (각각 별도 터미널, beat는 하나만)
 uv run celery -A backend.workers.celery_app worker --loglevel=info
+uv run celery -A backend.workers.celery_app beat --loglevel=info
 
 # 7. 문서 버킷과 데모 데이터 (데모는 로컬 전용) / 운영 첫 관리자
 uv run python -m scripts.create_bucket
@@ -678,6 +679,11 @@ CLAUDE_SERVER_FALLBACK=true
 SESSION_SECRET=change-me
 # 개인정보 삭제 요청 처리 기한(일)
 PRIVACY_DELETION_DAYS=30
+# 기한 알림: 매일 보내는 시각(UTC 0~23, 13 = 미국 동부 오전 9시)과 기준 일수
+REMINDER_HOUR_UTC=13
+REMINDER_PRIVACY_DAYS=3
+REMINDER_MATERIAL_DAYS=3
+REMINDER_UNASSIGNED_DAYS=2
 # 알림 메일 (비우면 화면 알림만)
 SMTP_HOST=
 SMTP_PORT=587

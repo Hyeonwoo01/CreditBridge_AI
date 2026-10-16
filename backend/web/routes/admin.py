@@ -43,6 +43,8 @@ def stats(request: Request, user: User = Admin, session: Session = Depends(get_d
         s=stats_service.institution_stats(session, user),
         audit_rows=stats_service.recent_audit(session, user),
         retention_days=get_settings().privacy_deletion_days,
+        reminders=views.reminder_preview(session, user),
+        reminder_hour=get_settings().reminder_hour_utc,
     )
 
 

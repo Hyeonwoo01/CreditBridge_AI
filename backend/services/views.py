@@ -39,6 +39,7 @@ from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
 from backend.services import notifications as notification_service
 from backend.services import privacy as privacy_service
+from backend.services import reminders as reminder_service
 from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import student as student_service
@@ -350,6 +351,13 @@ def colleagues(session: Session, professor: User) -> list[User]:
         for p in user_repo.professors_in(session, professor.institution_id or 0, professor.department or "")
         if p.id != professor.id
     ]
+
+
+def reminder_preview(session: Session, user: User) -> reminder_service.Plan:
+    """운영 통계 화면의 '기한 알림' 카드: 오늘 기한 알림을 받을 대상 (심사관·관리자)."""
+    if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
+        raise PermissionDeniedError("심사관과 기관 관리자만 볼 수 있어요.")
+    return reminder_service.plan(session, user.institution_id)
 
 
 def recent_audit(session: Session, admin: User) -> list[AuditLog]:
