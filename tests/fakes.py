@@ -199,6 +199,7 @@ class FakeLLM:
                         source_quotes=quotes,
                         target_quotes=[ref_sentence] if ref_sentence else [],
                         reason="테스트 판단",
+                        reason_en="Test judgment",
                     )
                 )
             avg = sum(c.coverage for c in concepts) / max(len(concepts), 1)
@@ -212,8 +213,10 @@ class FakeLLM:
                             course_code=header["course_code"],
                             level=level,
                             level_note="",
+                            level_note_en="",
                             concepts=concepts,
                             summary="요약",
+                            summary_en="Summary",
                         ),
                     )
                 )
@@ -224,8 +227,12 @@ class FakeLLM:
         return EvaluationOutput(
             candidates=chosen,
             no_match_reason="" if chosen else "대응 과목이 없어요.",
+            no_match_reason_en="" if chosen else "No equivalent course.",
             elective_eligible=True,
-            missing_materials=["주차별 상세 강의 계획"] if thin else [],
+            missing_materials=["주차별 상세 강의 계획", "고유값 단원 강의 노트"] if thin else [],
+            missing_materials_en=["Detailed weekly course plan", "Lecture notes for the eigenvalue unit"]
+            if thin
+            else [],
         )
 
     @staticmethod

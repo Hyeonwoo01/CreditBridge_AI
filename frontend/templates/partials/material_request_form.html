@@ -6,7 +6,7 @@
     <fieldset class="flex flex-wrap gap-2">
       <legend class="mb-1 text-sm text-muted">{{ _("필요한 자료 (분석이 제안한 자료가 먼저 나와요)") }}</legend>
       {% for item in v.suggested_materials %}
-      <label class="chip cursor-pointer"><input class="sr-only" type="checkbox" name="items" value="{{ item }}" {% if v.result and item in v.result.missing_materials %}checked{% endif %}>{{ item | t }}</label>
+      <label class="chip cursor-pointer"><input class="sr-only" type="checkbox" name="items" value="{{ item }}" {% if v.result and item in v.result.missing_materials %}checked{% endif %}>{{ item | ai_item(v.result) }}</label>
       {% endfor %}
     </fieldset>
     <label class="field"><span>{{ _("학생에게 전할 메모 (선택)") }}</span><textarea class="textarea" name="note" rows="2" maxlength="1000" placeholder="{{ _('예: 9~12주차에 다룬 고유값 단원의 강의 자료') }}"></textarea></label>

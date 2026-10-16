@@ -76,6 +76,48 @@ def highlight(text: str, marks: list[tuple[int, int]], prefix: str) -> Markup:
     return Markup("".join(out))
 
 
+def ai_text(obj: Any, field: str, fallback: str = "") -> str:
+    """AI가 쓴 설명을 화면 언어로: 영어 화면이면 field_en(있을 때), 아니면 한국어 field.
+    evaluation-v1 결과처럼 영어가 없으면 한국어를 그대로 보여 준다."""
+    if obj is None:
+        return fallback
+    value = getattr(obj, field, "") or fallback
+    if get_locale() != "ko":
+        english = getattr(obj, f"{field}_en", "")
+        if english:
+            return str(english)
+    return str(value)
+
+
+def ai_list(obj: Any, field: str) -> list[str]:
+    """AI가 쓴 목록(보완 자료 등)을 화면 언어로. 영어 목록이 없으면 한국어(고정 항목은 | t로 번역)."""
+    items: list[str] = list(getattr(obj, field, []) or [])
+    english: list[str] = list(getattr(obj, f"{field}_en", []) or [])
+    if get_locale() != "ko" and english and len(english) == len(items):
+        return english
+    return [translate_stored(i) for i in items]
+
+
+def ai_item(item: str, obj: Any, field: str = "missing_materials") -> str:
+    """AI가 제안한 항목 하나(보완 자료 요청에 저장된 값 등)를 화면 언어로: 같은 분석의 영어 목록에서 짝을 찾는다."""
+    if get_locale() != "ko" and obj is not None:
+        items: list[str] = list(getattr(obj, field, []) or [])
+        english: list[str] = list(getattr(obj, f"{field}_en", []) or [])
+        if item in items and len(english) == len(items):
+            return english[items.index(item)]
+    return translate_stored(item)
+
+
+def ai_warnings(result: Any) -> list[str]:
+    """분석 경고: AI가 쓴 경고는 영어 사본, 고정 문구는 번역 목록으로."""
+    english: list[str] = list(getattr(result, "warnings_en", []) or [])
+    out = []
+    for i, warning in enumerate(getattr(result, "warnings", []) or []):
+        en = english[i] if i < len(english) else ""
+        out.append(en if get_locale() != "ko" and en else translate_stored(warning))
+    return out
+
+
 def pct(value: float | None) -> str:
     return "–" if value is None else f"{round(value * 100)}%"
 
@@ -110,6 +152,10 @@ TEMPLATES.env.filters.update(
     appeal_status=lambda v: _label(APPEAL_LABEL, v),
     privacy_status=lambda v: _label(PRIVACY_LABEL, v),
     t=lambda v: translate_stored(v) if isinstance(v, str) else v,  # DB에 한국어로 저장된 글 번역
+    ai=ai_text,
+    ai_list=ai_list,
+    ai_warnings=ai_warnings,
+    ai_item=ai_item,
 )
 TEMPLATES.env.globals.update(
     reason_labels=REASON_LABELS,

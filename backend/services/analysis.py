@@ -326,6 +326,8 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
                     level=judgment.level,
                     level_note=judgment.level_note,
                     summary=judgment.summary,
+                    level_note_en=judgment.level_note_en,
+                    summary_en=judgment.summary_en,
                     coverage=score.coverage,
                     concepts=concepts,
                 ),
@@ -333,14 +335,18 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         )
     scored.sort(key=lambda pair: pair[0].adjusted, reverse=True)
 
-    warnings = []
+    warnings: list[str] = []
+    warnings_en: list[str] = []  # AI가 쓴 경고만 영어를 함께 둔다. 고정 문구는 ""(화면에서 번역)
+    summary_en = ""
     if scored:
         best_score, best = scored[0]
         if best.level == "lower":
             warnings.append(
                 best.level_note or N_("{code}보다 낮은 수준의 과목으로 판단돼요.").format(code=best.course_code)
             )
+            warnings_en.append(best.level_note_en if best.level_note else "")
         if student.credits is not None and student.credits < best.credits:
+            warnings_en.append("")
             warnings.append(
                 N_(
                     "전적 과목 {credits}학점이 {code}의 {target}학점보다 적어요. 학점 차이만큼 부분 인정될 수 있어요."
@@ -355,6 +361,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         evaluation.coverage = round(best_score.coverage, 3)
         evaluation.level_flag = best.level
         evaluation.summary = best.summary
+        summary_en = best.summary_en
         missing_concepts = best_score.missing_concepts
     else:
         if sparse:
@@ -364,9 +371,11 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
             evaluation.recommendation = Recommendation.ELECTIVE if output.elective_eligible else Recommendation.NONE
             evaluation.confidence = "medium"
         evaluation.summary = output.no_match_reason
+        summary_en = output.no_match_reason_en
         missing_concepts = []
     if student.injection_flags:
         warnings.append(N_("판정을 유도하는 의심 문구가 있어 해당 줄을 분석에서 제외했어요."))
+        warnings_en.append("")
 
     missing_materials = output.missing_materials or (
         DEFAULT_MISSING_MATERIALS if evaluation.recommendation == Recommendation.INSUFFICIENT else []
@@ -379,6 +388,13 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         warnings=warnings,
         no_match_reason=output.no_match_reason,
         injection_flags=student.injection_flags or [],
+        summary_en=summary_en,
+        no_match_reason_en=output.no_match_reason_en,
+        # 영어 목록은 한국어와 개수가 같을 때만 쓴다 (기본 목록일 때는 화면에서 번역)
+        missing_materials_en=output.missing_materials_en
+        if output.missing_materials and len(output.missing_materials_en) == len(output.missing_materials)
+        else [],
+        warnings_en=warnings_en,
     ).model_dump()
     evaluation.model = result.model
     evaluation.status = EvaluationStatus.DONE

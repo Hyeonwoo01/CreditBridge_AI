@@ -27,7 +27,7 @@
 
 <h2>{{ _("AI 추천") }}</h2>
 <p>{{ _("{recommendation} · 커버리지 {coverage} · 신뢰도 {confidence} · 후보 {x} · 모델 {model} · {prompt_version}", recommendation=(ev.recommendation | rec), coverage=(ev.coverage | pct), confidence=(ev.confidence | conf), x=((v.candidate.code ~ ' ' ~ v.candidate.title) if v.candidate else _('없음')), model=(ev.model or '–'), prompt_version=(ev.prompt_version or '')) }}</p>
-{% if ev.summary %}<p class="muted">{{ ev.summary }}</p>{% endif %}
+{% if ev.summary %}<p class="muted">{{ v.result | ai('summary', ev.summary) }}</p>{% endif %}
 
 {% if v.primary %}
 <h2>{{ _("개념별 근거 (원문 검증 완료 구절)") }}</h2>

@@ -101,6 +101,7 @@ def concept_results(
                 status=j.status,
                 coverage=j.coverage / 100,
                 reason=j.reason,
+                reason_en=j.reason_en,
                 verified=bool(src),
                 source_evidence=[
                     EvidenceView(side="source", text=student_text[s.start : s.end], char_start=s.start, char_end=s.end)

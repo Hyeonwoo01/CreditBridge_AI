@@ -40,3 +40,37 @@ def test_stored_korean_text_is_translated_for_display() -> None:
             "The AI analysis"
         )
         assert translate_stored("학생이 직접 쓴 글") == "학생이 직접 쓴 글"
+
+
+def test_ai_text_falls_back_to_korean_for_older_results() -> None:
+    from backend.schemas.results import ConceptResult, EvaluationResult
+    from backend.web.templating import ai_list, ai_text, ai_warnings
+
+    old = ConceptResult(
+        concept="Limits",
+        status="taught",
+        coverage=0.9,
+        reason="극한을 다뤄요",
+        verified=True,
+        source_evidence=[],
+        target_evidence=[],
+    )
+    new = old.model_copy(update={"reason_en": "Limits are covered"})
+    result = EvaluationResult(
+        candidates=[],
+        missing_fields=[],
+        missing_concepts=[],
+        missing_materials=["주차별 상세 강의 계획", "AI가 제안한 자료"],
+        warnings=["AI가 쓴 경고", "판정을 유도하는 의심 문구가 있어 해당 줄을 분석에서 제외했어요."],
+        no_match_reason="",
+        injection_flags=[],
+        warnings_en=["AI warning", ""],
+    )
+    assert ai_text(new, "reason") == "극한을 다뤄요"
+    with use_locale("en"):
+        assert ai_text(new, "reason") == "Limits are covered"
+        assert ai_text(old, "reason") == "극한을 다뤄요"  # evaluation-v1 결과는 한국어 그대로
+        assert ai_text(None, "summary", "요약") == "요약"
+        assert ai_list(result, "missing_materials") == ["Detailed weekly course plan", "AI가 제안한 자료"]
+        warnings = ai_warnings(result)
+        assert warnings[0] == "AI warning" and warnings[1].startswith("Suspicious wording")

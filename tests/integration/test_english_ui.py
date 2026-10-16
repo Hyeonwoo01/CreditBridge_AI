@@ -134,3 +134,30 @@ def test_notification_email_uses_recipient_language(seeded: Session, monkeypatch
         subjects["rachel@msu.example"] == "[CreditBridge] Deadline reminder: 2 courses waiting for a faculty assignment"
     )
     assert subjects["dkim@msu.example"] == "[CreditBridge] 기한 알림: 교수 배정을 기다리는 과목 2개"
+
+
+def test_ai_explanations_follow_screen_language(client: TestClient, seeded: Session) -> None:
+    """AI 근거 설명은 한국어(학생용)와 영어(교직원용) 두 벌로 저장하고 화면 언어에 맞춰 보여 준다."""
+    ev, _, token = professor_for(client, seeded, "linear_algebra_sparse.txt")
+    seeded.expire_all()
+    stored = seeded.get(type(ev), ev.id)
+    assert stored is not None and stored.prompt_version == "evaluation-v2"
+    result = stored.coverage_json or {}
+    assert result["candidates"][0]["concepts"][0]["reason_en"] == "Test judgment"
+    assert result["missing_materials_en"] == ["Detailed weekly course plan", "Lecture notes for the eigenvalue unit"]
+
+    page = client.get(f"/professor/evaluations/{ev.id}").text  # 교수 계정은 아직 한국어
+    assert "테스트 판단" in page and "고유값 단원 강의 노트" in page and "Test judgment" not in page
+    switch(client, "en", f"/professor/evaluations/{ev.id}")
+    page = client.get(f"/professor/evaluations/{ev.id}").text
+    assert "Test judgment" in page and "테스트 판단" not in page
+    assert "Lecture notes for the eigenvalue unit" in page  # 보완 자료 제안·요청 항목도 영어로
+
+    token = csrf_of(client, f"/professor/evaluations/{ev.id}")
+    client.post(
+        f"/professor/evaluations/{ev.id}/materials",
+        data={"items": ["고유값 단원 강의 노트"], "note": "", "csrf_token": token},
+    )
+    login(client, "jiwon@student.example")  # 학생 화면(한국어)에는 한국어 설명과 요청 항목
+    page = client.get(f"/student/evaluations/{ev.id}").text
+    assert "테스트 판단" in page and "고유값 단원 강의 노트" in page and "Test judgment" not in page

@@ -189,5 +189,5 @@ tests/           unit · integration(MariaDB) · eval(골든셋)
 - 웹 서버 접근 로그는 쿼리 문자열을 지우고 경로만 남깁니다(심사 대기열 검색어에 학생 이름이 들어갈 수 있음). 앞에 리버스 프록시를 둘 때도 접근 로그에서 쿼리 문자열을 빼세요.
 - 관리자 콘솔의 "데이터 보존 및 파기 정책" 카드는 [docs/privacy.md](docs/privacy.md)를 요약한 것입니다. 삭제 처리 기한은 `PRIVACY_DELETION_DAYS`(기본 30일)로 바꿉니다.
 - 일관성 경보의 유사도 기준(`SIMILARITY_MIN = 0.80`)은 첫 측정 후 확정하는 임시값입니다.
-- 화면 문구를 추가·수정하면 `backend/locales/en.json`에 영어를 함께 넣고 `uv run python -m scripts.i18n_check`로 빠진 번역이 없는지 확인하세요. AI가 쓰는 근거 설명은 프롬프트가 한국어로 정해 두어 영어 화면에서도 한국어로 나와요.
+- 화면 문구를 추가·수정하면 `backend/locales/en.json`에 영어를 함께 넣고 `uv run python -m scripts.i18n_check`로 빠진 번역이 없는지 확인하세요. AI 근거 설명은 한 번의 분석으로 한국어(학생용)와 영어(교직원용)를 함께 받아 화면 언어에 맞춰 보여 줘요(프롬프트 `evaluation-v2`). 그 전에 분석한 결과는 다시 분석하기 전까지 한국어로만 보여요.
 - 0007 마이그레이션 이전에 올린 강의계획서에는 원본 쪽 번호가 없어요. `uv run python -m scripts.backfill_page_offsets`를 한 번 돌리면 텍스트 PDF는 채워져요(LLM 호출 없음). 스캔본은 다시 올리면 채워져요. 새 테이블 `evaluation_notes`의 앱 계정 권한(SELECT·INSERT·DELETE)도 [docs/db-grants.sql](docs/db-grants.sql)대로 부여하세요.
