@@ -9,6 +9,8 @@
 
 심사 중에 필요한 일도 앱 안에서 처리합니다: 심사관·교수의 보완 자료 요청과 학생 제출, 학생 이의 신청(근거 자료 첨부)과 재판정, 기한이 있는 문서 삭제 요청, 화면·메일 알림, 기존 동등 과목표(CSV) 가져오기, 확정 판정 CSV·API 내보내기(`GET /api/sis/decisions`), 판정 근거 리포트 PDF 내려받기(`/evaluations/{id}/report.pdf`).
 
+화면은 **한국어·영어**로 볼 수 있어요. 상단 메뉴의 언어 버튼("English" / "한국어")으로 바꾸면 그 계정의 알림·메일도 같은 언어로 가요. 처음 들어올 때는 브라우저 언어를 따릅니다.
+
 기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
 
 ## AI가 판정을 추천하는 방식
@@ -167,7 +169,7 @@ frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘) · samples/(CSV 예시)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (MySQL 8.0 호환 문법만)
-scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · demo_data/
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · demo_data/
 tests/           unit · integration(MariaDB) · eval(골든셋)
 ```
 
@@ -187,4 +189,5 @@ tests/           unit · integration(MariaDB) · eval(골든셋)
 - 웹 서버 접근 로그는 쿼리 문자열을 지우고 경로만 남깁니다(심사 대기열 검색어에 학생 이름이 들어갈 수 있음). 앞에 리버스 프록시를 둘 때도 접근 로그에서 쿼리 문자열을 빼세요.
 - 관리자 콘솔의 "데이터 보존 및 파기 정책" 카드는 [docs/privacy.md](docs/privacy.md)를 요약한 것입니다. 삭제 처리 기한은 `PRIVACY_DELETION_DAYS`(기본 30일)로 바꿉니다.
 - 일관성 경보의 유사도 기준(`SIMILARITY_MIN = 0.80`)은 첫 측정 후 확정하는 임시값입니다.
+- 화면 문구를 추가·수정하면 `backend/locales/en.json`에 영어를 함께 넣고 `uv run python -m scripts.i18n_check`로 빠진 번역이 없는지 확인하세요. AI가 쓰는 근거 설명은 프롬프트가 한국어로 정해 두어 영어 화면에서도 한국어로 나와요.
 - 0007 마이그레이션 이전에 올린 강의계획서에는 원본 쪽 번호가 없어요. `uv run python -m scripts.backfill_page_offsets`를 한 번 돌리면 텍스트 PDF는 채워져요(LLM 호출 없음). 스캔본은 다시 올리면 채워져요. 새 테이블 `evaluation_notes`의 앱 계정 권한(SELECT·INSERT·DELETE)도 [docs/db-grants.sql](docs/db-grants.sql)대로 부여하세요.

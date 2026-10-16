@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import Settings, get_settings
 from backend.db.base import utcnow
+from backend.i18n import translate_stored, use_locale
 from backend.models import Notification, User
 from backend.models.enums import Role
 from backend.repositories import notifications as notification_repo
@@ -111,12 +112,15 @@ def deliver_pending(session: Session, settings: Settings | None = None) -> int:
     sent = 0
     with _smtp(settings) as smtp:
         for notification, user in pending:
+            # 알림은 한국어 원문으로 저장돼 있다: 받는 사람의 언어로 바꿔 보낸다
+            with use_locale(user.locale):
+                text = translate_stored(notification.message)
             msg = EmailMessage()
-            msg["Subject"] = "[CreditBridge] " + notification.message[:80]
+            msg["Subject"] = "[CreditBridge] " + text[:80]
             msg["From"] = settings.smtp_from
             msg["To"] = user.email
             link = f"\n\n{settings.app_base_url.rstrip('/')}{notification.link}" if notification.link else ""
-            msg.set_content(notification.message + link)
+            msg.set_content(text + link)
             try:
                 smtp.send_message(msg)
             except smtplib.SMTPException as exc:

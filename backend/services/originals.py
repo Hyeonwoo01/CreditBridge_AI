@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.documents.text import CONTENT_TYPES, extension
 from backend.errors import NotFoundError
+from backend.i18n import gettext as tr
 from backend.models import CourseEvaluation, Syllabus, User
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
@@ -40,11 +41,11 @@ def _syllabus_for(session: Session, evaluation: CourseEvaluation, side: str) -> 
 def open_original(session: Session, user: User, evaluation_id: int, side: str) -> OriginalFile:
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None or side not in SIDES:
-        raise NotFoundError("원본 파일을 찾을 수 없어요.")
+        raise NotFoundError(tr("원본 파일을 찾을 수 없어요."))
     ensure_can_view_evaluation(session, user, evaluation)
     syllabus = _syllabus_for(session, evaluation, side)
     if syllabus is None or not syllabus.source_file_key:
-        raise NotFoundError("원본 파일이 없어요. 개인정보 삭제 요청으로 지워졌거나 텍스트로만 등록된 문서예요.")
+        raise NotFoundError(tr("원본 파일이 없어요. 개인정보 삭제 요청으로 지워졌거나 텍스트로만 등록된 문서예요."))
     ext = extension(syllabus.original_filename) or extension(syllabus.source_file_key)
     if side == "source":
         audit.record(session, user, "syllabus.original_view", "syllabus", str(syllabus.id), evaluation=evaluation.id)

@@ -11,6 +11,8 @@ from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError, UploadRejectedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import (
     Appeal,
     CourseEvaluation,
@@ -43,9 +45,9 @@ class UploadedFile:
 def get_own_request(session: Session, student: User, request_id: int) -> TransferRequest:
     request = request_repo.get(session, request_id)
     if request is None:
-        raise NotFoundError("편입 요청을 찾을 수 없어요.")
+        raise NotFoundError(tr("편입 요청을 찾을 수 없어요."))
     if request.student_id != student.id:
-        raise PermissionDeniedError("본인의 편입 요청만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("본인의 편입 요청만 볼 수 있어요."))
     return request
 
 
@@ -53,12 +55,12 @@ def create_request(session: Session, student: User, source_institution_id: int, 
     """MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다. 대상 대학은 학생의 소속 대학으로 정해진다."""
     target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
     if target is None or not target.is_target:
-        raise CreditBridgeError("입학이 확정된 대학에 소속된 학생 계정만 편입 요청을 만들 수 있어요.")
+        raise CreditBridgeError(tr("입학이 확정된 대학에 소속된 학생 계정만 편입 요청을 만들 수 있어요."))
     source = catalog_repo.get_institution(session, source_institution_id)
     if source is None or source.is_target:
-        raise CreditBridgeError("다니던 대학을 다시 선택해 주세요.")
+        raise CreditBridgeError(tr("다니던 대학을 다시 선택해 주세요."))
     if major not in catalog_repo.departments_of(session, target.id):
-        raise CreditBridgeError("편입 전공을 다시 선택해 주세요.")
+        raise CreditBridgeError(tr("편입 전공을 다시 선택해 주세요."))
     request = request_repo.add(
         session,
         TransferRequest(
@@ -82,9 +84,14 @@ def add_syllabi(
     """파일을 검증해 객체 스토리지에 저장하고 강의계획서 행을 만든다. 분석 작업 등록은 호출자가 한다."""
     settings = get_settings()
     if request.status != RequestStatus.DRAFT:
-        raise CreditBridgeError("심사에 제출한 요청에는 과목을 추가할 수 없어요.")
+        raise CreditBridgeError(tr("심사에 제출한 요청에는 과목을 추가할 수 없어요."))
     if syllabus_repo.count_of_request(session, request.id) + len(files) > settings.max_syllabi_per_request:
-        raise UploadRejectedError(f"강의계획서는 요청당 최대 {settings.max_syllabi_per_request}건까지 올릴 수 있어요.")
+        raise UploadRejectedError(
+            tr(
+                "강의계획서는 요청당 최대 {max_syllabi_per_request}건까지 올릴 수 있어요.",
+                max_syllabi_per_request=settings.max_syllabi_per_request,
+            )
+        )
     validated = [(f, doc_text.validate_upload(f.filename, f.data, settings.max_upload_mb)) for f in files]
     created: list[Syllabus] = []
     duplicates: list[Syllabus] = []
@@ -133,11 +140,11 @@ def confirm_link(
 ) -> TranscriptEntry:
     entry = request_repo.get_entry(session, entry_id)
     if entry is None or entry.transfer_request_id != request.id:
-        raise NotFoundError("성적표 항목을 찾을 수 없어요.")
+        raise NotFoundError(tr("성적표 항목을 찾을 수 없어요."))
     if syllabus_id:
         syllabus = syllabus_repo.get(session, syllabus_id)
         if syllabus is None or syllabus.transfer_request_id != request.id:
-            raise NotFoundError("강의계획서를 찾을 수 없어요.")
+            raise NotFoundError(tr("강의계획서를 찾을 수 없어요."))
         entry.syllabus_id = syllabus.id
     else:
         entry.syllabus_id = None
@@ -155,18 +162,20 @@ def store_supplement(
     제출 전에는 언제든, 제출 뒤에는 심사관·교수의 보완 자료 요청이 열려 있을 때만 올릴 수 있다.
     """
     if syllabus.owner_id != student.id:
-        raise PermissionDeniedError("본인의 강의계획서만 보완할 수 있어요.")
+        raise PermissionDeniedError(tr("본인의 강의계획서만 보완할 수 있어요."))
     if syllabus.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING, SyllabusStatus.DELETED):
-        raise CreditBridgeError("분석이 끝난 강의계획서에만 보완 자료를 올릴 수 있어요.")
+        raise CreditBridgeError(tr("분석이 끝난 강의계획서에만 보완 자료를 올릴 수 있어요."))
     request = request_repo.get(session, syllabus.transfer_request_id) if syllabus.transfer_request_id else None
     if request is None:
-        raise NotFoundError("편입 요청을 찾을 수 없어요.")
+        raise NotFoundError(tr("편입 요청을 찾을 수 없어요."))
     latest = evaluation_repo.latest_for_syllabus(session, syllabus.id)
     if latest is not None and decision_repo.for_evaluation(session, latest.id) is not None:
-        raise CreditBridgeError("판정이 끝난 과목이에요. 결과에 이의가 있으면 이의 신청을 해 주세요.")
+        raise CreditBridgeError(tr("판정이 끝난 과목이에요. 결과에 이의가 있으면 이의 신청을 해 주세요."))
     open_requests = materials.open_for_syllabus(session, syllabus.id)
     if request.status != RequestStatus.DRAFT and not open_requests:
-        raise CreditBridgeError("심사 중인 과목은 학사처나 교수의 보완 자료 요청이 있을 때만 자료를 올릴 수 있어요.")
+        raise CreditBridgeError(
+            tr("심사 중인 과목은 학사처나 교수의 보완 자료 요청이 있을 때만 자료를 올릴 수 있어요.")
+        )
     ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
     key = storage.new_key("supplements", file.filename)
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
@@ -187,12 +196,12 @@ def store_supplement(
 
 def submit_request(session: Session, student: User, request: TransferRequest) -> None:
     if request.status != RequestStatus.DRAFT:
-        raise CreditBridgeError("이미 제출한 요청이에요.")
+        raise CreditBridgeError(tr("이미 제출한 요청이에요."))
     syllabi = syllabus_repo.of_request(session, request.id)
     if not syllabi:
-        raise CreditBridgeError("강의계획서를 한 건 이상 올려 주세요.")
+        raise CreditBridgeError(tr("강의계획서를 한 건 이상 올려 주세요."))
     if any(s.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING) for s in syllabi):
-        raise CreditBridgeError("분석이 끝난 뒤에 제출할 수 있어요.")
+        raise CreditBridgeError(tr("분석이 끝난 뒤에 제출할 수 있어요."))
     request.status = RequestStatus.SUBMITTED
     request.submitted_at = utcnow()
     audit.record(session, student, "request.submit", "transfer_request", str(request.id), courses=len(syllabi))
@@ -201,7 +210,7 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
 
 # ---------- 진행 상황 포털 (FR-21) ----------
 
-STAGES = ["접수", "AI 분석", "교수 검토", "확정"]
+STAGES = [N_("접수"), N_("AI 분석"), N_("교수 검토"), N_("확정")]
 
 
 @dataclass(frozen=True)
@@ -348,7 +357,7 @@ def simulate(
 
 def ensure_student(user: User) -> None:
     if user.role != Role.STUDENT:
-        raise PermissionDeniedError("학생 계정으로 로그인해 주세요.")
+        raise PermissionDeniedError(tr("학생 계정으로 로그인해 주세요."))
 
 
 # ---------- 대시보드: 할 일과 서류 준비율 ----------
@@ -388,7 +397,7 @@ def readiness(session: Session, request: TransferRequest) -> Readiness:
     for s in syllabi:
         if s.id in asked:
             course = (s.course_code or s.course_title or s.original_filename).strip()
-            todos.append(Todo("missing", f"{course} 보완 자료 제출", f"/student/syllabi/{s.id}"))
+            todos.append(Todo("missing", tr("{course} 보완 자료 제출", course=course), f"/student/syllabi/{s.id}"))
     done = total = 0
     if request.status == RequestStatus.DRAFT:
         entries = request_repo.transcript_entries(session, request.id)
@@ -396,7 +405,7 @@ def readiness(session: Session, request: TransferRequest) -> Readiness:
         if request.transcript_file_key:
             done += 1
         else:
-            todos.append(Todo("missing", "성적표 올리기", f"{base}#transcript"))
+            todos.append(Todo("missing", tr("성적표 올리기"), f"{base}#transcript"))
         if entries:
             # 강의계획서 없이 확인한 과목(인정 신청하지 않는 과목)은 준비된 것으로 본다
             unlinked = sum(1 for e in entries if e.syllabus_id is None and not e.link_confirmed)
@@ -404,19 +413,25 @@ def readiness(session: Session, request: TransferRequest) -> Readiness:
             total += len(entries)
             done += len(entries) - unlinked - unconfirmed
             if unlinked:
-                todos.append(Todo("missing", f"강의계획서 미등록 {unlinked}건", f"{base}#upload"))
+                todos.append(Todo("missing", tr("강의계획서 미등록 {unlinked}건", unlinked=unlinked), f"{base}#upload"))
             if unconfirmed:
-                todos.append(Todo("missing", f"성적표 과목 연결 확인 {unconfirmed}건", f"{base}#transcript"))
+                todos.append(
+                    Todo(
+                        "missing",
+                        tr("성적표 과목 연결 확인 {unconfirmed}건", unconfirmed=unconfirmed),
+                        f"{base}#transcript",
+                    )
+                )
         else:
             total += 1
             if syllabi:
                 done += 1
             else:
-                todos.append(Todo("missing", "강의계획서 올리기", f"{base}#upload"))
+                todos.append(Todo("missing", tr("강의계획서 올리기"), f"{base}#upload"))
         failed = sum(1 for s in syllabi if s.status == SyllabusStatus.FAILED)
         if failed:
-            todos.append(Todo("missing", f"분석하지 못한 강의계획서 {failed}건 다시 올리기", base))
+            todos.append(Todo("missing", tr("분석하지 못한 강의계획서 {failed}건 다시 올리기", failed=failed), base))
         busy = any(s.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING) for s in syllabi)
         if syllabi and not busy and not any(t.kind == "missing" for t in todos):
-            todos.append(Todo("action", "학사처에 심사 요청하기", f"{base}#submit"))
+            todos.append(Todo("action", tr("학사처에 심사 요청하기"), f"{base}#submit"))
     return Readiness(request, done, total, todos)

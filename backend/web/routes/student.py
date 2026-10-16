@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from backend.db.session import get_db
 from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
@@ -83,10 +84,10 @@ def upload_syllabi(
         for s in result.created:
             tasks.process_syllabus.delay(s.id)
         if result.created:
-            flash(request, f"강의계획서 {len(result.created)}건을 받았어요. AI 분석이 끝나면 결과가 표시돼요.")
+            flash(request, tr("강의계획서 {n}건을 받았어요. AI 분석이 끝나면 결과가 표시돼요.", n=len(result.created)))
         if result.duplicates:
             names = ", ".join(s.original_filename for s in result.duplicates)
-            flash(request, f"이미 올린 문서라 저장된 분석 결과를 그대로 보여드려요: {names}")
+            flash(request, tr("이미 올린 문서라 저장된 분석 결과를 그대로 보여드려요: {names}", names=names))
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
 
 
@@ -104,13 +105,13 @@ def upload_transcript(
     uploaded = _read([file])
     try:
         if not uploaded:
-            raise CreditBridgeError("성적표 파일을 선택해 주세요.")
+            raise CreditBridgeError(tr("성적표 파일을 선택해 주세요."))
         student_service.set_transcript(session, get_storage(), user, transfer, uploaded[0])
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
     else:
         tasks.process_transcript.delay(transfer.id)
-        flash(request, "성적표를 받았어요. 과목과 강의계획서를 자동으로 연결할게요.")
+        flash(request, tr("성적표를 받았어요. 과목과 강의계획서를 자동으로 연결할게요."))
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
 
 
@@ -142,7 +143,7 @@ def submit(
     transfer = student_service.get_own_request(session, user, request_id)
     try:
         student_service.submit_request(session, user, transfer)
-        flash(request, "학사처에 심사를 요청했어요. 진행 상황은 이 화면에서 확인할 수 있어요.")
+        flash(request, tr("학사처에 심사를 요청했어요. 진행 상황은 이 화면에서 확인할 수 있어요."))
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
@@ -165,7 +166,7 @@ def request_deletion(
         flash(request, str(exc), "error")
     else:
         send_emails()
-        flash(request, f"문서 삭제 요청을 접수했어요. {privacy.due_at:%Y-%m-%d}까지 처리돼요.")
+        flash(request, tr("문서 삭제 요청을 접수했어요. {due_at}까지 처리돼요.", due_at=f"{privacy.due_at:%Y-%m-%d}"))
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
 
 
@@ -175,7 +176,7 @@ def syllabus_result(
 ) -> Response:
     evaluation_id = views.latest_evaluation_id(session, user, syllabus_id)
     if evaluation_id is None:
-        flash(request, "아직 분석 중이에요. 잠시 후 다시 확인해 주세요.")
+        flash(request, tr("아직 분석 중이에요. 잠시 후 다시 확인해 주세요."))
         return RedirectResponse(request.headers.get("referer") or "/student", status_code=303)
     return RedirectResponse(f"/student/evaluations/{evaluation_id}", status_code=303)
 
@@ -203,14 +204,14 @@ def supplement(
     uploaded = _read([file])
     try:
         if not uploaded:
-            raise CreditBridgeError("보완 자료 파일을 선택해 주세요.")
+            raise CreditBridgeError(tr("보완 자료 파일을 선택해 주세요."))
         key = student_service.store_supplement(session, get_storage(), user, syllabus, uploaded[0])
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
         return RedirectResponse(request.headers.get("referer") or "/student", status_code=303)
     tasks.add_supplement.delay(syllabus.id, key)
     send_emails()
-    flash(request, "보완 자료를 받았어요. 다시 분석한 뒤 결과를 갱신할게요. 이전 결과는 기록으로 남아요.")
+    flash(request, tr("보완 자료를 받았어요. 다시 분석한 뒤 결과를 갱신할게요. 이전 결과는 기록으로 남아요."))
     return RedirectResponse(f"/student/requests/{views.request_id_of(session, syllabus)}", status_code=303)
 
 
@@ -260,7 +261,7 @@ def appeal(
             reason=reason,
         )
     send_emails()
-    flash(request, "이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요.")
+    flash(request, tr("이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요."))
     return RedirectResponse("/student/appeals", status_code=303)
 
 

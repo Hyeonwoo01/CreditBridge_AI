@@ -465,7 +465,7 @@ DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법�
 | 테이블 | 용도 | 핵심 컬럼 |
 | --- | --- | --- |
 | institutions | 출신 대학과 대상 대학 | name, country, is\_target, tuition\_per\_credit, degree\_credits, sis\_token\_hash |
-| users | 학생, 심사관, 교수, 관리자 | email(UNIQUE), password\_hash, role, institution\_id, department, delegate\_user\_id, away\_until, must\_change\_password, failed\_logins, locked\_until, is\_active, deactivated\_at |
+| users | 학생, 심사관, 교수, 관리자 | email(UNIQUE), password\_hash, role, institution\_id, department, delegate\_user\_id, away\_until, must\_change\_password, failed\_logins, locked\_until, is\_active, deactivated\_at, locale(화면·알림·메일 언어 ko/en) |
 | courses | 대상 대학 카탈로그 과목 | institution\_id, code, title, credits, department, level, concepts, reference\_syllabus\_id |
 | syllabi | 업로드된 강의계획서와 추출 결과 | transfer\_request\_id, owner\_id, source\_file\_key, content\_hash(요청 안에서 UNIQUE), raw\_text, page\_offsets(원본 PDF 페이지 위치표, FR-25), extracted\_json, quality\_score, injection\_flags, status |
 | syllabus\_chunks | 주차·개념 단위로 나눈 텍스트 | syllabus\_id, week\_no, concept, text, char\_start, char\_end |
@@ -497,10 +497,12 @@ creditbridge/
 ├── docker-compose.yml
 ├── .env.example
 ├── alembic/
-│   └── versions/           # 0001 초기 스키마 … 0006 계정 비활성화 · 0007 원본 PDF 페이지·내부 메모
+│   └── versions/           # 0001 초기 스키마 … 0006 계정 비활성화 · 0007 원본 PDF 페이지·내부 메모 · 0008 사용자 언어
 ├── backend/                # 백엔드 (Python 패키지, import backend.*)
 │   ├── main.py             # FastAPI 앱 생성, 라우터 등록, /static 마운트
 │   ├── config.py           # pydantic-settings, 환경변수는 여기서만 읽음
+│   ├── i18n.py             # 화면 언어(한국어·영어): 언어 고르기, gettext, 저장된 한국어 글 번역
+│   ├── locales/en.json     # 영어 번역 (한국어 원문이 열쇠)
 │   ├── errors.py           # 사용자 정의 예외
 │   ├── logging_setup.py    # JSON 로그, 접근 로그 쿼리 문자열 제거
 │   ├── db/
@@ -539,7 +541,7 @@ creditbridge/
 │   ├── unit/
 │   ├── integration/        # MariaDB 필요 (TEST_DATABASE_URL)
 │   └── eval/               # 골든셋 AI 품질 평가
-└── scripts/                # start.sh · build_css.sh · create_admin · seed_demo · create_bucket · backfill_page_offsets · demo_data/
+└── scripts/                # start.sh · build_css.sh · create_admin · seed_demo · create_bucket · backfill_page_offsets · i18n_check · demo_data/
 ```
 
 **코딩 규칙**
@@ -591,6 +593,7 @@ docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문�
 - 폴더: 백엔드(Python)는 backend/(import도 backend.*), 프론트엔드(화면 파일)는 frontend/ — 템플릿 frontend/templates, CSS·JS·이미지 frontend/static, Tailwind 입력 frontend/tailwind/input.css. 둘은 한 앱으로 함께 실행된다
 - 화면 디자인은 docs/DESIGN.md를 따른다. 화면 폭은 기본 1280px, 심사 큐·원문 대조 화면만 1440px(frontend/templates/base.html의 {% block width %})
 - 의존 방향: web -> services -> repositories -> models (web은 repositories를 직접 부르지 않고 services/views.py를 쓴다)
+- 화면 문구는 한국어 원문 + 영어 번역(backend/i18n.py, backend/locales/en.json). 템플릿은 {{ _("…") }}, 파이썬은 tr("…")(backend.i18n.gettext). DB에 저장하는 글(알림·분석 경고·오류)은 번역하지 않고 N_("…")로 표시한 한국어로 저장하고, 화면에서 | t 필터로 바꾼다. 자리표시자는 {이름}
 - SQL은 backend/repositories에만 작성
 - LLM 호출은 backend/ai/llm_client.py를 통해서만
 - 프롬프트는 backend/ai/prompts/*.md 파일로 관리 (첫 줄 `<!-- version: ... -->`, 바꾸면 버전을 올린다)
@@ -619,6 +622,7 @@ docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문�
 - uv run pytest tests/unit tests/integration   (통합 테스트는 MariaDB 필요: TEST_DATABASE_URL)
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
 - 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
+- 화면 문구를 추가·수정했다면 backend/locales/en.json에 영어를 넣고 uv run python -m scripts.i18n_check 통과 (테스트 tests/unit/test_i18n.py도 같은 검사)
 - 템플릿에 새 Tailwind 클래스를 썼다면 scripts/build_css.sh로 frontend/static/css/app.css를 다시 빌드
 - 새 의존성이 필요하면 추가하지 말고 먼저 사람에게 물어볼 것
 ```

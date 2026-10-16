@@ -10,6 +10,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from backend.errors import CreditBridgeError, PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import Equivalency, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
@@ -41,35 +42,35 @@ def course_key(label: str) -> str:
 
 def import_csv(session: Session, evaluator: User, filename: str, data: bytes) -> ImportResult:
     if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
-        raise PermissionDeniedError("심사관 계정만 동등 과목표를 가져올 수 있어요.")
+        raise PermissionDeniedError(tr("심사관 계정만 동등 과목표를 가져올 수 있어요."))
     result = ImportResult()
     rows: list[Equivalency] = []
     for line_no, row in csv_import.read_rows(filename, data, COLUMNS, COLUMNS[:4], MAX_ROWS):
         problems = []
         source = catalog_repo.source_institution_by_name(session, row.get("source_institution", ""))
         if source is None:
-            problems.append("등록되지 않은 출신 대학")
+            problems.append(tr("등록되지 않은 출신 대학"))
         label = row.get("source_course", "")
         if not label:
-            problems.append("출신 과목 없음")
+            problems.append(tr("출신 과목 없음"))
         verdict = RESULTS.get(row.get("result", "").lower()) or RESULTS.get(row.get("result", ""))
         if verdict is None:
-            problems.append("판정은 direct·elective·none 중 하나")
+            problems.append(tr("판정은 direct·elective·none 중 하나"))
         target = None
         if row.get("target_course"):
             target = catalog_repo.course_by_code(session, evaluator.institution_id, row["target_course"])
             if target is None:
-                problems.append(f"카탈로그에 없는 대상 과목({row['target_course']})")
+                problems.append(tr("카탈로그에 없는 대상 과목({target_course})", target_course=row["target_course"]))
         elif verdict == "direct":
-            problems.append("직접 인정은 대상 과목이 필요")
+            problems.append(tr("직접 인정은 대상 과목이 필요"))
         decided_on = None
         if row.get("decided_on"):
             try:
                 decided_on = date.fromisoformat(row["decided_on"])
             except ValueError:
-                problems.append("판정일은 YYYY-MM-DD")
+                problems.append(tr("판정일은 YYYY-MM-DD"))
         if problems or source is None or verdict is None:
-            result.errors.append(f"{line_no}행: {', '.join(problems)}")
+            result.errors.append(tr("{line_no}행: {problems}", line_no=line_no, problems=", ".join(problems)))
             continue
         rows.append(
             Equivalency(
@@ -87,7 +88,7 @@ def import_csv(session: Session, evaluator: User, filename: str, data: bytes) ->
     if result.errors:
         return result
     if not rows:
-        raise CreditBridgeError("가져올 행이 없어요.")
+        raise CreditBridgeError(tr("가져올 행이 없어요."))
     equivalency_repo.add_many(session, rows)
     audit.record(session, evaluator, "equivalency.import", "institution", str(evaluator.institution_id), rows=len(rows))
     session.commit()
@@ -97,5 +98,5 @@ def import_csv(session: Session, evaluator: User, filename: str, data: bytes) ->
 
 def recent(session: Session, evaluator: User) -> list[Equivalency]:
     if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
-        raise PermissionDeniedError("심사관 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
     return equivalency_repo.of_institution(session, evaluator.institution_id)

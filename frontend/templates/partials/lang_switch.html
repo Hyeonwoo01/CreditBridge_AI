@@ -1,0 +1,11 @@
+{# 화면 언어 전환 (한국어 ↔ English). 로그인했으면 계정 언어(알림·메일)도 함께 바뀐다. dark: 검정 헤더용 #}
+{% set other = 'en' if current_locale() == 'ko' else 'ko' %}
+<form method="post" action="/lang" class="{{ lang_form_class | default('') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="lang" value="{{ other }}">
+  <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+  <button class="flex h-11 items-center gap-1 text-xs tracking-[-0.12px] text-white/70 hover:text-white" lang="{{ other }}" title="{{ _('화면 언어 바꾸기') }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+    {{ locale_labels[other] }}
+  </button>
+</form>

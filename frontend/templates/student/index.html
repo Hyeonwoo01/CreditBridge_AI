@@ -3,43 +3,43 @@
 {% block nav %}{% include "student/_nav.html" %}{% endblock %}
 {% block content %}
 <header class="grid gap-2">
-  <h1 class="page-title">내 편입 요청</h1>
-  <p class="text-muted">강의계획서를 올리면 수강 신청 전에 과목별 예상 인정 결과와 근거를 볼 수 있어요.</p>
+  <h1 class="page-title">{{ _("내 편입 요청") }}</h1>
+  <p class="text-muted">{{ _("강의계획서를 올리면 수강 신청 전에 과목별 예상 인정 결과와 근거를 볼 수 있어요.") }}</p>
 </header>
 
 {% if home.target %}
 <form method="post" action="/student/requests" class="mt-6 flex flex-col gap-3 rounded-lg border border-hairline bg-white p-4 md:flex-row md:items-center md:rounded-full md:py-2 md:pr-2 md:pl-7">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label class="grid flex-1 gap-0.5 px-3 md:px-0">
-    <span class="text-xs font-semibold">다니던 대학</span>
+    <span class="text-xs font-semibold">{{ _("다니던 대학") }}</span>
     <select name="source_institution_id" class="bg-transparent text-sm text-ink-80 focus:outline-none" required>
       {% for i in home.sources %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
     </select>
   </label>
   <span class="hidden h-8 w-px bg-hairline md:block"></span>
   <div class="grid flex-1 gap-0.5 px-3 md:px-0">
-    <span class="text-xs font-semibold">편입 대학</span>
+    <span class="text-xs font-semibold">{{ _("편입 대학") }}</span>
     <span class="text-sm text-ink-80">{{ home.target.name }}</span>
   </div>
   <span class="hidden h-8 w-px bg-hairline md:block"></span>
   <label class="grid flex-1 gap-0.5 px-3 md:px-0">
-    <span class="text-xs font-semibold">전공</span>
+    <span class="text-xs font-semibold">{{ _("전공") }}</span>
     <select name="major" class="bg-transparent text-sm text-ink-80 focus:outline-none" required>
       {% for m in home.majors %}<option value="{{ m }}" {% if m == 'Computer Science and Engineering' %}selected{% endif %}>{{ m }}</option>{% endfor %}
     </select>
   </label>
-  <button class="btn-primary px-7 text-[18px] font-light">새 요청 만들기</button>
+  <button class="btn-primary px-7 text-[18px] font-light">{{ _("새 요청 만들기") }}</button>
 </form>
 {% else %}
-<p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">입학이 확정된 대학에 소속된 계정만 편입 요청을 만들 수 있어요. 학사처에 계정 연결을 요청해 주세요.</p>
+<p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">{{ _("입학이 확정된 대학에 소속된 계정만 편입 요청을 만들 수 있어요. 학사처에 계정 연결을 요청해 주세요.") }}</p>
 {% endif %}
 
 {% if home.todos or home.unread_results %}
 <section class="mt-10 grid gap-3" aria-labelledby="todo-title">
-  <h2 id="todo-title" class="section-title">할 일</h2>
+  <h2 id="todo-title" class="section-title">{{ _("할 일") }}</h2>
   <ul class="grid divide-y divide-hairline rounded-lg border border-hairline bg-white">
     {% if home.unread_results %}
-    <li><a href="/notifications" class="flex items-center gap-3 px-5 py-3.5 hover:text-primary"><span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-hl-target px-2 text-xs font-semibold text-primary tabular-nums">{{ home.unread_results }}</span><span class="flex-1">새 판정 결과 확인</span><span aria-hidden="true" class="text-muted">›</span></a></li>
+    <li><a href="/notifications" class="flex items-center gap-3 px-5 py-3.5 hover:text-primary"><span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-hl-target px-2 text-xs font-semibold text-primary tabular-nums">{{ home.unread_results }}</span><span class="flex-1">{{ _("새 판정 결과 확인") }}</span><span aria-hidden="true" class="text-muted">›</span></a></li>
     {% endif %}
     {% for r, t in home.todos %}
     <li><a href="{{ t.href }}" class="flex items-center gap-3 px-5 py-3.5 hover:text-primary">
@@ -52,7 +52,7 @@
 </section>
 {% endif %}
 
-<section class="mt-10 grid gap-4" aria-label="편입 요청 목록">
+<section class="mt-10 grid gap-4" aria-label="{{ _('편입 요청 목록') }}">
   {% for sm in home.summaries %}
   {% set r = sm.request %}
   {% set sim = sm.simulation %}
@@ -61,26 +61,26 @@
     <div class="flex items-start justify-between gap-4">
       <div class="grid gap-1">
         <span class="font-semibold">{{ r.source_institution.name }} → {{ r.target_institution.name }}{% if r.major %} · {{ r.major }}{% endif %}</span>
-        <span class="text-sm text-muted">만든 날 {{ time(r.created_at, "date") }} · {{ {"draft": "준비 중 (사전 시뮬레이션)", "submitted": "학사처 심사 중", "decided": "판정 완료"}[r.status] }}</span>
+        <span class="text-sm text-muted">{{ _("만든 날 {time} · {draft}", time=(time(r.created_at, "date")), draft=({"draft": _("준비 중 (사전 시뮬레이션)"), "submitted": _("학사처 심사 중"), "decided": _("판정 완료")}[r.status])) }}</span>
       </div>
       <span aria-hidden="true">›</span>
     </div>
     {% if sm.courses %}
     <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">예상 인정 학점</dt><dd class="font-semibold tabular-nums">{{ sim.credits_low | round(1) }}{% if sim.credits_high != sim.credits_low %}~{{ sim.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">/ {{ sim.source_credits | round(1) }}학점</span></dd></div>
-      <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">판정 확정</dt><dd class="font-semibold tabular-nums">{{ sm.decided }} <span class="text-sm font-normal text-muted">/ {{ sm.courses }}과목</span></dd></div>
-      <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">남은 학기(예상)</dt><dd class="font-semibold tabular-nums">{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}학기</dd></div>
+      <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ sim.credits_low | round(1) }}{% if sim.credits_high != sim.credits_low %}~{{ sim.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(sim.source_credits | round(1))) }}</span></dd></div>
+      <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("판정 확정") }}</dt><dd class="font-semibold tabular-nums">{{ sm.decided }} <span class="text-sm font-normal text-muted">{{ _("/ {courses}과목", courses=(sm.courses)) }}</span></dd></div>
+      <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">{{ _("남은 학기(예상)") }}</dt><dd class="font-semibold tabular-nums">{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}{{ _("학기") }}</dd></div>
     </dl>
     {% endif %}
     {% if rd.percent is not none %}
     <div class="grid gap-1.5">
-      <div class="flex flex-wrap justify-between gap-2 text-sm"><span>서류 준비 <strong class="tabular-nums">{{ rd.percent }}%</strong></span>{% if rd.missing %}<span class="text-elective">채워야 할 서류 {{ rd.missing }}건</span>{% else %}<span class="text-muted">제출할 준비가 됐어요</span>{% endif %}</div>
-      <span class="meter block" role="progressbar" aria-label="서류 준비율" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ rd.percent }}"><span style="width: {{ rd.percent }}%"></span></span>
+      <div class="flex flex-wrap justify-between gap-2 text-sm"><span>{{ _("서류 준비") }} <strong class="tabular-nums">{{ rd.percent }}%</strong></span>{% if rd.missing %}<span class="text-elective">{{ _("채워야 할 서류 {missing}건", missing=(rd.missing)) }}</span>{% else %}<span class="text-muted">{{ _("제출할 준비가 됐어요") }}</span>{% endif %}</div>
+      <span class="meter block" role="progressbar" aria-label="{{ _('서류 준비율') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ rd.percent }}"><span style="width: {{ rd.percent }}%"></span></span>
     </div>
     {% endif %}
   </a>
   {% else %}
-  <p class="rounded-md bg-parchment p-6 text-center text-muted">아직 편입 요청이 없어요. 위에서 대학을 골라 시작해 보세요.</p>
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("아직 편입 요청이 없어요. 위에서 대학을 골라 시작해 보세요.") }}</p>
   {% endfor %}
 </section>
 {% endblock %}

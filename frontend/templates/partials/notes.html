@@ -2,25 +2,25 @@
 {# 심사 건 내부 메모: 심사관·담당 교수끼리. 학생 화면과 판정 근거 리포트에는 나오지 않는다 #}
 <section id="notes" class="mt-8 grid scroll-mt-16 gap-3 rounded-lg border border-hairline bg-white p-6" aria-labelledby="notes-title">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="notes-title" class="font-semibold">내부 메모{% if v.notes %} <span class="text-sm font-normal text-muted tabular-nums">{{ v.notes | length }}</span>{% endif %}</h2>
-    <span class="text-xs text-muted">심사관과 담당 교수만 봐요 · 학생 화면과 리포트에는 나오지 않아요</span>
+    <h2 id="notes-title" class="font-semibold">{{ _("내부 메모") }}{% if v.notes %} <span class="text-sm font-normal text-muted tabular-nums">{{ v.notes | length }}</span>{% endif %}</h2>
+    <span class="text-xs text-muted">{{ _("심사관과 담당 교수만 봐요 · 학생 화면과 리포트에는 나오지 않아요") }}</span>
   </div>
   {% if v.notes %}
   <ol class="grid gap-0 border-t border-divider">
     {% for n in v.notes %}
     {% set author = v.users.get(n.author_id) %}
     <li class="grid gap-1 border-b border-divider py-3 text-sm last:border-b-0">
-      <p class="text-xs text-muted"><span class="font-semibold text-ink">{{ author.name if author else '알 수 없음' }}</span> · {{ {'evaluator': '심사관', 'professor': '교수'}.get(author.role, '') if author else '' }} · {{ time(n.created_at) }}{% if n.course_evaluation_id != v.evaluation.id %} · 이전 분석에서 남김{% endif %}</p>
+      <p class="text-xs text-muted"><span class="font-semibold text-ink">{{ author.name if author else _('알 수 없음') }}</span> · {{ {'evaluator': _('심사관'), 'professor': _('교수')}.get(author.role, '') if author else '' }} · {{ time(n.created_at) }}{% if n.course_evaluation_id != v.evaluation.id %} {{ _("· 이전 분석에서 남김") }}{% endif %}</p>
       <p class="whitespace-pre-line text-ink-80">{{ n.body }}</p>
     </li>
     {% endfor %}
   </ol>
   {% else %}
-  <p class="rounded-md bg-parchment px-4 py-3 text-sm text-muted">아직 메모가 없어요. 확인 중인 일이나 다른 담당자에게 전할 말을 남겨 두세요.</p>
+  <p class="rounded-md bg-parchment px-4 py-3 text-sm text-muted">{{ _("아직 메모가 없어요. 확인 중인 일이나 다른 담당자에게 전할 말을 남겨 두세요.") }}</p>
   {% endif %}
   <form method="post" action="/evaluations/{{ v.evaluation.id }}/notes" class="grid gap-2">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label class="field"><span class="sr-only">메모</span><textarea class="textarea" name="body" rows="2" maxlength="1000" required placeholder="예: 학과장 확인 중 · 실험 시수 자료 다시 받기로 함. 이름·학번·성적은 적지 마세요."></textarea></label>
-    <button class="btn-secondary w-fit">메모 남기기</button>
+    <label class="field"><span class="sr-only">{{ _("메모") }}</span><textarea class="textarea" name="body" rows="2" maxlength="1000" required placeholder="{{ _('예: 학과장 확인 중 · 실험 시수 자료 다시 받기로 함. 이름·학번·성적은 적지 마세요.') }}"></textarea></label>
+    <button class="btn-secondary w-fit">{{ _("메모 남기기") }}</button>
   </form>
 </section>

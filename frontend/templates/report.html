@@ -1,62 +1,62 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import time %}
-{% block title %}판정 근거 리포트 · CreditBridge AI{% endblock %}
+{% block title %}{{ _("판정 근거 리포트 · CreditBridge AI") }}{% endblock %}
 {% block nav %}{% include "partials/role_nav.html" %}{% endblock %}
 {% block content %}
 {% set ev = v.evaluation %}
 {# 역할별로 이 심사 건을 보던 화면으로 돌아간다 (인쇄할 때는 숨김) #}
-{% set back = {'student': ('/student/evaluations/', '과목 결과로'), 'evaluator': ('/review/evaluations/', '심사 건으로'), 'professor': ('/professor/evaluations/', '판정 화면으로')}.get(user.role) %}
+{% set back = {'student': ('/student/evaluations/', _('과목 결과로')), 'evaluator': ('/review/evaluations/', _('심사 건으로')), 'professor': ('/professor/evaluations/', _('판정 화면으로'))}.get(user.role) %}
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-  {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-text text-sm">← {{ back[1] }} 돌아가기</a>{% else %}<span></span>{% endif %}
-  <a href="/evaluations/{{ ev.id }}/report.pdf" class="btn-primary" download>PDF 내려받기</a>
+  {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-text text-sm">{{ _("← {back} 돌아가기", back=(back[1])) }}</a>{% else %}<span></span>{% endif %}
+  <a href="/evaluations/{{ ev.id }}/report.pdf" class="btn-primary" download>{{ _("PDF 내려받기") }}</a>
 </div>
 <article class="grid gap-6 text-sm">
   <header class="grid gap-1">
     <img src="/static/img/logo.png" alt="CreditBridge AI" width="120" height="66" class="h-auto w-[120px]">
     <h1 class="page-title">Transfer Credit Evaluation Report</h1>
-    <p class="text-muted">{{ v.request.source_institution.name }} {{ v.syllabus.course_code }} {{ v.syllabus.course_title }} → {{ v.request.target_institution.name }} · 생성 {{ time(ev.created_at) }}</p>
+    <p class="text-muted">{{ _("{name} {course_code} {course_title} → {name2} · 생성 {time}", name=(v.request.source_institution.name), course_code=(v.syllabus.course_code), course_title=(v.syllabus.course_title), name2=(v.request.target_institution.name), time=(time(ev.created_at))) }}</p>
   </header>
   <section class="grid gap-1">
-    <h2 class="font-semibold">사람 판정</h2>
+    <h2 class="font-semibold">{{ _("사람 판정") }}</h2>
     {% if v.decision %}
-    <p>결과 <strong>{{ v.decision.result | rec }}</strong>{% if v.decided_target %} ({{ v.decided_target.code }}){% endif %} · {{ v.decision.action | action }} · 판정자 {{ v.decided_by.name if v.decided_by else '' }} · {{ time(v.decision.decided_at) }}</p>
-    <p>사유: {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}없음 (AI 추천과 동일){% endif %}</p>
+    <p>{{ _("결과") }} <strong>{{ v.decision.result | rec }}</strong>{% if v.decided_target %} ({{ v.decided_target.code }}){% endif %} {{ _("· {action} · 판정자 {decided_by} · {time}", action=(v.decision.action | action), decided_by=(v.decided_by.name if v.decided_by else ''), time=(time(v.decision.decided_at))) }}</p>
+    <p>{{ _("사유:") }} {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}{{ _("없음 (AI 추천과 동일)") }}{% endif %}</p>
     {% set snap = v.decision.ai_recommendation_snapshot %}
-    <p class="text-muted">판정 당시 AI 추천: {{ snap.recommendation | rec }} · 커버리지 {{ snap.coverage | pct }} · 신뢰도 {{ snap.confidence | conf }} · {{ snap.prompt_version }}</p>
-    {% if v.decision.conflict_acknowledged %}<p class="text-reject">과거 판정과 다른 결과임을 확인하고 확정함</p>{% endif %}
-    {% else %}<p class="text-muted">아직 판정되지 않았어요.</p>{% endif %}
+    <p class="text-muted">{{ _("판정 당시 AI 추천: {recommendation} · 커버리지 {coverage} · 신뢰도 {confidence} · {prompt_version}", recommendation=(snap.recommendation | rec), coverage=(snap.coverage | pct), confidence=(snap.confidence | conf), prompt_version=(snap.prompt_version)) }}</p>
+    {% if v.decision.conflict_acknowledged %}<p class="text-reject">{{ _("과거 판정과 다른 결과임을 확인하고 확정함") }}</p>{% endif %}
+    {% else %}<p class="text-muted">{{ _("아직 판정되지 않았어요.") }}</p>{% endif %}
   </section>
   {% if v.decisions | length > 1 or v.appeals %}
   <section class="grid gap-1">
-    <h2 class="font-semibold">판정·이의 신청 경과</h2>
-    {% for d in v.decisions %}<p>{{ time(d.decided_at) }} · {{ '재판정' if d.appeal_id else '원 판정' }} {{ d.result | rec }} · {{ d.action | action }} · {{ v.users[d.decided_by].name if d.decided_by in v.users else '' }}{% if d.reason_codes %} · 사유 {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endfor %}
-    {% for a in v.appeals %}<p>{{ time(a.created_at) }} · 이의 신청 {{ a.status | appeal_status }}: “{{ a.reason }}”{% if a.handler_note %} · 학사처 메모: {{ a.handler_note }}{% endif %}</p>{% endfor %}
+    <h2 class="font-semibold">{{ _("판정·이의 신청 경과") }}</h2>
+    {% for d in v.decisions %}<p>{{ time(d.decided_at) }} · {{ _('재판정') if d.appeal_id else _('원 판정') }} {{ d.result | rec }} · {{ d.action | action }} · {{ v.users[d.decided_by].name if d.decided_by in v.users else '' }}{% if d.reason_codes %} {{ _("· 사유") }} {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endfor %}
+    {% for a in v.appeals %}<p>{{ _("{time} · 이의 신청 {status}: “{reason}”", time=(time(a.created_at)), status=(a.status | appeal_status), reason=(a.reason)) }}{% if a.handler_note %} {{ _("· 학사처 메모: {handler_note}", handler_note=(a.handler_note)) }}{% endif %}</p>{% endfor %}
   </section>
   {% endif %}
   <section class="grid gap-1">
-    <h2 class="font-semibold">AI 추천</h2>
-    <p>{{ ev.recommendation | rec }} · 커버리지 {{ ev.coverage | pct }} · 신뢰도 {{ ev.confidence | conf }} · 후보 {{ v.candidate.code if v.candidate else '없음' }} · 모델 {{ ev.model or '–' }}</p>
+    <h2 class="font-semibold">{{ _("AI 추천") }}</h2>
+    <p>{{ _("{recommendation} · 커버리지 {coverage} · 신뢰도 {confidence} · 후보 {candidate} · 모델 {model}", recommendation=(ev.recommendation | rec), coverage=(ev.coverage | pct), confidence=(ev.confidence | conf), candidate=(v.candidate.code if v.candidate else _('없음')), model=(ev.model or '–')) }}</p>
   </section>
   {% if v.primary %}
   <section class="grid gap-2">
-    <h2 class="font-semibold">개념별 근거 (원문 검증 완료 구절)</h2>
+    <h2 class="font-semibold">{{ _("개념별 근거 (원문 검증 완료 구절)") }}</h2>
     {% for k in v.primary.concepts %}
     <div class="border-t border-divider pt-2">
       <p><strong>{{ k.concept }}</strong> {{ k.coverage | pct }} · {{ k.status | concept_status }}</p>
-      {% for e in k.source_evidence %}{% set page = v.source_page(e.char_start) %}<p>학생: “{{ e.text }}” <span class="text-muted">[{% if page %}원본 {{ page }}쪽 · {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
-      {% for e in k.target_evidence %}{% set page = v.target_page(e.char_start) %}<p>기준: “{{ e.text }}” <span class="text-muted">[{% if page %}원본 {{ page }}쪽 · {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
+      {% for e in k.source_evidence %}{% set page = v.source_page(e.char_start) %}<p>{{ _("학생: “{text}”", text=(e.text)) }} <span class="text-muted">[{% if page %}{{ _("원본 {page}쪽 ·", page=(page)) }} {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
+      {% for e in k.target_evidence %}{% set page = v.target_page(e.char_start) %}<p>{{ _("기준: “{text}”", text=(e.text)) }} <span class="text-muted">[{% if page %}{{ _("원본 {page}쪽 ·", page=(page)) }} {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
     </div>
     {% endfor %}
   </section>
   {% endif %}
   {% include "partials/history.html" %}
   {% if v.audit %}
-  <section class="grid gap-1"><h2 class="font-semibold">감사 로그</h2>{% for a in v.audit %}<p>{{ time(a.created_at) }} · {{ a.action }} · {{ a.payload_json }}</p>{% endfor %}</section>
+  <section class="grid gap-1"><h2 class="font-semibold">{{ _("감사 로그") }}</h2>{% for a in v.audit %}<p>{{ time(a.created_at) }} · {{ a.action }} · {{ a.payload_json }}</p>{% endfor %}</section>
   {% endif %}
   <div class="flex flex-wrap gap-2 print:hidden">
-    {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-primary">{{ back[1] }} 돌아가기</a>{% endif %}
-    <a href="/evaluations/{{ ev.id }}/report.pdf" class="btn-secondary w-fit" download>PDF 내려받기</a>
-    <button class="btn-secondary w-fit border-hairline text-ink" onclick="window.print()">인쇄</button>
+    {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-primary">{{ _("{back} 돌아가기", back=(back[1])) }}</a>{% endif %}
+    <a href="/evaluations/{{ ev.id }}/report.pdf" class="btn-secondary w-fit" download>{{ _("PDF 내려받기") }}</a>
+    <button class="btn-secondary w-fit border-hairline text-ink" onclick="window.print()">{{ _("인쇄") }}</button>
   </div>
 </article>
 {% endblock %}

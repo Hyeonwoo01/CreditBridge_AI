@@ -6,6 +6,7 @@
 import re
 from dataclasses import dataclass, field
 
+from backend.i18n import gettext as tr
 from backend.models import CourseEvaluation, SupplementFile, Syllabus
 from backend.models.enums import EvaluationStatus
 from backend.schemas.results import CandidateResult, ConceptResult, EvaluationResult
@@ -125,7 +126,7 @@ def added_materials(
     for f in sorted(files, key=lambda f: (f.created_at, f.id)):
         if not previous.created_at < f.created_at <= current.created_at:
             continue
-        name = (f.file_key or "").rsplit("/", 1)[-1] or "보완 자료"
+        name = (f.file_key or "").rsplit("/", 1)[-1] or tr("보완 자료")
         out.append(AddedMaterial(filename=name, text=sections.get(name, "")))
     return out
 

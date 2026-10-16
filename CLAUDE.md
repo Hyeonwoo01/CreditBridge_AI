@@ -27,6 +27,7 @@ docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문�
 - 폴더: 백엔드(Python)는 backend/(import도 backend.*), 프론트엔드(화면 파일)는 frontend/ — 템플릿 frontend/templates, CSS·JS·이미지 frontend/static, Tailwind 입력 frontend/tailwind/input.css. 둘은 한 앱으로 함께 실행된다
 - 화면 디자인은 docs/DESIGN.md를 따른다. 화면 폭은 기본 1280px, 심사 큐·원문 대조 화면만 1440px(frontend/templates/base.html의 {% block width %})
 - 의존 방향: web -> services -> repositories -> models (web은 repositories를 직접 부르지 않고 services/views.py를 쓴다)
+- 화면 문구는 한국어 원문 + 영어 번역(backend/i18n.py, backend/locales/en.json). 템플릿은 {{ _("…") }}, 파이썬은 tr("…")(backend.i18n.gettext). DB에 저장하는 글(알림·분석 경고·오류)은 번역하지 않고 N_("…")로 표시한 한국어로 저장하고, 화면에서 | t 필터로 바꾼다. 자리표시자는 {이름}
 - SQL은 backend/repositories에만 작성
 - LLM 호출은 backend/ai/llm_client.py를 통해서만
 - 프롬프트는 backend/ai/prompts/*.md 파일로 관리 (첫 줄 `<!-- version: ... -->`, 바꾸면 버전을 올린다)
@@ -55,5 +56,6 @@ docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문�
 - uv run pytest tests/unit tests/integration   (통합 테스트는 MariaDB 필요: TEST_DATABASE_URL)
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
 - 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
+- 화면 문구를 추가·수정했다면 backend/locales/en.json에 영어를 넣고 uv run python -m scripts.i18n_check 통과 (테스트 tests/unit/test_i18n.py도 같은 검사)
 - 템플릿에 새 Tailwind 클래스를 썼다면 scripts/build_css.sh로 frontend/static/css/app.css를 다시 빌드
 - 새 의존성이 필요하면 추가하지 말고 먼저 사람에게 물어볼 것

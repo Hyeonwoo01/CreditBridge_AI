@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.errors import PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.repositories import users as user_repo
@@ -44,7 +45,7 @@ def current_user(request: Request, session: Session = Depends(get_db)) -> User:
 def require(*roles: Role):  # type: ignore[no-untyped-def]
     def dependency(user: User = Depends(current_user)) -> User:
         if user.role not in roles:
-            raise PermissionDeniedError("이 화면을 사용할 권한이 없어요.")
+            raise PermissionDeniedError(tr("이 화면을 사용할 권한이 없어요."))
         return user
 
     return dependency

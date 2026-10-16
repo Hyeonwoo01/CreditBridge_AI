@@ -12,6 +12,8 @@ from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import Appeal, AppealFile, Assignment, CourseEvaluation, Decision, Syllabus, TransferRequest, User
 from backend.models.enums import AppealStatus, Role
 from backend.repositories import appeals as appeal_repo
@@ -44,7 +46,7 @@ class AppealRow:
 
 
 def _course(syllabus: Syllabus) -> str:
-    return (syllabus.course_code or syllabus.course_title or "강의계획서").strip()
+    return (syllabus.course_code or syllabus.course_title or N_("강의계획서")).strip()
 
 
 def file_appeal(
@@ -64,25 +66,29 @@ def file_appeal(
         else None
     )
     if evaluation is None or request is None:
-        raise NotFoundError("심사 건을 찾을 수 없어요.")
+        raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
     if student.role != Role.STUDENT or request.student_id != student.id:
-        raise PermissionDeniedError("본인의 판정에만 이의 신청을 할 수 있어요.")
+        raise PermissionDeniedError(tr("본인의 판정에만 이의 신청을 할 수 있어요."))
     decision = decision_repo.for_evaluation(session, evaluation.id)
     if decision is None:
-        raise CreditBridgeError("판정이 확정된 과목만 이의 신청을 할 수 있어요.")
+        raise CreditBridgeError(tr("판정이 확정된 과목만 이의 신청을 할 수 있어요."))
     if any(a.status in OPEN for a in appeal_repo.for_evaluation(session, evaluation.id)):
-        raise CreditBridgeError("이미 처리 중인 이의 신청이 있어요.")
+        raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요."))
     reason = reason.strip()
     if len(reason) < MIN_REASON_CHARS:
-        raise CreditBridgeError(f"이의 사유를 {MIN_REASON_CHARS}자 이상 구체적으로 적어 주세요.")
+        raise CreditBridgeError(
+            tr("이의 사유를 {min_reason_chars}자 이상 구체적으로 적어 주세요.", min_reason_chars=MIN_REASON_CHARS)
+        )
     if len(reason) > MAX_REASON_CHARS:
-        raise CreditBridgeError(f"이의 사유는 {MAX_REASON_CHARS}자까지 적을 수 있어요.")
+        raise CreditBridgeError(
+            tr("이의 사유는 {max_reason_chars}자까지 적을 수 있어요.", max_reason_chars=MAX_REASON_CHARS)
+        )
     if len(files) > MAX_FILES:
-        raise CreditBridgeError(f"근거 자료는 {MAX_FILES}개까지 올릴 수 있어요.")
+        raise CreditBridgeError(tr("근거 자료는 {max_files}개까지 올릴 수 있어요.", max_files=MAX_FILES))
     max_mb = get_settings().max_upload_mb
     checked = [(f, doc_text.validate_upload(f.filename, f.data, max_mb)) for f in files]
     if checked and storage is None:
-        raise CreditBridgeError("파일 저장소를 쓸 수 없어요.")
+        raise CreditBridgeError(tr("파일 저장소를 쓸 수 없어요."))
     appeal = appeal_repo.add(
         session,
         Appeal(course_evaluation_id=evaluation.id, decision_id=decision.id, student_id=student.id, reason=reason),
@@ -106,7 +112,7 @@ def file_appeal(
         session,
         notifications.staff(session, request.target_institution_id, Role.EVALUATOR),
         "appeal.submitted",
-        f"{_course(syllabus) if syllabus else '과목'} 판정에 이의 신청이 접수됐어요.",
+        N_("{course} 판정에 이의 신청이 접수됐어요.").format(course=_course(syllabus) if syllabus else N_("과목")),
         "/review/appeals",
     )
     audit.record(
@@ -118,7 +124,7 @@ def file_appeal(
 
 def _load(session: Session, evaluator: User, appeal_id: int) -> tuple[Appeal, CourseEvaluation, TransferRequest]:
     if evaluator.role != Role.EVALUATOR:
-        raise PermissionDeniedError("이의 신청은 심사관이 접수·처리해요.")
+        raise PermissionDeniedError(tr("이의 신청은 심사관이 접수·처리해요."))
     appeal = appeal_repo.get(session, appeal_id)
     evaluation = evaluation_repo.get(session, appeal.course_evaluation_id) if appeal else None
     request = (
@@ -127,11 +133,11 @@ def _load(session: Session, evaluator: User, appeal_id: int) -> tuple[Appeal, Co
         else None
     )
     if appeal is None or evaluation is None or request is None:
-        raise NotFoundError("이의 신청을 찾을 수 없어요.")
+        raise NotFoundError(tr("이의 신청을 찾을 수 없어요."))
     if request.target_institution_id != evaluator.institution_id:
-        raise PermissionDeniedError("소속 기관의 이의 신청만 처리할 수 있어요.")
+        raise PermissionDeniedError(tr("소속 기관의 이의 신청만 처리할 수 있어요."))
     if appeal.status != AppealStatus.SUBMITTED:
-        raise CreditBridgeError("이미 처리한 이의 신청이에요.")
+        raise CreditBridgeError(tr("이미 처리한 이의 신청이에요."))
     return appeal, evaluation, request
 
 
@@ -153,7 +159,7 @@ def accept(session: Session, evaluator: User, appeal_id: int, reviewer_id: int |
     professors = _department_professors(session, evaluation, request.target_institution_id)
     reviewer = next((p for p in professors if p.id == reviewer_id), None)
     if reviewer is None:
-        raise CreditBridgeError("재판정할 학과 교수를 선택해 주세요.")
+        raise CreditBridgeError(tr("재판정할 학과 교수를 선택해 주세요."))
     evaluation_repo.add_assignment(
         session, Assignment(course_evaluation_id=evaluation.id, reviewer_id=reviewer.id, assigned_by=evaluator.id)
     )
@@ -162,12 +168,12 @@ def accept(session: Session, evaluator: User, appeal_id: int, reviewer_id: int |
     appeal.handler_note = note.strip()
     appeal.handled_at = utcnow()
     syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
-    course = _course(syllabus) if syllabus else "과목"
+    course = _course(syllabus) if syllabus else N_("과목")
     notifications.notify(
         session,
         [reviewer],
         "appeal.redecide",
-        f"{course} 판정에 대한 이의 신청이 받아들여져 재판정이 배정됐어요.",
+        N_("{course} 판정에 대한 이의 신청이 받아들여져 재판정이 배정됐어요.").format(course=course),
         f"/professor/evaluations/{evaluation.id}",
     )
     student = user_repo.get_by_id(session, request.student_id)
@@ -175,7 +181,7 @@ def accept(session: Session, evaluator: User, appeal_id: int, reviewer_id: int |
         session,
         [student] if student else [],
         "appeal.accepted",
-        f"{course} 이의 신청이 접수돼 학과 교수가 다시 판정해요.",
+        N_("{course} 이의 신청이 접수돼 학과 교수가 다시 판정해요.").format(course=course),
         f"/student/evaluations/{evaluation.id}",
     )
     audit.record(
@@ -195,7 +201,7 @@ def dismiss(session: Session, evaluator: User, appeal_id: int, note: str) -> App
     appeal, evaluation, request = _load(session, evaluator, appeal_id)
     note = note.strip()
     if not note:
-        raise CreditBridgeError("기각할 때는 학생에게 전할 사유를 적어 주세요.")
+        raise CreditBridgeError(tr("기각할 때는 학생에게 전할 사유를 적어 주세요."))
     appeal.status = AppealStatus.DISMISSED
     appeal.handled_by = evaluator.id
     appeal.handler_note = note
@@ -206,7 +212,9 @@ def dismiss(session: Session, evaluator: User, appeal_id: int, note: str) -> App
         session,
         [student] if student else [],
         "appeal.dismissed",
-        f"{_course(syllabus) if syllabus else '과목'} 이의 신청이 기각됐어요. 사유를 확인해 주세요.",
+        N_("{course} 이의 신청이 기각됐어요. 사유를 확인해 주세요.").format(
+            course=_course(syllabus) if syllabus else N_("과목")
+        ),
         f"/student/evaluations/{evaluation.id}",
     )
     audit.record(session, evaluator, "appeal.dismiss", "course_evaluation", str(evaluation.id), appeal=appeal.id)
@@ -227,7 +235,7 @@ def for_evaluation(session: Session, evaluation_id: int) -> list[Appeal]:
 
 def rows(session: Session, evaluator: User) -> list[AppealRow]:
     if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
-        raise PermissionDeniedError("심사관 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
     today = utcnow().date()
     out = []
     found = appeal_repo.of_institution(session, evaluator.institution_id)
@@ -272,7 +280,7 @@ class StudentAppealRow:
 def student_rows(session: Session, student: User) -> list[StudentAppealRow]:
     """학생 본인이 낸 이의 신청 (최근 순)."""
     if student.role != Role.STUDENT:
-        raise PermissionDeniedError("학생 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("학생 계정만 사용할 수 있어요."))
     out = []
     found = appeal_repo.of_student(session, student.id)
     files = appeal_repo.files_for(session, [a.id for a, _, _, _ in found])
@@ -298,7 +306,7 @@ class Appealable:
 
 def appealable(session: Session, student: User) -> list[Appealable]:
     if student.role != Role.STUDENT:
-        raise PermissionDeniedError("학생 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("학생 계정만 사용할 수 있어요."))
     out = []
     for request in request_repo.of_student(session, student.id):
         for row in student_service.course_rows(session, request):
@@ -322,11 +330,11 @@ def file_for_download(session: Session, user: User, file_id: int) -> AppealFile:
     appeal = appeal_repo.get(session, file.appeal_id) if file else None
     evaluation = evaluation_repo.get(session, appeal.course_evaluation_id) if appeal else None
     if file is None or evaluation is None:
-        raise NotFoundError("파일을 찾을 수 없어요.")
+        raise NotFoundError(tr("파일을 찾을 수 없어요."))
     if not can_view_evaluation(session, user, evaluation):
-        raise PermissionDeniedError("이 파일을 볼 권한이 없어요.")
+        raise PermissionDeniedError(tr("이 파일을 볼 권한이 없어요."))
     if file.file_key is None:
-        raise NotFoundError("개인정보 삭제 요청으로 지워진 파일이에요.")
+        raise NotFoundError(tr("개인정보 삭제 요청으로 지워진 파일이에요."))
     # 누가 언제 학생 파일을 열어 봤는지 감사 로그에 남긴다 (파일 이름은 넣지 않는다)
     audit.record(
         session,
@@ -344,7 +352,7 @@ def file_for_download(session: Session, user: User, file_id: int) -> AppealFile:
 def submitted_count(session: Session, evaluator: User) -> int:
     """심사관 메뉴 배지: 접수돼 처리를 기다리는 이의 신청 수."""
     if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
-        raise PermissionDeniedError("심사관 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
     return sum(
         1
         for appeal, _, _, _ in appeal_repo.of_institution(session, evaluator.institution_id)

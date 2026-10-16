@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import utcnow
 from backend.errors import PermissionDeniedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import AuditLog, Decision, User
 from backend.models.enums import AppealStatus, Role
 from backend.repositories import appeals as appeal_repo
@@ -80,7 +82,7 @@ def _months(now: datetime, count: int = 6) -> list[str]:
 
 def institution_stats(session: Session, user: User) -> Stats:
     if user.role not in (Role.ADMIN, Role.EVALUATOR) or user.institution_id is None:
-        raise PermissionDeniedError("기관 관리자와 심사관만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("기관 관리자와 심사관만 볼 수 있어요."))
     institution_id = user.institution_id
     now = utcnow()
     stats = Stats()
@@ -155,11 +157,11 @@ def institution_stats(session: Session, user: User) -> Stats:
     dept_days: dict[str, list[float]] = {}
     for e, _, _ in waiting:
         course = courses.get(e.candidate_course_id) if e.candidate_course_id else None
-        received[course.department if course else "미분류"] += 1
+        received[course.department if course else tr("미분류")] += 1
     for evaluation_id, d in current.items():
         target = d.target_course_id or candidate_of.get(evaluation_id)
         course = courses.get(target) if target else None
-        name = course.department if course else "미분류"
+        name = course.department if course else tr("미분류")
         received[name] += 1
         decided[name] += 1
         start = submitted_at.get(request_of[evaluation_id] or 0)
@@ -189,40 +191,40 @@ def institution_stats(session: Session, user: User) -> Stats:
 
 # 감사 로그 행위 → 화면 표시 (이름, 배지 톤)
 ACTION_LABELS = {
-    "decision.create": ("판정 확정", "decision"),
-    "assignment.create": ("교수 배정", "neutral"),
-    "material.request": ("보완 서류 요청", "elective"),
-    "material.fulfilled": ("보완 서류 제출", "neutral"),
-    "appeal.submit": ("이의 신청 접수", "elective"),
-    "appeal.accept": ("이의 신청 수용", "neutral"),
-    "appeal.dismiss": ("이의 신청 기각", "reject"),
-    "privacy.request": ("삭제 요청", "elective"),
-    "privacy.review": ("삭제 요청 처리", "neutral"),
-    "privacy.delete_documents": ("문서 삭제 완료", "reject"),
-    "request.submit": ("심사 요청", "neutral"),
-    "syllabus.upload": ("강의계획서 업로드", "neutral"),
-    "syllabus.supplement": ("보완 자료 업로드", "neutral"),
-    "sis.token_issue": ("연동 토큰 발급", "neutral"),
-    "sis.token_revoke": ("연동 토큰 폐기", "neutral"),
-    "equivalency.import": ("동등 과목표 가져오기", "neutral"),
-    "professor.away": ("부재 설정", "neutral"),
-    "auth.login": ("로그인", "neutral"),
-    "auth.password_change": ("비밀번호 변경", "neutral"),
-    "auth.password_reset_request": ("비밀번호 재설정 요청", "neutral"),
-    "auth.password_reset": ("비밀번호 재설정", "neutral"),
-    "auth.lockout": ("로그인 1분 잠금", "elective"),
-    "auth.lockout_reset": ("로그인 실패로 비밀번호 초기화", "reject"),
-    "account.password_reset_by_admin": ("임시 비밀번호 재발급", "elective"),
-    "account.import": ("계정 가져오기", "neutral"),
-    "account.deactivate": ("계정 비활성화", "reject"),
-    "account.reactivate": ("계정 다시 활성화", "neutral"),
-    "appeal_file.download": ("이의 신청 근거 자료 열람", "neutral"),
-    "syllabus.original_view": ("강의계획서 원본 열람", "neutral"),
-    "note.create": ("내부 메모 작성", "neutral"),
-    "account.bootstrap": ("첫 관리자 생성", "neutral"),
-    "course.import": ("과목 가져오기", "neutral"),
-    "course.reference_upload": ("기준 강의계획서 등록", "neutral"),
-    "institution.create": ("출신 대학 등록", "neutral"),
+    "decision.create": (N_("판정 확정"), "decision"),
+    "assignment.create": (N_("교수 배정"), "neutral"),
+    "material.request": (N_("보완 서류 요청"), "elective"),
+    "material.fulfilled": (N_("보완 서류 제출"), "neutral"),
+    "appeal.submit": (N_("이의 신청 접수"), "elective"),
+    "appeal.accept": (N_("이의 신청 수용"), "neutral"),
+    "appeal.dismiss": (N_("이의 신청 기각"), "reject"),
+    "privacy.request": (N_("삭제 요청"), "elective"),
+    "privacy.review": (N_("삭제 요청 처리"), "neutral"),
+    "privacy.delete_documents": (N_("문서 삭제 완료"), "reject"),
+    "request.submit": (N_("심사 요청"), "neutral"),
+    "syllabus.upload": (N_("강의계획서 업로드"), "neutral"),
+    "syllabus.supplement": (N_("보완 자료 업로드"), "neutral"),
+    "sis.token_issue": (N_("연동 토큰 발급"), "neutral"),
+    "sis.token_revoke": (N_("연동 토큰 폐기"), "neutral"),
+    "equivalency.import": (N_("동등 과목표 가져오기"), "neutral"),
+    "professor.away": (N_("부재 설정"), "neutral"),
+    "auth.login": (N_("로그인"), "neutral"),
+    "auth.password_change": (N_("비밀번호 변경"), "neutral"),
+    "auth.password_reset_request": (N_("비밀번호 재설정 요청"), "neutral"),
+    "auth.password_reset": (N_("비밀번호 재설정"), "neutral"),
+    "auth.lockout": (N_("로그인 1분 잠금"), "elective"),
+    "auth.lockout_reset": (N_("로그인 실패로 비밀번호 초기화"), "reject"),
+    "account.password_reset_by_admin": (N_("임시 비밀번호 재발급"), "elective"),
+    "account.import": (N_("계정 가져오기"), "neutral"),
+    "account.deactivate": (N_("계정 비활성화"), "reject"),
+    "account.reactivate": (N_("계정 다시 활성화"), "neutral"),
+    "appeal_file.download": (N_("이의 신청 근거 자료 열람"), "neutral"),
+    "syllabus.original_view": (N_("강의계획서 원본 열람"), "neutral"),
+    "note.create": (N_("내부 메모 작성"), "neutral"),
+    "account.bootstrap": (N_("첫 관리자 생성"), "neutral"),
+    "course.import": (N_("과목 가져오기"), "neutral"),
+    "course.reference_upload": (N_("기준 강의계획서 등록"), "neutral"),
+    "institution.create": (N_("출신 대학 등록"), "neutral"),
 }
 
 
@@ -240,7 +242,7 @@ class AuditRow:
 def recent_audit(session: Session, user: User, limit: int = 8) -> list[AuditRow]:
     """소속 기관 사용자가 남긴 최근 감사 로그 (로그인 기록 제외)."""
     if user.role != Role.ADMIN or user.institution_id is None:
-        raise PermissionDeniedError("기관 관리자만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("기관 관리자만 볼 수 있어요."))
     out: list[AuditRow] = []
     actors: dict[int, User | None] = {}
     for log in audit_repo.recent_for_institution(
@@ -250,6 +252,7 @@ def recent_audit(session: Session, user: User, limit: int = 8) -> list[AuditRow]
             actors[log.actor_id] = user_repo.get_by_id(session, log.actor_id)
         actor = actors.get(log.actor_id) if log.actor_id is not None else None
         label, tone = ACTION_LABELS.get(log.action, (log.action, "neutral"))
+        label = tr(label)
         payload = log.payload_json or {}
         out.append(
             AuditRow(

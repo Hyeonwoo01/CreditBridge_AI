@@ -4,53 +4,53 @@
 <body>
 <img src="logo.png" width="96"/>
 <p class="label">TRANSFER CREDIT EVALUATION REPORT</p>
-<h1>판정 근거 리포트</h1>
+<h1>{{ _("판정 근거 리포트") }}</h1>
 <p class="muted">{{ v.request.source_institution.name }} {{ v.syllabus.course_code }} {{ v.syllabus.course_title }} → {{ v.request.target_institution.name }}</p>
-<p class="muted">심사 건 #{{ ev.id }} · 분석 {{ ev.created_at | utc }} · 내려받음 {{ generated_at | utc }}</p>
+<p class="muted">{{ _("심사 건 #{id} · 분석 {created_at} · 내려받음 {generated_at}", id=(ev.id), created_at=(ev.created_at | utc), generated_at=(generated_at | utc)) }}</p>
 
-<h2>사람 판정</h2>
+<h2>{{ _("사람 판정") }}</h2>
 {% if v.decision %}
-<p>결과 <b>{{ v.decision.result | rec }}</b>{% if v.decided_target %} ({{ v.decided_target.code }} {{ v.decided_target.title }}){% endif %} · {{ v.decision.action | action }} · 판정자 {{ v.decided_by.name if v.decided_by else '' }} · {{ v.decision.decided_at | utc }}</p>
-<p>사유: {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}없음 (AI 추천과 동일){% endif %}</p>
+<p>{{ _("결과") }} <b>{{ v.decision.result | rec }}</b>{% if v.decided_target %} ({{ v.decided_target.code }} {{ v.decided_target.title }}){% endif %} {{ _("· {action} · 판정자 {decided_by} · {decided_at}", action=(v.decision.action | action), decided_by=(v.decided_by.name if v.decided_by else ''), decided_at=(v.decision.decided_at | utc)) }}</p>
+<p>{{ _("사유:") }} {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}{{ _("없음 (AI 추천과 동일)") }}{% endif %}</p>
 {% set snap = v.decision.ai_recommendation_snapshot %}
-<p class="muted">판정 당시 AI 추천: {{ snap.recommendation | rec }} · 커버리지 {{ snap.coverage | pct }} · 신뢰도 {{ snap.confidence | conf }} · {{ snap.prompt_version }}</p>
-{% if v.decision.conflict_acknowledged %}<p class="reject">과거 판정과 다른 결과임을 확인하고 확정함</p>{% endif %}
+<p class="muted">{{ _("판정 당시 AI 추천: {recommendation} · 커버리지 {coverage} · 신뢰도 {confidence} · {prompt_version}", recommendation=(snap.recommendation | rec), coverage=(snap.coverage | pct), confidence=(snap.confidence | conf), prompt_version=(snap.prompt_version)) }}</p>
+{% if v.decision.conflict_acknowledged %}<p class="reject">{{ _("과거 판정과 다른 결과임을 확인하고 확정함") }}</p>{% endif %}
 {% else %}
-<p class="muted">아직 판정되지 않았어요. 아래 AI 추천은 확정이 아니에요.</p>
+<p class="muted">{{ _("아직 판정되지 않았어요. 아래 AI 추천은 확정이 아니에요.") }}</p>
 {% endif %}
 
 {% if v.decisions | length > 1 or v.appeals %}
-<h2>판정·이의 신청 경과</h2>
-{% for d in v.decisions %}<p>{{ d.decided_at | utc }} · {{ '재판정' if d.appeal_id else '원 판정' }} {{ d.result | rec }} · {{ d.action | action }} · {{ v.users[d.decided_by].name if d.decided_by in v.users else '' }}{% if d.reason_codes %} · 사유 {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endfor %}
-{% for a in v.appeals %}<p>{{ a.created_at | utc }} · 이의 신청 {{ a.status | appeal_status }}: “{{ a.reason }}”{% if a.handler_note %} · 학사처 메모: {{ a.handler_note }}{% endif %}</p>{% endfor %}
+<h2>{{ _("판정·이의 신청 경과") }}</h2>
+{% for d in v.decisions %}<p>{{ d.decided_at | utc }} · {{ _('재판정') if d.appeal_id else _('원 판정') }} {{ d.result | rec }} · {{ d.action | action }} · {{ v.users[d.decided_by].name if d.decided_by in v.users else '' }}{% if d.reason_codes %} {{ _("· 사유") }} {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endfor %}
+{% for a in v.appeals %}<p>{{ _("{created_at} · 이의 신청 {status}: “{reason}”", created_at=(a.created_at | utc), status=(a.status | appeal_status), reason=(a.reason)) }}{% if a.handler_note %} {{ _("· 학사처 메모: {handler_note}", handler_note=(a.handler_note)) }}{% endif %}</p>{% endfor %}
 {% endif %}
 
-<h2>AI 추천</h2>
-<p>{{ ev.recommendation | rec }} · 커버리지 {{ ev.coverage | pct }} · 신뢰도 {{ ev.confidence | conf }} · 후보 {{ (v.candidate.code ~ ' ' ~ v.candidate.title) if v.candidate else '없음' }} · 모델 {{ ev.model or '–' }} · {{ ev.prompt_version or '' }}</p>
+<h2>{{ _("AI 추천") }}</h2>
+<p>{{ _("{recommendation} · 커버리지 {coverage} · 신뢰도 {confidence} · 후보 {x} · 모델 {model} · {prompt_version}", recommendation=(ev.recommendation | rec), coverage=(ev.coverage | pct), confidence=(ev.confidence | conf), x=((v.candidate.code ~ ' ' ~ v.candidate.title) if v.candidate else _('없음')), model=(ev.model or '–'), prompt_version=(ev.prompt_version or '')) }}</p>
 {% if ev.summary %}<p class="muted">{{ ev.summary }}</p>{% endif %}
 
 {% if v.primary %}
-<h2>개념별 근거 (원문 검증 완료 구절)</h2>
+<h2>{{ _("개념별 근거 (원문 검증 완료 구절)") }}</h2>
 <table>
-<tr><th>개념</th><th>커버리지</th><th>판단</th></tr>
+<tr><th>{{ _("개념") }}</th><th>{{ _("커버리지") }}</th><th>{{ _("판단") }}</th></tr>
 {% for k in v.primary.concepts %}
 <tr><td>{{ k.concept }}</td><td>{{ k.coverage | pct }}</td><td>{{ k.status | concept_status }}</td></tr>
 {% endfor %}
 </table>
 {% for k in v.primary.concepts if k.source_evidence or k.target_evidence %}
 <p><b>{{ k.concept }}</b></p>
-{% for e in k.source_evidence %}{% set page = v.source_page(e.char_start) %}<p class="quote">학생: “{{ e.text }}” <span class="muted">[{% if page %}원본 {{ page }}쪽 · {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
-{% for e in k.target_evidence %}{% set page = v.target_page(e.char_start) %}<p class="quote">기준: “{{ e.text }}” <span class="muted">[{% if page %}원본 {{ page }}쪽 · {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
+{% for e in k.source_evidence %}{% set page = v.source_page(e.char_start) %}<p class="quote">{{ _("학생: “{text}”", text=(e.text)) }} <span class="muted">[{% if page %}{{ _("원본 {page}쪽 ·", page=(page)) }} {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
+{% for e in k.target_evidence %}{% set page = v.target_page(e.char_start) %}<p class="quote">{{ _("기준: “{text}”", text=(e.text)) }} <span class="muted">[{% if page %}{{ _("원본 {page}쪽 ·", page=(page)) }} {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
 {% endfor %}
 {% endif %}
 
 {% if v.history %}
-<h2>같은 과목의 과거 판정 {{ v.history | length }}건</h2>
-{% for h in v.history %}<p>{{ h.decided_at.strftime('%Y-%m-%d') }} · {{ h.result | rec }}{% if h.target_code %} ({{ h.target_code }}){% endif %} · {% if h.imported %}기존 동등 과목표{% else %}강의계획서 유사도 {{ h.similarity | pct }}{% endif %}{% if h.reason_codes %} — {% for c in h.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if h.reason_memo %}: {{ h.reason_memo }}{% endif %}</p>{% endfor %}
+<h2>{{ _("같은 과목의 과거 판정 {history}건", history=(v.history | length)) }}</h2>
+{% for h in v.history %}<p>{{ h.decided_at.strftime('%Y-%m-%d') }} · {{ h.result | rec }}{% if h.target_code %} ({{ h.target_code }}){% endif %} · {% if h.imported %}{{ _("기존 동등 과목표") }}{% else %}{{ _("강의계획서 유사도 {similarity}", similarity=(h.similarity | pct)) }}{% endif %}{% if h.reason_codes %} — {% for c in h.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if h.reason_memo %}: {{ h.reason_memo }}{% endif %}</p>{% endfor %}
 {% endif %}
 
 {% if v.audit %}
-<h2>감사 로그</h2>
+<h2>{{ _("감사 로그") }}</h2>
 {% for a in v.audit %}<p class="muted">{{ a.created_at | utc }} · {{ a.action }} · {{ a.payload_json }}</p>{% endfor %}
 {% endif %}
 </body>

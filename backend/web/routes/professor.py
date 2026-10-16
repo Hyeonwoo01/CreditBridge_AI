@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.errors import CreditBridgeError, DecisionValidationError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
@@ -86,7 +87,7 @@ def decide(
             request, "professor/evaluation.html", status_code=422, user=user, v=view, error=str(exc), form=form
         )
     send_emails()
-    flash(request, "판정을 확정했어요. 학생 포털과 내보내기에 바로 반영돼요.")
+    flash(request, tr("판정을 확정했어요. 학생 포털과 내보내기에 바로 반영돼요."))
     return RedirectResponse("/professor", status_code=303)
 
 
@@ -104,9 +105,9 @@ def away(
     send_emails()
     flash(
         request,
-        f"부재 기간을 저장했어요. 진행 중인 {moved}건을 대리 심사자에게 넘겼어요."
+        tr("부재 기간을 저장했어요. 진행 중인 {moved}건을 대리 심사자에게 넘겼어요.", moved=moved)
         if days > 0
-        else "복귀로 표시했어요.",
+        else tr("복귀로 표시했어요."),
     )
     return RedirectResponse("/professor", status_code=303)
 
@@ -130,5 +131,5 @@ def request_materials(
         flash(request, str(exc), "error")
     else:
         send_emails()
-        flash(request, "학생에게 보완 자료를 요청했어요. 자료가 오면 다시 분석한 결과로 이어서 판정할 수 있어요.")
+        flash(request, tr("학생에게 보완 자료를 요청했어요. 자료가 오면 다시 분석한 결과로 이어서 판정할 수 있어요."))
     return RedirectResponse(f"/professor/evaluations/{evaluation_id}", status_code=303)

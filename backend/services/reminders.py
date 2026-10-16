@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import Settings, get_settings
 from backend.db.base import utcnow
+from backend.i18n import N_
 from backend.models import Institution, PrivacyRequest, Syllabus, User
 from backend.models.enums import PrivacyStatus, Role
 from backend.repositories import catalog as catalog_repo
@@ -88,7 +89,7 @@ def plan(session: Session, institution_id: int, now: datetime | None = None, set
 
 
 def _course(syllabus: Syllabus) -> str:
-    return (syllabus.course_code or syllabus.course_title or "강의계획서").strip()
+    return (syllabus.course_code or syllabus.course_title or N_("강의계획서")).strip()
 
 
 def _send(session: Session, user: User | None, kind: str, message: str, link: str, now: datetime) -> int:
@@ -108,31 +109,35 @@ def send_for_institution(session: Session, institution: Institution, now: dateti
     for professor_id in set(p.overdue) | set(p.due_soon):
         parts = []
         if p.overdue.get(professor_id):
-            parts.append(f"판정 기한이 지난 심사 {p.overdue[professor_id]}건")
+            parts.append(N_("판정 기한이 지난 심사 {n}건").format(n=p.overdue[professor_id]))
         if p.due_soon.get(professor_id):
-            parts.append(f"내일까지 판정할 심사 {p.due_soon[professor_id]}건")
-        message = "기한 알림: " + " · ".join(parts)
+            parts.append(N_("내일까지 판정할 심사 {n}건").format(n=p.due_soon[professor_id]))
+        message = N_("기한 알림: {items}").format(items=" · ".join(parts))
         sent += _send(
             session, user_repo.get_by_id(session, professor_id), "reminder.review", message, "/professor", now
         )
     staff_parts = []
     if p.overdue_total:
-        staff_parts.append(f"판정 기한이 지난 심사 {p.overdue_total}건")
+        staff_parts.append(N_("판정 기한이 지난 심사 {n}건").format(n=p.overdue_total))
     if p.unassigned:
-        staff_parts.append(f"교수 배정을 기다리는 과목 {p.unassigned}개")
+        staff_parts.append(N_("교수 배정을 기다리는 과목 {n}개").format(n=p.unassigned))
     if p.privacy_review:
-        staff_parts.append(f"처리 기한이 다가온 삭제 요청 {len(p.privacy_review)}건")
+        staff_parts.append(N_("처리 기한이 다가온 삭제 요청 {n}건").format(n=len(p.privacy_review)))
     if staff_parts:
-        message = "기한 알림: " + " · ".join(staff_parts)
+        message = N_("기한 알림: {items}").format(items=" · ".join(staff_parts))
         for evaluator in notifications.staff(session, institution.id, Role.EVALUATOR):
             sent += _send(session, evaluator, "reminder.evaluator", message, "/review", now)
     if p.privacy_approve:
-        message = f"기한 알림: 승인 기한이 다가온 삭제 요청 {len(p.privacy_approve)}건"
+        message = N_("기한 알림: {items}").format(
+            items=N_("승인 기한이 다가온 삭제 요청 {n}건").format(n=len(p.privacy_approve))
+        )
         for admin in notifications.staff(session, institution.id, Role.ADMIN):
             sent += _send(session, admin, "reminder.admin", message, "/admin/privacy", now)
     for student_id, syllabi in p.materials.items():
         courses = ", ".join(sorted({_course(s) for s in syllabi}))
-        message = f"기한 알림: {courses} 보완 자료 요청에 아직 답하지 않았어요. 늦어지면 심사도 늦어져요."
+        message = N_("기한 알림: {courses} 보완 자료 요청에 아직 답하지 않았어요. 늦어지면 심사도 늦어져요.").format(
+            courses=courses
+        )
         link = f"/student/syllabi/{syllabi[0].id}"
         sent += _send(session, user_repo.get_by_id(session, student_id), "reminder.material", message, link, now)
     return sent

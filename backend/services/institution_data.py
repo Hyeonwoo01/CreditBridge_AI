@@ -20,6 +20,8 @@ from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, LLMError, NotFoundError, PermissionDeniedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import Assignment, Course, Institution, Syllabus, User
 from backend.models.enums import Role, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
@@ -110,7 +112,7 @@ class Overview:
 
 def ensure_admin(user: User) -> int:
     if user.role != Role.ADMIN or user.institution_id is None:
-        raise PermissionDeniedError("기관 관리자만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("기관 관리자만 사용할 수 있어요."))
     return user.institution_id
 
 
@@ -118,7 +120,7 @@ def overview(session: Session, admin: User) -> Overview:
     institution_id = ensure_admin(admin)
     institution = catalog_repo.get_institution(session, institution_id)
     if institution is None:
-        raise NotFoundError("기관을 찾을 수 없어요.")
+        raise NotFoundError(tr("기관을 찾을 수 없어요."))
     courses = catalog_repo.courses_of(session, institution_id)
     uploads = syllabus_repo.latest_reference_uploads(session, institution_id)
     staffed = user_repo.professor_departments(session, institution_id)
@@ -153,11 +155,11 @@ def set_active(session: Session, admin: User, email: str, active: bool) -> Activ
     institution_id = ensure_admin(admin)
     user = user_repo.get_by_email(session, email)
     if user is None or user.institution_id != institution_id:
-        raise NotFoundError("우리 기관에 그 이메일의 계정이 없어요.")
+        raise NotFoundError(tr("우리 기관에 그 이메일의 계정이 없어요."))
     if user.id == admin.id:
-        raise CreditBridgeError("본인 계정은 비활성화할 수 없어요.")
+        raise CreditBridgeError(tr("본인 계정은 비활성화할 수 없어요."))
     if user.is_active == active:
-        raise CreditBridgeError("이미 활성 상태인 계정이에요." if active else "이미 비활성화된 계정이에요.")
+        raise CreditBridgeError(tr("이미 활성 상태인 계정이에요.") if active else tr("이미 비활성화된 계정이에요."))
     user.is_active = active
     user.deactivated_at = None if active else utcnow()
     session.flush()
@@ -204,18 +206,26 @@ def _hand_over_reviews(session: Session, admin: User, professor: User) -> tuple[
             session,
             [reviewer],
             "assignment.delegated",
-            f"교수 계정 변경으로 진행 중인 심사 {n}건이 배정됐어요.",
+            N_("교수 계정 변경으로 진행 중인 심사 {n}건이 배정됐어요.").format(n=n),
             "/professor",
         )
     if moved or released:
-        parts = [f"{moved}건은 같은 학과 다른 교수에게 넘겼어요"] if moved else []
-        if released:
-            parts.append(f"{released}건은 교수 배정이 필요해요")
+        if moved and released:
+            template = N_(
+                "{dept} 교수 계정이 비활성화돼 진행 중인 심사 중 {moved}건은 같은 학과 다른 교수에게 넘겼어요, "
+                "{released}건은 교수 배정이 필요해요."
+            )
+        elif moved:
+            template = N_(
+                "{dept} 교수 계정이 비활성화돼 진행 중인 심사 중 {moved}건은 같은 학과 다른 교수에게 넘겼어요."
+            )
+        else:
+            template = N_("{dept} 교수 계정이 비활성화돼 진행 중인 심사 중 {released}건은 교수 배정이 필요해요.")
         notifications.notify(
             session,
             notifications.staff(session, admin.institution_id or 0, Role.EVALUATOR),
             "assignment.delegated",
-            f"{professor.department or ''} 교수 계정이 비활성화돼 진행 중인 심사 중 {', '.join(parts)}.",
+            template.format(dept=professor.department or "", moved=moved, released=released),
             "/review",
         )
     return moved, released
@@ -236,39 +246,44 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
         role = ROLES.get(row.get("role", "").lower()) or ROLES.get(row.get("role", ""))
         department = row.get("department", "") or None
         if not _EMAIL.match(email) or len(email) > 255:
-            problems.append("이메일 형식이 아님")
+            problems.append(tr("이메일 형식이 아님"))
         elif email in seen:
-            problems.append("파일 안에서 이메일이 중복됨")
+            problems.append(tr("파일 안에서 이메일이 중복됨"))
         if not name:
-            problems.append("이름 없음")
+            problems.append(tr("이름 없음"))
         elif len(name) > 100:
-            problems.append("이름은 100자까지")
+            problems.append(tr("이름은 100자까지"))
         if role is None:
-            problems.append("역할은 student·evaluator·professor·admin(또는 학생·심사관·교수·관리자) 중 하나")
+            problems.append(tr("역할은 student·evaluator·professor·admin(또는 학생·심사관·교수·관리자) 중 하나"))
         if department and len(department) > 50:
-            problems.append("학과는 50자까지")
+            problems.append(tr("학과는 50자까지"))
         if role == Role.PROFESSOR:
             if not department:
-                problems.append("교수는 학과가 필요(과목 배정 기준)")
+                problems.append(tr("교수는 학과가 필요(과목 배정 기준)"))
             elif departments and department not in departments:
-                problems.append(f"과목 목록에 없는 학과({department}). 과목 CSV의 학과명과 똑같이 써 주세요")
+                problems.append(
+                    tr(
+                        "과목 목록에 없는 학과({department}). 과목 CSV의 학과명과 똑같이 써 주세요",
+                        department=department,
+                    )
+                )
         if not problems:
             existing = user_repo.get_by_email(session, email)
             if existing is not None and existing.institution_id != institution_id:
-                problems.append("다른 기관에 이미 있는 이메일")
+                problems.append(tr("다른 기관에 이미 있는 이메일"))
             elif existing is not None:
                 result.skipped.append(email)
                 seen.add(email)
                 continue
         seen.add(email)
         if problems or role is None:
-            result.errors.append(f"{line_no}행: {', '.join(problems)}")
+            result.errors.append(tr("{line_no}행: {problems}", line_no=line_no, problems=", ".join(problems)))
             continue
         pending.append((email, name, role, department))
     if result.errors:
         return result
     if not pending and not result.skipped:
-        raise CreditBridgeError("가져올 행이 없어요.")
+        raise CreditBridgeError(tr("가져올 행이 없어요."))
     for email, name, role, department in pending:
         password = "" if by_email else temporary_password()
         created = user_repo.add(
@@ -315,41 +330,41 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
         problems = []
         code, title, department = row.get("code", ""), row.get("title", ""), row.get("department", "")
         if not code:
-            problems.append("과목 코드 없음")
+            problems.append(tr("과목 코드 없음"))
         elif len(code) > 30:
-            problems.append("과목 코드는 30자까지")
+            problems.append(tr("과목 코드는 30자까지"))
         elif code in seen:
-            problems.append("파일 안에서 과목 코드가 중복됨")
+            problems.append(tr("파일 안에서 과목 코드가 중복됨"))
         if not title:
-            problems.append("과목명 없음")
+            problems.append(tr("과목명 없음"))
         elif len(title) > 200:
-            problems.append("과목명은 200자까지")
+            problems.append(tr("과목명은 200자까지"))
         credits = 0.0
         try:
             credits = float(row.get("credits", ""))
         except ValueError:
-            problems.append("학점은 숫자")
+            problems.append(tr("학점은 숫자"))
         else:
             if not 0 < credits <= 30:
-                problems.append("학점은 0보다 크고 30 이하")
+                problems.append(tr("학점은 0보다 크고 30 이하"))
         if not department:
-            problems.append("학과 없음")
+            problems.append(tr("학과 없음"))
         elif len(department) > 50:
-            problems.append("학과는 50자까지")
+            problems.append(tr("학과는 50자까지"))
         concepts = _concepts(row.get("concepts", ""))
         if not concepts:
-            problems.append("필수 개념을 ;로 구분해 1개 이상")
+            problems.append(tr("필수 개념을 ;로 구분해 1개 이상"))
         elif any(len(c) > 200 for c in concepts):
-            problems.append("필수 개념 하나는 200자까지")
+            problems.append(tr("필수 개념 하나는 200자까지"))
         seen.add(code)
         if problems:
-            result.errors.append(f"{line_no}행: {', '.join(problems)}")
+            result.errors.append(tr("{line_no}행: {problems}", line_no=line_no, problems=", ".join(problems)))
             continue
         parsed.append((code, title, credits, department, row.get("level", ""), concepts))
     if result.errors:
         return result
     if not parsed:
-        raise CreditBridgeError("가져올 행이 없어요.")
+        raise CreditBridgeError(tr("가져올 행이 없어요."))
     for code, title, credits, department, level, concepts in parsed:
         course = catalog_repo.course_by_code(session, institution_id, code)
         if course is None:
@@ -391,11 +406,11 @@ def add_source_institution(session: Session, admin: User, name: str, country: st
     ensure_admin(admin)
     name, country = name.strip(), country.strip().upper()
     if not name or len(name) > 200:
-        raise CreditBridgeError("대학 이름을 200자 이내로 적어 주세요.")
+        raise CreditBridgeError(tr("대학 이름을 200자 이내로 적어 주세요."))
     if not re.fullmatch(r"[A-Z]{2}", country):
-        raise CreditBridgeError("국가는 두 글자 코드로 적어 주세요 (예: KR, US).")
+        raise CreditBridgeError(tr("국가는 두 글자 코드로 적어 주세요 (예: KR, US)."))
     if catalog_repo.source_institution_by_name(session, name) is not None:
-        raise CreditBridgeError("이미 등록된 출신 대학이에요.")
+        raise CreditBridgeError(tr("이미 등록된 출신 대학이에요."))
     institution = catalog_repo.add_institution(session, Institution(name=name, country=country, is_target=False))
     audit.record(session, admin, "institution.create", "institution", str(institution.id))
     session.commit()
@@ -412,7 +427,7 @@ def upload_reference(
     institution_id = ensure_admin(admin)
     course = catalog_repo.get_course(session, course_id)
     if course is None or course.institution_id != institution_id:
-        raise NotFoundError("과목을 찾을 수 없어요.")
+        raise NotFoundError(tr("과목을 찾을 수 없어요."))
     ext = doc_text.validate_upload(filename, data, get_settings().max_upload_mb)
     key = storage.new_key("references", filename)
     storage.put(key, data, doc_text.CONTENT_TYPES[ext])
@@ -452,13 +467,15 @@ def process_reference(
     text, quality = doc.text, doc.quality
     if not text.strip():
         syllabus.status = SyllabusStatus.FAILED
-        syllabus.error_message = "문서에서 글자를 읽지 못했어요. 텍스트가 있는 PDF나 더 선명한 스캔본을 올려 주세요."
+        syllabus.error_message = N_(
+            "문서에서 글자를 읽지 못했어요. 텍스트가 있는 PDF나 더 선명한 스캔본을 올려 주세요."
+        )
         session.commit()
         return
     syllabus.raw_text = text
     syllabus.quality_score = quality
     syllabus.page_offsets = doc.page_offsets
-    syllabus.injection_flags = [f"{f.line_no}행: {f.text}" for f in detect(text)]
+    syllabus.injection_flags = [N_("{line}행: {text}").format(line=f.line_no, text=f.text) for f in detect(text)]
     syllabus.status = SyllabusStatus.READY
     course.reference_syllabus_id = syllabus.id
     session.commit()
@@ -484,15 +501,15 @@ def bootstrap_admin(
         name.strip(),
     )
     if not institution_name or len(institution_name) > 200:
-        raise CreditBridgeError("대학 이름을 200자 이내로 적어 주세요.")
+        raise CreditBridgeError(tr("대학 이름을 200자 이내로 적어 주세요."))
     if not re.fullmatch(r"[A-Z]{2}", country):
-        raise CreditBridgeError("국가는 두 글자 코드로 적어 주세요 (예: KR, US).")
+        raise CreditBridgeError(tr("국가는 두 글자 코드로 적어 주세요 (예: KR, US)."))
     if not _EMAIL.match(email):
-        raise CreditBridgeError("이메일 형식이 아니에요.")
+        raise CreditBridgeError(tr("이메일 형식이 아니에요."))
     if not name or len(name) > 100:
-        raise CreditBridgeError("이름을 100자 이내로 적어 주세요.")
+        raise CreditBridgeError(tr("이름을 100자 이내로 적어 주세요."))
     if user_repo.get_by_email(session, email) is not None:
-        raise CreditBridgeError("이미 있는 이메일이에요.")
+        raise CreditBridgeError(tr("이미 있는 이메일이에요."))
     institution = catalog_repo.target_institution_by_name(session, institution_name)
     if institution is None:
         institution = catalog_repo.add_institution(

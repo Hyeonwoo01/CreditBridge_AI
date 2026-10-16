@@ -1,10 +1,18 @@
+// 화면 언어(<html lang>)와 서버가 넣어 준 번역 문구(base.html #i18n-js). 없으면 한국어 원문.
+const LANG = document.documentElement.lang || "ko";
+const I18N = (() => {
+  try { return JSON.parse(document.getElementById("i18n-js").textContent); } catch { return {}; }
+})();
+const t = (key, fallback, params = {}) =>
+  (I18N[key] || fallback).replace(/\{(\w+)\}/g, (_, name) => (name in params ? params[name] : `{${name}}`));
+
 // UTC로 저장된 시각을 보는 사람의 현지 시각으로 표시한다.
 function localizeTimes(root) {
   root.querySelectorAll("time[datetime]").forEach((el) => {
     const d = new Date(el.getAttribute("datetime"));
     if (isNaN(d)) return;
     const withTime = el.dataset.format !== "date";
-    el.textContent = d.toLocaleString("ko-KR", withTime
+    el.textContent = d.toLocaleString(LANG === "en" ? "en-US" : "ko-KR", withTime
       ? { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
       : { year: "numeric", month: "short", day: "numeric" });
   });
@@ -65,16 +73,18 @@ document.querySelectorAll("[data-decision-form]").forEach((form) => {
     return { action, reasons: action === "reject" || (action === "modify" && differs), conflicts };
   };
   const open = (p) => {
-    const title = p.action === "reject" ? "학점 불인정 사유 선택 및 소명" : p.reasons ? "판정 변경 사유 선택 및 소명" : "과거 판정과 다른 결과 확인";
+    const title = p.action === "reject" ? t("reject_title", "학점 불인정 사유 선택 및 소명")
+      : p.reasons ? t("modify_title", "판정 변경 사유 선택 및 소명") : t("conflict_title", "과거 판정과 다른 결과 확인");
     dialog.querySelector("[data-reason-title]").textContent = title;
     dialog.querySelector("[data-reason-submit]").textContent =
-      p.action === "reject" ? "불인정 사유 저장 및 판정 확정" : p.reasons ? "사유 저장 및 판정 확정" : "확인하고 판정 확정";
+      p.action === "reject" ? t("reject_submit", "불인정 사유 저장 및 판정 확정")
+        : p.reasons ? t("modify_submit", "사유 저장 및 판정 확정") : t("conflict_submit", "확인하고 판정 확정");
     dialog.querySelectorAll("[data-reasons]").forEach((el) => { el.hidden = !p.reasons; });
     const warn = dialog.querySelector("[data-conflict-warning]");
     if (p.conflicts) {
       warn.hidden = false;
       dialog.querySelector("[data-conflict-text]").textContent =
-        `같은 강의계획서로 내린 과거 판정 ${p.conflicts}건과 결과가 달라요. 이력을 확인한 뒤 확정해 주세요.`;
+        t("conflict_text", "같은 강의계획서로 내린 과거 판정 {n}건과 결과가 달라요. 이력을 확인한 뒤 확정해 주세요.", { n: p.conflicts });
     }
     if (!dialog.open) dialog.showModal();
   };
@@ -106,7 +116,15 @@ document.querySelectorAll("textarea[data-count]").forEach((el) => {
 document.querySelectorAll("input[type=file][data-max-files]").forEach((el) => {
   el.addEventListener("change", () => {
     const max = Number(el.dataset.maxFiles);
-    el.setCustomValidity(el.files.length > max ? `파일은 ${max}개까지 올릴 수 있어요.` : "");
+    el.setCustomValidity(el.files.length > max ? t("max_files", "파일은 {n}개까지 올릴 수 있어요.", { n: max }) : "");
     el.reportValidity();
   });
+});
+
+// 되돌릴 수 없는 처리 전 확인: 폼이나 버튼의 data-confirm 문구(화면 언어로 들어 있음)를 띄운다.
+document.addEventListener("submit", (e) => {
+  const form = e.target;
+  const button = e.submitter && e.submitter.closest("[data-confirm]");
+  const message = (button && button.dataset.confirm) || (form.dataset && form.dataset.confirm);
+  if (message && !window.confirm(message)) e.preventDefault();
 });

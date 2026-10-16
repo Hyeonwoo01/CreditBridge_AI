@@ -6,6 +6,7 @@
 from sqlalchemy.orm import Session
 
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import EvaluationNote, User
 from backend.models.enums import Role
 from backend.repositories import evaluations as evaluation_repo
@@ -24,14 +25,14 @@ def for_syllabus(session: Session, syllabus_id: int) -> list[EvaluationNote]:
 def add(session: Session, user: User, evaluation_id: int, body: str) -> EvaluationNote:
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
-        raise NotFoundError("심사 건을 찾을 수 없어요.")
+        raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
     if user.role not in STAFF or not can_view_evaluation(session, user, evaluation):
-        raise PermissionDeniedError("이 심사 건에 메모를 남길 권한이 없어요.")
+        raise PermissionDeniedError(tr("이 심사 건에 메모를 남길 권한이 없어요."))
     body = body.strip()
     if not body:
-        raise CreditBridgeError("메모 내용을 적어 주세요.")
+        raise CreditBridgeError(tr("메모 내용을 적어 주세요."))
     if len(body) > MAX_LENGTH:
-        raise CreditBridgeError(f"메모는 {MAX_LENGTH}자까지 남길 수 있어요.")
+        raise CreditBridgeError(tr("메모는 {max_length}자까지 남길 수 있어요.", max_length=MAX_LENGTH))
     note = note_repo.add(
         session,
         EvaluationNote(

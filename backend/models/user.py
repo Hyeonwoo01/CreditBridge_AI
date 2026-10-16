@@ -27,6 +27,8 @@ class User(IdMixin, CreatedAtMixin, Base):
     # 졸업·퇴직 등으로 비활성화된 계정: 지우지 않고(감사 기록 보존) 로그인·배정·알림 메일에서 뺀다
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     deactivated_at: Mapped[datetime | None] = mapped_column(default=None)
+    # 화면·알림·메일 언어 (backend/i18n.py, ko/en). 처음 로그인할 때 그때 화면 언어로 정하고 언어 전환으로 바꾼다
+    locale: Mapped[str | None] = mapped_column(String(5), default=None)
 
     institution: Mapped[Institution | None] = relationship(lazy="joined")
 

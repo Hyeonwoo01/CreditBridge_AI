@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.documents.text import page_at
 from backend.errors import NotFoundError, PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import (
     Appeal,
     AppealFile,
@@ -140,12 +141,12 @@ class EvaluationView:
 def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_audit: bool = False) -> EvaluationView:
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
-        raise NotFoundError("분석 결과를 찾을 수 없어요.")
+        raise NotFoundError(tr("분석 결과를 찾을 수 없어요."))
     ensure_can_view_evaluation(session, user, evaluation)
     syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
     request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
     if syllabus is None or request is None:
-        raise NotFoundError("분석 결과를 찾을 수 없어요.")
+        raise NotFoundError(tr("분석 결과를 찾을 수 없어요."))
     decision = decision_repo.for_evaluation(session, evaluation.id)
     assignment = evaluation_repo.active_assignment(session, evaluation.id)
     view = EvaluationView(
@@ -348,7 +349,7 @@ def student_badges(session: Session, student: User) -> StudentBadges:
 def own_syllabus(session: Session, student: User, syllabus_id: int) -> Syllabus:
     syllabus = syllabus_repo.get(session, syllabus_id)
     if syllabus is None or syllabus.owner_id != student.id:
-        raise NotFoundError("강의계획서를 찾을 수 없어요.")
+        raise NotFoundError(tr("강의계획서를 찾을 수 없어요."))
     return syllabus
 
 
@@ -398,14 +399,14 @@ def colleagues(session: Session, professor: User) -> list[User]:
 def reminder_preview(session: Session, user: User) -> reminder_service.Plan:
     """운영 통계 화면의 '기한 알림' 카드: 오늘 기한 알림을 받을 대상 (심사관·관리자)."""
     if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
-        raise PermissionDeniedError("심사관과 기관 관리자만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("심사관과 기관 관리자만 볼 수 있어요."))
     return reminder_service.plan(session, user.institution_id)
 
 
 def recent_audit(session: Session, admin: User) -> list[AuditLog]:
     """전체 감사 로그 화면: 관리자 소속 기관 사용자의 기록만 (다른 기관 기록은 보이지 않는다)."""
     if admin.role != Role.ADMIN or admin.institution_id is None:
-        raise PermissionDeniedError("기관 관리자만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("기관 관리자만 볼 수 있어요."))
     return audit_repo.recent_for_institution(session, admin.institution_id)
 
 
@@ -417,7 +418,7 @@ def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:
 def request_id_of(session: Session, syllabus: Syllabus) -> int:
     request = request_repo.get(session, syllabus.transfer_request_id) if syllabus.transfer_request_id else None
     if request is None:
-        raise NotFoundError("편입 요청을 찾을 수 없어요.")
+        raise NotFoundError(tr("편입 요청을 찾을 수 없어요."))
     return request.id
 
 
@@ -433,12 +434,12 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
         b = student_badges(session, user)
         return {
             "/student": [
-                (b.missing, "todo", f"채워야 할 서류 {b.missing}건"),
-                (b.results, "new", f"새 판정 결과 {b.results}건"),
+                (b.missing, "todo", tr("채워야 할 서류 {missing}건", missing=b.missing)),
+                (b.results, "new", tr("새 판정 결과 {results}건", results=b.results)),
             ],
             "/student/appeals": [
-                (b.appealable, "count", f"이의 신청할 수 있는 과목 {b.appealable}개"),
-                (b.appeal_results, "new", f"새 이의 신청 결과 {b.appeal_results}건"),
+                (b.appealable, "count", tr("이의 신청할 수 있는 과목 {appealable}개", appealable=b.appealable)),
+                (b.appeal_results, "new", tr("새 이의 신청 결과 {appeal_results}건", appeal_results=b.appeal_results)),
             ],
         }
     if user.role == Role.EVALUATOR:
@@ -446,13 +447,13 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
         appeals = appeal_service.submitted_count(session, user)
         privacy = privacy_service.pending_count(session, user)
         return {
-            "/review": [(unassigned, "todo", f"교수 배정이 필요한 과목 {unassigned}개")],
-            "/review/appeals": [(appeals, "todo", f"처리할 이의 신청 {appeals}건")],
-            "/review/privacy": [(privacy, "todo", f"처리할 삭제 요청 {privacy}건")],
+            "/review": [(unassigned, "todo", tr("교수 배정이 필요한 과목 {unassigned}개", unassigned=unassigned))],
+            "/review/appeals": [(appeals, "todo", tr("처리할 이의 신청 {appeals}건", appeals=appeals))],
+            "/review/privacy": [(privacy, "todo", tr("처리할 삭제 요청 {privacy}건", privacy=privacy))],
         }
     if user.role == Role.PROFESSOR:
         pending = len(professor_items(session, user))
-        return {"/professor": [(pending, "todo", f"판정할 심사 {pending}건")]}
+        return {"/professor": [(pending, "todo", tr("판정할 심사 {pending}건", pending=pending))]}
     if user.role == Role.ADMIN and user.institution_id is not None:
         overview = institution_service.overview(session, user)
         setup = overview.missing_reference + len(overview.departments_without_professor)
@@ -462,10 +463,15 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
                 (
                     setup,
                     "todo",
-                    f"준비가 필요한 항목 {setup}건 (기준 강의계획서 없는 과목 {overview.missing_reference}개, "
-                    f"교수가 없는 학과 {len(overview.departments_without_professor)}개)",
+                    tr(
+                        "준비가 필요한 항목 {n}건 "
+                        "(기준 강의계획서 없는 과목 {courses}개, 교수가 없는 학과 {departments}개)",
+                        n=setup,
+                        courses=overview.missing_reference,
+                        departments=len(overview.departments_without_professor),
+                    ),
                 )
             ],
-            "/admin/privacy": [(privacy, "todo", f"승인할 삭제 요청 {privacy}건")],
+            "/admin/privacy": [(privacy, "todo", tr("승인할 삭제 요청 {privacy}건", privacy=privacy))],
         }
     return {}

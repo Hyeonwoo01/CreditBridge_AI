@@ -13,6 +13,8 @@ from backend.config import get_settings
 from backend.db.base import utcnow
 from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import PrivacyRequest, TransferRequest, User
 from backend.models.enums import PrivacyStatus, Role, SyllabusStatus
 from backend.repositories import appeals as appeal_repo
@@ -39,10 +41,10 @@ def is_overdue(privacy: PrivacyRequest, now: datetime | None = None) -> bool:
 
 def request_deletion(session: Session, student: User, request: TransferRequest) -> PrivacyRequest:
     if request.student_id != student.id:
-        raise PermissionDeniedError("본인의 편입 요청만 삭제를 요청할 수 있어요.")
+        raise PermissionDeniedError(tr("본인의 편입 요청만 삭제를 요청할 수 있어요."))
     latest = privacy_repo.latest_for_request(session, request.id)
     if latest is not None and latest.status != PrivacyStatus.COMPLETED:
-        raise CreditBridgeError("이미 처리 중인 삭제 요청이 있어요.")
+        raise CreditBridgeError(tr("이미 처리 중인 삭제 요청이 있어요."))
     now = utcnow()
     privacy = privacy_repo.add(
         session,
@@ -57,7 +59,7 @@ def request_deletion(session: Session, student: User, request: TransferRequest) 
         session,
         notifications.staff(session, request.target_institution_id, Role.EVALUATOR),
         "privacy.requested",
-        f"문서 삭제 요청이 접수됐어요 (요청 #{request.id}). 기한 안에 처리해 주세요.",
+        N_("문서 삭제 요청이 접수됐어요 (요청 #{id}). 기한 안에 처리해 주세요.").format(id=request.id),
         "/review/privacy",
     )
     audit.record(session, student, "privacy.request", "transfer_request", str(request.id), privacy=privacy.id)
@@ -73,19 +75,19 @@ def _load(session: Session, user: User, privacy_id: int) -> tuple[PrivacyRequest
     privacy = privacy_repo.get(session, privacy_id)
     request = request_repo.get(session, privacy.transfer_request_id) if privacy else None
     if privacy is None or request is None:
-        raise NotFoundError("삭제 요청을 찾을 수 없어요.")
+        raise NotFoundError(tr("삭제 요청을 찾을 수 없어요."))
     if user.institution_id != request.target_institution_id:
-        raise PermissionDeniedError("소속 기관의 요청만 처리할 수 있어요.")
+        raise PermissionDeniedError(tr("소속 기관의 요청만 처리할 수 있어요."))
     return privacy, request
 
 
 def review(session: Session, evaluator: User, privacy_id: int) -> PrivacyRequest:
     """심사관 처리: 진행 중인 심사와 보관 의무를 확인하고 관리자 승인으로 넘긴다."""
     if evaluator.role != Role.EVALUATOR:
-        raise PermissionDeniedError("심사관만 삭제 요청을 처리할 수 있어요.")
+        raise PermissionDeniedError(tr("심사관만 삭제 요청을 처리할 수 있어요."))
     privacy, request = _load(session, evaluator, privacy_id)
     if privacy.status != PrivacyStatus.REQUESTED:
-        raise CreditBridgeError("이미 처리한 요청이에요.")
+        raise CreditBridgeError(tr("이미 처리한 요청이에요."))
     privacy.status = PrivacyStatus.REVIEWED
     privacy.reviewed_by = evaluator.id
     privacy.reviewed_at = utcnow()
@@ -93,7 +95,7 @@ def review(session: Session, evaluator: User, privacy_id: int) -> PrivacyRequest
         session,
         notifications.staff(session, request.target_institution_id, Role.ADMIN),
         "privacy.reviewed",
-        f"문서 삭제 요청(요청 #{request.id})이 처리돼 승인을 기다려요.",
+        N_("문서 삭제 요청(요청 #{id})이 처리돼 승인을 기다려요.").format(id=request.id),
         "/admin/privacy",
     )
     audit.record(session, evaluator, "privacy.review", "transfer_request", str(request.id), privacy=privacy.id)
@@ -104,10 +106,10 @@ def review(session: Session, evaluator: User, privacy_id: int) -> PrivacyRequest
 def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: int) -> PrivacyRequest:
     """관리자 승인: 승인 즉시 삭제를 실행한다. 심사관 처리 전이라도 기한이 급하면 승인할 수 있다."""
     if admin.role != Role.ADMIN:
-        raise PermissionDeniedError("기관 관리자만 삭제를 승인할 수 있어요.")
+        raise PermissionDeniedError(tr("기관 관리자만 삭제를 승인할 수 있어요."))
     privacy, request = _load(session, admin, privacy_id)
     if privacy.status == PrivacyStatus.COMPLETED:
-        raise CreditBridgeError("이미 삭제를 마친 요청이에요.")
+        raise CreditBridgeError(tr("이미 삭제를 마친 요청이에요."))
     _delete_documents(session, storage, request)
     privacy.status = PrivacyStatus.COMPLETED
     privacy.approved_by = admin.id
@@ -117,7 +119,7 @@ def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: i
         session,
         [student] if student else [],
         "privacy.completed",
-        "요청한 문서 삭제를 마쳤어요. 원본 파일과 추출 텍스트가 지워졌어요.",
+        N_("요청한 문서 삭제를 마쳤어요. 원본 파일과 추출 텍스트가 지워졌어요."),
         f"/student/requests/{request.id}",
     )
     audit.record(
@@ -165,7 +167,7 @@ def _delete_documents(session: Session, storage: ObjectStorage, request: Transfe
 
 def rows(session: Session, user: User) -> list[PrivacyRow]:
     if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
-        raise PermissionDeniedError("심사관과 기관 관리자만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("심사관과 기관 관리자만 볼 수 있어요."))
     now = utcnow()
     out = []
     for privacy, request in privacy_repo.of_institution(session, user.institution_id):
@@ -180,6 +182,6 @@ def rows(session: Session, user: User) -> list[PrivacyRow]:
 def pending_count(session: Session, user: User) -> int:
     """메뉴 배지: 심사관은 처리할 요청(requested), 기관 관리자는 승인할 요청(reviewed) 수."""
     if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
-        raise PermissionDeniedError("심사관과 기관 관리자만 볼 수 있어요.")
+        raise PermissionDeniedError(tr("심사관과 기관 관리자만 볼 수 있어요."))
     waiting = PrivacyStatus.REQUESTED if user.role == Role.EVALUATOR else PrivacyStatus.REVIEWED
     return sum(1 for p, _ in privacy_repo.of_institution(session, user.institution_id) if p.status == waiting)

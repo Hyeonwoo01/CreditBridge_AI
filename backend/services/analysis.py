@@ -19,6 +19,7 @@ from backend.ai.prompts_loader import load_prompt
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import LLMError
+from backend.i18n import N_
 from backend.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry
 from backend.models.enums import EvaluationStatus, Recommendation, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
@@ -36,7 +37,8 @@ from backend.services import scoring
 logger = logging.getLogger(__name__)
 
 AUTO_LINK_SCORE = 0.85
-DEFAULT_MISSING_MATERIALS = ["주차별 상세 강의 계획", "교재 목차(다룬 장 표시)", "시험지 또는 과제 샘플"]
+# 저장하는 글은 한국어 원문 그대로 두고 화면에서 번역한다 (backend/i18n.py N_, translate_stored)
+DEFAULT_MISSING_MATERIALS = [N_("주차별 상세 강의 계획"), N_("교재 목차(다룬 장 표시)"), N_("시험지 또는 과제 샘플")]
 
 
 def content_hash(*parts: bytes) -> str:
@@ -149,7 +151,7 @@ def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: Obje
         raise LLMError("document has no readable text")
 
     flags = injection.detect(syllabus.raw_text)
-    syllabus.injection_flags = [f"{f.line_no}행: {f.text}" for f in flags]
+    syllabus.injection_flags = [N_("{line}행: {text}").format(line=f.line_no, text=f.text) for f in flags]
     result = extract_syllabus(llm, injection.sanitize(syllabus.raw_text, flags))
     extraction = result.output
     syllabus.extracted_json = extraction.model_dump()
@@ -189,7 +191,7 @@ def process_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient, stor
     except LLMError as exc:
         session.rollback()
         syllabus.status = SyllabusStatus.FAILED
-        syllabus.error_message = (
+        syllabus.error_message = N_(
             "문서를 분석하지 못했어요. 글자를 읽을 수 있는 PDF나 이미지인지 확인한 뒤 다시 올려 주세요."
         )
         session.commit()
@@ -292,7 +294,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         result = matching.compare(llm, prompt)
     except LLMError as exc:
         evaluation.status = EvaluationStatus.FAILED
-        evaluation.error_message = "AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요."
+        evaluation.error_message = N_("AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요.")
         session.commit()
         logger.warning("evaluation failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
         return evaluation
@@ -335,11 +337,14 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     if scored:
         best_score, best = scored[0]
         if best.level == "lower":
-            warnings.append(best.level_note or f"{best.course_code}보다 낮은 수준의 과목으로 판단돼요.")
+            warnings.append(
+                best.level_note or N_("{code}보다 낮은 수준의 과목으로 판단돼요.").format(code=best.course_code)
+            )
         if student.credits is not None and student.credits < best.credits:
             warnings.append(
-                f"전적 과목 {student.credits:g}학점이 {best.course_code}의 {best.credits:g}학점보다 적어요. "
-                "학점 차이만큼 부분 인정될 수 있어요."
+                N_(
+                    "전적 과목 {credits}학점이 {code}의 {target}학점보다 적어요. 학점 차이만큼 부분 인정될 수 있어요."
+                ).format(credits=f"{student.credits:g}", code=best.course_code, target=f"{best.credits:g}")
             )
         # 커버리지가 낮으면 특정 과목으로 억지 매핑하지 않는다 (선택 인정·불인정만 추천).
         # 정보 부족이면 판단 대상 후보로 남겨 무엇을 보완할지 보여준다.
@@ -361,7 +366,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         evaluation.summary = output.no_match_reason
         missing_concepts = []
     if student.injection_flags:
-        warnings.append("판정을 유도하는 의심 문구가 있어 해당 줄을 분석에서 제외했어요.")
+        warnings.append(N_("판정을 유도하는 의심 문구가 있어 해당 줄을 분석에서 제외했어요."))
 
     missing_materials = output.missing_materials or (
         DEFAULT_MISSING_MATERIALS if evaluation.recommendation == Recommendation.INSUFFICIENT else []

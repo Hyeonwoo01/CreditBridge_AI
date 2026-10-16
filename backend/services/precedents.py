@@ -10,6 +10,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from backend.errors import PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import Course, Institution, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
@@ -37,7 +38,7 @@ class PrecedentSearch:
 
 def search(session: Session, student: User, source_id: int | None, query: str) -> PrecedentSearch:
     if student.role != Role.STUDENT:
-        raise PermissionDeniedError("학생 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("학생 계정만 사용할 수 있어요."))
     target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
     if target is None or not target.is_target:
         return PrecedentSearch(None, [], None, query)

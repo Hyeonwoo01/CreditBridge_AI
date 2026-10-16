@@ -4,14 +4,14 @@
 {%- endmacro %}
 
 {% macro conf_badge(conf) -%}
-<span class="{{ {'high': 'badge-approve', 'medium': 'badge-elective', 'low': 'badge-reject'}.get(conf, 'badge') }}">신뢰도 {{ conf | conf }}</span>
+<span class="{{ {'high': 'badge-approve', 'medium': 'badge-elective', 'low': 'badge-reject'}.get(conf, 'badge') }}">{{ _("신뢰도 {conf}", conf=(conf | conf)) }}</span>
 {%- endmacro %}
 
 {% macro stage_bar(stages, current) -%}
-<ol class="flex items-center gap-1" aria-label="진행 단계">
+<ol class="flex items-center gap-1" aria-label="{{ _('진행 단계') }}">
   {% for s in stages %}
   <li class="flex items-center gap-1 text-xs {{ 'font-semibold text-ink' if loop.index0 <= current else 'text-muted' }}">
-    <span class="size-2 rounded-full {{ 'bg-primary' if loop.index0 <= current else 'bg-hairline' }}"></span>{{ s }}
+    <span class="size-2 rounded-full {{ 'bg-primary' if loop.index0 <= current else 'bg-hairline' }}"></span>{{ s | t }}
     {% if not loop.last %}<span class="mx-1 h-px w-3 bg-hairline"></span>{% endif %}
   </li>
   {% endfor %}

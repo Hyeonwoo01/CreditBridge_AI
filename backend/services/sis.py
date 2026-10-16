@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.errors import PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import Decision, Institution, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
@@ -99,5 +100,5 @@ def has_token(session: Session, admin: User) -> bool:
 def _own_institution(session: Session, admin: User) -> Institution:
     institution = catalog_repo.get_institution(session, admin.institution_id) if admin.institution_id else None
     if admin.role != Role.ADMIN or institution is None or not institution.is_target:
-        raise PermissionDeniedError("대상 대학의 기관 관리자만 연동 토큰을 관리할 수 있어요.")
+        raise PermissionDeniedError(tr("대상 대학의 기관 관리자만 연동 토큰을 관리할 수 있어요."))
     return institution

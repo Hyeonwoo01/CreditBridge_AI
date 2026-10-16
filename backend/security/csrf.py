@@ -4,6 +4,8 @@ import secrets
 
 from fastapi import HTTPException, Request
 
+from backend.i18n import gettext as tr
+
 
 def csrf_token(request: Request) -> str:
     token = request.session.get("csrf")
@@ -18,5 +20,5 @@ def check_csrf(request: Request, sent: str | None) -> None:
     sent = sent or request.headers.get("X-CSRF-Token")
     if not expected or not sent or not secrets.compare_digest(str(expected), sent):
         raise HTTPException(
-            status_code=403, detail="보안 토큰이 만료됐어요. 페이지를 새로고침한 뒤 다시 시도해 주세요."
+            status_code=403, detail=tr("보안 토큰이 만료됐어요. 페이지를 새로고침한 뒤 다시 시도해 주세요.")
         )

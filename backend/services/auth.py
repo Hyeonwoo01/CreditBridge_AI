@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from backend.config import Settings, get_settings
 from backend.db.base import utcnow
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import N_, normalize, use_locale
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.repositories import audit as audit_repo
@@ -38,8 +40,8 @@ def hash_password(password: str) -> str:
 LOCK_AFTER = 5  # 연속 실패가 이 횟수가 되면
 LOCK_FOR = timedelta(minutes=1)  # 이만큼 로그인을 막는다
 RESET_AFTER = 10  # 연속 실패가 이 횟수가 되면 비밀번호를 무효로 하고 메일 재설정만 허용
-WRONG_PASSWORD = "이메일 또는 비밀번호가 맞지 않아요."
-INACTIVE = "비활성화된 계정이에요. 다시 쓰려면 소속 기관 관리자에게 요청해 주세요."
+WRONG_PASSWORD = N_("이메일 또는 비밀번호가 맞지 않아요.")
+INACTIVE = N_("비활성화된 계정이에요. 다시 쓰려면 소속 기관 관리자에게 요청해 주세요.")
 
 
 @dataclass(frozen=True)
@@ -52,25 +54,25 @@ class LoginAttempt:
 
 def lockout_message(settings: Settings | None = None) -> str:
     how = (
-        "가입한 이메일로 보낸 링크에서 새 비밀번호를 정해 주세요."
+        tr("가입한 이메일로 보낸 링크에서 새 비밀번호를 정해 주세요.")
         if notifications.email_enabled(settings)
-        else "기관 관리자에게 임시 비밀번호 발급을 요청해 주세요."
+        else tr("기관 관리자에게 임시 비밀번호 발급을 요청해 주세요.")
     )
-    return f"로그인 실패가 {RESET_AFTER}번 이어져 보안을 위해 비밀번호를 초기화했어요. {how}"
+    return tr("로그인 실패가 {n}번 이어져 보안을 위해 비밀번호를 초기화했어요. {how}", n=RESET_AFTER, how=how)
 
 
 def login_attempt(session: Session, email: str, password: str) -> LoginAttempt:
     user = user_repo.get_by_email(session, email)
     if user is None:
         _hasher.hash(password)  # 존재하지 않는 계정도 같은 시간이 걸리게
-        return LoginAttempt(error=WRONG_PASSWORD, status_code=401)
+        return LoginAttempt(error=tr(WRONG_PASSWORD), status_code=401)
     if not user.is_active:
         # 비밀번호가 맞을 때만 비활성 안내를 보여 준다 (틀리면 일반 안내, 실패 횟수·재설정 메일 없음)
         try:
             _hasher.verify(user.password_hash, password)
         except (VerificationError, InvalidHashError):
-            return LoginAttempt(error=WRONG_PASSWORD, status_code=401)
-        return LoginAttempt(error=INACTIVE, status_code=403)
+            return LoginAttempt(error=tr(WRONG_PASSWORD), status_code=401)
+        return LoginAttempt(error=tr(INACTIVE), status_code=403)
     if user.failed_logins >= RESET_AFTER:
         _hasher.hash(password)
         return LoginAttempt(error=lockout_message(), status_code=423)
@@ -79,7 +81,11 @@ def login_attempt(session: Session, email: str, password: str) -> LoginAttempt:
         _hasher.hash(password)
         seconds = math.ceil((user.locked_until - now).total_seconds())
         return LoginAttempt(
-            error=f"비밀번호를 {LOCK_AFTER}번 틀려 로그인이 잠겼어요. {seconds}초 뒤에 다시 시도해 주세요.",
+            error=tr(
+                "비밀번호를 {n}번 틀려 로그인이 잠겼어요. {seconds}초 뒤에 다시 시도해 주세요.",
+                n=LOCK_AFTER,
+                seconds=seconds,
+            ),
             status_code=429,
         )
     try:
@@ -106,17 +112,21 @@ def _failed(session: Session, user: User, now: datetime) -> LoginAttempt:
         audit.record(session, user, "auth.lockout", "user", str(user.id), failed=count)
         session.commit()
         return LoginAttempt(
-            error=f"비밀번호를 {LOCK_AFTER}번 틀려 1분 동안 로그인할 수 없어요. "
-            f"그 뒤로도 {RESET_AFTER - LOCK_AFTER}번 더 틀리면 비밀번호가 초기화돼요.",
+            error=tr(
+                "비밀번호를 {n}번 틀려 1분 동안 로그인할 수 없어요. "
+                "그 뒤로도 {more}번 더 틀리면 비밀번호가 초기화돼요.",
+                n=LOCK_AFTER,
+                more=RESET_AFTER - LOCK_AFTER,
+            ),
             status_code=429,
         )
     session.commit()
     if count < LOCK_AFTER:
         left = LOCK_AFTER - count
-        hint = f" {left}번 더 틀리면 1분 동안 로그인할 수 없어요." if left <= 2 else ""
+        hint = " " + tr("{n}번 더 틀리면 1분 동안 로그인할 수 없어요.", n=left) if left <= 2 else ""
     else:
-        hint = f" {RESET_AFTER - count}번 더 틀리면 비밀번호가 초기화돼요."
-    return LoginAttempt(error=WRONG_PASSWORD + hint, status_code=401)
+        hint = " " + tr("{n}번 더 틀리면 비밀번호가 초기화돼요.", n=RESET_AFTER - count)
+    return LoginAttempt(error=tr(WRONG_PASSWORD) + hint, status_code=401)
 
 
 # 헷갈리는 글자(0·O·1·l·I)를 뺀 임시 비밀번호 글자
@@ -130,9 +140,9 @@ def temporary_password(length: int = 12) -> str:
 
 def _check_new(new: str, confirm: str) -> None:
     if len(new) < MIN_PASSWORD_LENGTH:
-        raise CreditBridgeError(f"새 비밀번호는 {MIN_PASSWORD_LENGTH}자 이상으로 정해 주세요.")
+        raise CreditBridgeError(tr("새 비밀번호는 {n}자 이상으로 정해 주세요.", n=MIN_PASSWORD_LENGTH))
     if new != confirm:
-        raise CreditBridgeError("새 비밀번호 확인이 일치하지 않아요.")
+        raise CreditBridgeError(tr("새 비밀번호 확인이 일치하지 않아요."))
 
 
 def change_password(session: Session, user: User, current: str, new: str, confirm: str) -> None:
@@ -140,10 +150,10 @@ def change_password(session: Session, user: User, current: str, new: str, confir
     try:
         _hasher.verify(user.password_hash, current)
     except (VerificationError, InvalidHashError):
-        raise CreditBridgeError("현재 비밀번호가 맞지 않아요.") from None
+        raise CreditBridgeError(tr("현재 비밀번호가 맞지 않아요.")) from None
     _check_new(new, confirm)
     if new == current:
-        raise CreditBridgeError("지금과 다른 비밀번호로 정해 주세요.")
+        raise CreditBridgeError(tr("지금과 다른 비밀번호로 정해 주세요."))
     user.password_hash = _hasher.hash(new)
     user.must_change_password = False
     audit.record(session, user, "auth.password_change", "user", str(user.id))
@@ -160,27 +170,27 @@ RESET_COOLDOWN = timedelta(minutes=5)  # 같은 계정에 재설정 메일을 �
 _MAILS = {
     "reset": (
         "reset",
-        "[CreditBridge] 비밀번호 재설정",
-        "CreditBridge AI 비밀번호 재설정 요청을 받았어요.",
-        "요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요.",
+        N_("[CreditBridge] 비밀번호 재설정"),
+        N_("CreditBridge AI 비밀번호 재설정 요청을 받았어요."),
+        N_("요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요."),
     ),
     "lockout": (
         "reset",
-        "[CreditBridge] 비밀번호 재설정",
-        f"로그인 실패가 {RESET_AFTER}번 이어져 보안을 위해 CreditBridge AI 비밀번호를 초기화했어요.",
-        "본인이 시도한 것이 아니라면 누군가 비밀번호를 추측하려 한 것일 수 있어요. 기관 관리자에게도 알려 주세요.",
+        N_("[CreditBridge] 비밀번호 재설정"),
+        N_("로그인 실패가 {n}번 이어져 보안을 위해 CreditBridge AI 비밀번호를 초기화했어요."),
+        N_("본인이 시도한 것이 아니라면 누군가 비밀번호를 추측하려 한 것일 수 있어요. 기관 관리자에게도 알려 주세요."),
     ),
     "admin": (
         "setup",
-        "[CreditBridge] 비밀번호 재설정",
-        "기관 관리자가 CreditBridge AI 비밀번호를 초기화했어요. 이전 비밀번호는 더 이상 쓸 수 없어요.",
-        "초기화를 요청한 적이 없다면 기관 관리자에게 문의해 주세요.",
+        N_("[CreditBridge] 비밀번호 재설정"),
+        N_("기관 관리자가 CreditBridge AI 비밀번호를 초기화했어요. 이전 비밀번호는 더 이상 쓸 수 없어요."),
+        N_("초기화를 요청한 적이 없다면 기관 관리자에게 문의해 주세요."),
     ),
     "welcome": (
         "setup",
-        "[CreditBridge] 계정이 만들어졌어요",
-        "CreditBridge AI 계정이 만들어졌어요. 로그인 이메일은 이 메일을 받은 주소예요.",
-        "모르는 계정이라면 이 메일을 무시하고 기관 관리자에게 알려 주세요.",
+        N_("[CreditBridge] 계정이 만들어졌어요"),
+        N_("CreditBridge AI 계정이 만들어졌어요. 로그인 이메일은 이 메일을 받은 주소예요."),
+        N_("모르는 계정이라면 이 메일을 무시하고 기관 관리자에게 알려 주세요."),
     ),
 }
 
@@ -237,12 +247,14 @@ def send_reset_email(session: Session, user_id: int, settings: Settings | None =
     purpose, subject, intro, outro = _MAILS[kind]
     token = reset_token(user, settings, purpose)
     link = f"{settings.app_base_url.rstrip('/')}/account/reset?token={quote(token)}"
-    within = "72시간" if purpose == "setup" else f"{RESET_MAX_AGE // 60}분"
-    body = (
-        f"{intro}\n"
-        f"아래 링크에서 {within} 안에 비밀번호를 정해 주세요. 링크는 한 번만 쓸 수 있어요.\n"
-        f"{outro}\n\n{link}\n"
-    )
+    with use_locale(user.locale):  # 받는 사람의 언어로
+        within = tr("72시간") if purpose == "setup" else tr("{n}분", n=RESET_MAX_AGE // 60)
+        body = (
+            f"{tr(intro, n=RESET_AFTER)}\n"
+            f"{tr('아래 링크에서 {within} 안에 비밀번호를 정해 주세요. 링크는 한 번만 쓸 수 있어요.', within=within)}\n"
+            f"{tr(outro)}\n\n{link}\n"
+        )
+        subject = tr(subject)
     return notifications.send_email(user.email, subject, body, settings)
 
 
@@ -254,7 +266,7 @@ def unusable_password() -> str:
 def reset_password(session: Session, token: str, new: str, confirm: str) -> User:
     user = user_for_reset_token(session, token)
     if user is None:
-        raise CreditBridgeError("재설정 링크가 만료됐거나 이미 사용됐어요. 다시 요청해 주세요.")
+        raise CreditBridgeError(tr("재설정 링크가 만료됐거나 이미 사용됐어요. 다시 요청해 주세요."))
     _check_new(new, confirm)
     user.password_hash = _hasher.hash(new)
     user.must_change_password = False
@@ -270,12 +282,12 @@ def admin_reset_password(session: Session, admin: User, email: str, by_email: bo
     by_email이면 아무도 모르는 값으로 바꾸고(호출자가 72시간짜리 설정 링크 메일을 보낸다) 비밀번호를 돌려주지
     않는다. 메일을 쓸 수 없으면 임시 비밀번호를 만들어 돌려주고 다음 로그인 때 바꾸게 한다."""
     if admin.role != Role.ADMIN or admin.institution_id is None:
-        raise PermissionDeniedError("기관 관리자만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("기관 관리자만 사용할 수 있어요."))
     user = user_repo.get_by_email(session, email)
     if user is None or user.institution_id != admin.institution_id:
-        raise NotFoundError("우리 기관에 그 이메일의 계정이 없어요.")
+        raise NotFoundError(tr("우리 기관에 그 이메일의 계정이 없어요."))
     if user.id == admin.id:
-        raise CreditBridgeError("본인 비밀번호는 비밀번호 변경 화면에서 바꿔 주세요.")
+        raise CreditBridgeError(tr("본인 비밀번호는 비밀번호 변경 화면에서 바꿔 주세요."))
     password = None if by_email else temporary_password()
     user.password_hash = unusable_password() if password is None else _hasher.hash(password)
     user.must_change_password = True
@@ -283,3 +295,20 @@ def admin_reset_password(session: Session, admin: User, email: str, by_email: bo
     audit.record(session, admin, "account.password_reset_by_admin", "user", str(user.id), by_email=by_email)
     session.commit()
     return user, password
+
+
+def remember_locale(user: User, current: str) -> str:
+    """로그인할 때 쓸 화면 언어. 저장된 언어가 없으면 지금 화면 언어를 계정에 저장한다 (알림·메일 언어).
+    커밋은 호출한 쪽이 한다."""
+    if normalize(user.locale) is None:
+        user.locale = current
+    return user.locale or current
+
+
+def set_locale(session: Session, user: User, locale: str) -> None:
+    """화면 위 언어 전환: 계정 언어를 바꾼다 (이후 알림·메일도 이 언어)."""
+    code = normalize(locale)
+    if code is None:
+        raise CreditBridgeError(tr("지원하지 않는 언어예요."))
+    user.locale = code
+    session.commit()

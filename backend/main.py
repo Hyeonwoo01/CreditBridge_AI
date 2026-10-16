@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -8,6 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from backend.config import get_settings
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import COOKIE, from_accept_language, normalize, set_locale
 from backend.logging_setup import configure_logging
 from backend.security.session import PASSWORD_PAGE, LoginRequired, PasswordChangeRequired
 from backend.web.api import decisions as api_decisions
@@ -29,6 +31,15 @@ app.add_middleware(
     https_only=settings.is_production,
     max_age=60 * 60 * 8,
 )
+
+
+@app.middleware("http")
+async def choose_locale(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """요청마다 화면 언어를 정한다: cb_lang 쿠키(로그인·언어 전환 때 저장) → 브라우저 언어 → 한국어."""
+    set_locale(normalize(request.cookies.get(COOKIE)) or from_accept_language(request.headers.get("accept-language")))
+    return await call_next(request)
+
+
 # 화면 파일(템플릿·CSS·JS·이미지)은 저장소 루트의 frontend/ 에 있다
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND / "static"), name="static")

@@ -4,30 +4,30 @@
 {% set tone = {'direct': 'badge-approve', 'elective': 'badge-elective', 'none': 'badge-reject'} %}
 <header class="grid gap-1">
   <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase">Precedents</p>
-  <h1 class="page-title">선배 인정 사례</h1>
-  <p class="text-sm text-muted">{{ found.target.name if found.target else '소속 대학' }}의 공식 동등 과목표에서 같은 대학 출신 과목이 어떻게 인정돼 왔는지 찾아볼 수 있어요. 다른 학생이 받은 판정은 보여 주지 않아요.</p>
+  <h1 class="page-title">{{ _("선배 인정 사례") }}</h1>
+  <p class="text-sm text-muted">{{ _("{target}의 공식 동등 과목표에서 같은 대학 출신 과목이 어떻게 인정돼 왔는지 찾아볼 수 있어요. 다른 학생이 받은 판정은 보여 주지 않아요.", target=(found.target.name if found.target else _('소속 대학'))) }}</p>
 </header>
 
 {% if not found.target %}
-<p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">입학이 확정된 대학에 소속된 계정만 인정 사례를 볼 수 있어요.</p>
+<p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">{{ _("입학이 확정된 대학에 소속된 계정만 인정 사례를 볼 수 있어요.") }}</p>
 {% else %}
 <form method="get" action="/student/precedents" class="mt-6 flex flex-col gap-3 rounded-lg border border-hairline bg-white p-4 md:flex-row md:items-end">
-  <label class="field md:w-80"><span>다니던 대학</span>
+  <label class="field md:w-80"><span>{{ _("다니던 대학") }}</span>
     <select name="source" class="input h-11">
       {% for i in found.sources %}<option value="{{ i.id }}" {% if found.source and i.id == found.source.id %}selected{% endif %}>{{ i.name }}</option>{% endfor %}
     </select>
   </label>
-  <label class="field flex-1"><span>과목 검색</span><input class="input h-11" type="search" name="q" value="{{ found.query }}" maxlength="100" placeholder="과목 코드나 이름 (예: MATH, 미적분)"></label>
-  <button class="btn-primary h-11">찾기</button>
+  <label class="field flex-1"><span>{{ _("과목 검색") }}</span><input class="input h-11" type="search" name="q" value="{{ found.query }}" maxlength="100" placeholder="{{ _('과목 코드나 이름 (예: MATH, 미적분)') }}"></label>
+  <button class="btn-primary h-11">{{ _("찾기") }}</button>
 </form>
 
-<section class="mt-6 grid gap-3" aria-label="인정 사례">
+<section class="mt-6 grid gap-3" aria-label="{{ _('인정 사례') }}">
   {% if found.rows %}
-  <p class="text-sm text-muted">동등 과목표 · {{ found.source.name }} 과목 {{ found.rows | length }}건</p>
+  <p class="text-sm text-muted">{{ _("동등 과목표 · {name} 과목 {rows}건", name=(found.source.name), rows=(found.rows | length)) }}</p>
   <div class="overflow-x-auto rounded-lg border border-hairline bg-white">
     <table class="w-full min-w-[560px] text-left text-sm">
       <thead class="bg-pearl text-xs text-muted">
-        <tr><th scope="col" class="px-5 py-3 font-normal">출신 과목</th><th scope="col" class="px-3 py-3 font-normal">인정된 과목</th><th scope="col" class="px-3 py-3 font-normal">결과</th><th scope="col" class="px-5 py-3 font-normal">판정일</th></tr>
+        <tr><th scope="col" class="px-5 py-3 font-normal">{{ _("출신 과목") }}</th><th scope="col" class="px-3 py-3 font-normal">{{ _("인정된 과목") }}</th><th scope="col" class="px-3 py-3 font-normal">{{ _("결과") }}</th><th scope="col" class="px-5 py-3 font-normal">{{ _("판정일") }}</th></tr>
       </thead>
       <tbody class="divide-y divide-divider">
         {% for r in found.rows %}
@@ -42,9 +42,9 @@
     </table>
   </div>
   {% else %}
-  <p class="rounded-md bg-parchment p-8 text-center text-muted">{% if found.query %}"{{ found.query }}"에 맞는 사례가 없어요. 과목 코드만 넣어 다시 찾아보세요.{% else %}동등 과목표에 아직 이 대학 과목이 없어요. 과목별 예상 결과는 강의계획서를 올려 확인해 보세요.{% endif %}</p>
+  <p class="rounded-md bg-parchment p-8 text-center text-muted">{% if found.query %}{{ _("\"{query}\"에 맞는 사례가 없어요. 과목 코드만 넣어 다시 찾아보세요.", query=(found.query)) }}{% else %}{{ _("동등 과목표에 아직 이 대학 과목이 없어요. 과목별 예상 결과는 강의계획서를 올려 확인해 보세요.") }}{% endif %}</p>
   {% endif %}
-  <p class="text-xs text-muted">과거 기준은 참고용이에요. 교육과정이 바뀌었거나 강의계획서 내용이 다르면 결과가 달라질 수 있고, 최종 판정은 학과 교수가 합니다.</p>
+  <p class="text-xs text-muted">{{ _("과거 기준은 참고용이에요. 교육과정이 바뀌었거나 강의계획서 내용이 다르면 결과가 달라질 수 있고, 최종 판정은 학과 교수가 합니다.") }}</p>
 </section>
 {% endif %}
 {% endblock %}

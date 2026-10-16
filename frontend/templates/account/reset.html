@@ -1,24 +1,24 @@
 {% extends "base.html" %}
-{% block title %}비밀번호 재설정 · CreditBridge AI{% endblock %}
+{% block title %}{{ _("비밀번호 재설정 · CreditBridge AI") }}{% endblock %}
 {% block content %}
 <div class="mx-auto grid max-w-[480px] gap-6">
   <header class="grid gap-2">
-    <h1 class="page-title">새 비밀번호 정하기</h1>
-    {% if token %}<p class="text-muted">새 비밀번호를 정하면 이전 비밀번호와 다른 기기의 로그인은 더 이상 쓸 수 없어요.</p>{% endif %}
+    <h1 class="page-title">{{ _("새 비밀번호 정하기") }}</h1>
+    {% if token %}<p class="text-muted">{{ _("새 비밀번호를 정하면 이전 비밀번호와 다른 기기의 로그인은 더 이상 쓸 수 없어요.") }}</p>{% endif %}
   </header>
   {% if error %}<p class="rounded-sm bg-reject-subtle px-3 py-2 text-sm text-reject" role="alert">{{ error }}</p>{% endif %}
   {% if token %}
   <form method="post" action="/account/reset" class="card grid gap-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="token" value="{{ token }}">
-    <label class="field"><span>새 비밀번호 <span class="text-muted">({{ min_length }}자 이상)</span></span><input class="input" type="password" name="new" required minlength="{{ min_length }}" autocomplete="new-password"></label>
-    <label class="field"><span>새 비밀번호 확인</span><input class="input" type="password" name="confirm" required minlength="{{ min_length }}" autocomplete="new-password"></label>
-    <button class="btn-primary w-full">비밀번호 바꾸기</button>
+    <label class="field"><span>{{ _("새 비밀번호") }} <span class="text-muted">{{ _("({min_length}자 이상)", min_length=(min_length)) }}</span></span><input class="input" type="password" name="new" required minlength="{{ min_length }}" autocomplete="new-password"></label>
+    <label class="field"><span>{{ _("새 비밀번호 확인") }}</span><input class="input" type="password" name="confirm" required minlength="{{ min_length }}" autocomplete="new-password"></label>
+    <button class="btn-primary w-full">{{ _("비밀번호 바꾸기") }}</button>
   </form>
   {% else %}
-  {% if not error %}<p class="rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">재설정 링크가 만료됐거나 이미 사용됐어요. 링크는 30분 동안, 한 번만 쓸 수 있어요.</p>{% endif %}
-  <a href="/account/forgot" class="btn-primary w-full">재설정 링크 다시 받기</a>
+  {% if not error %}<p class="rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">{{ _("재설정 링크가 만료됐거나 이미 사용됐어요. 링크는 30분 동안, 한 번만 쓸 수 있어요.") }}</p>{% endif %}
+  <a href="/account/forgot" class="btn-primary w-full">{{ _("재설정 링크 다시 받기") }}</a>
   {% endif %}
-  <p class="text-center text-sm"><a href="/login" class="btn-text">로그인으로 돌아가기</a></p>
+  <p class="text-center text-sm"><a href="/login" class="btn-text">{{ _("로그인으로 돌아가기") }}</a></p>
 </div>
 {% endblock %}

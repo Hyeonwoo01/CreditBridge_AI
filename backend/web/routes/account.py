@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.errors import CreditBridgeError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.security import session as auth_session
 from backend.security.csrf import check_csrf
@@ -46,7 +47,7 @@ def password_change(
             error=str(exc),
         )
     auth_session.login(request, user)  # 이 기기는 로그인을 유지하고, 다른 기기의 세션은 끊긴다
-    flash(request, "비밀번호를 바꿨어요. 다른 기기에 로그인돼 있었다면 다시 로그인해야 해요.")
+    flash(request, tr("비밀번호를 바꿨어요. 다른 기기에 로그인돼 있었다면 다시 로그인해야 해요."))
     return RedirectResponse(HOME.get(user.role, "/"), status_code=303)
 
 
@@ -121,5 +122,5 @@ def reset(
             )
         )
     auth_session.logout(request)
-    flash(request, "비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.")
+    flash(request, tr("비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요."))
     return RedirectResponse("/login", status_code=303)

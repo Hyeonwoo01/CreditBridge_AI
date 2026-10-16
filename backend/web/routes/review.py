@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend.config import get_settings
 from backend.db.session import get_db
 from backend.errors import CreditBridgeError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
@@ -65,11 +66,11 @@ def assign(
 ) -> Response:
     check_csrf(request, csrf_token)
     if not evaluation_ids:
-        flash(request, "배정할 건을 선택해 주세요.", "error")
+        flash(request, tr("배정할 건을 선택해 주세요."), "error")
     else:
         count, problems = review_service.auto_assign(session, user, evaluation_ids)
         send_emails()
-        flash(request, f"{count}건을 학과 담당 교수에게 배정했어요. 근거 요약이 함께 전달돼요.")
+        flash(request, tr("{count}건을 학과 담당 교수에게 배정했어요. 근거 요약이 함께 전달돼요.", count=count))
         for p in problems:
             flash(request, p, "error")
     return RedirectResponse(f"/review?tab={tab}", status_code=303)
@@ -116,7 +117,7 @@ def request_materials(
         flash(request, str(exc), "error")
     else:
         send_emails()
-        flash(request, "학생에게 보완 자료를 요청했어요. 자료가 오면 알림으로 알려 드려요.")
+        flash(request, tr("학생에게 보완 자료를 요청했어요. 자료가 오면 알림으로 알려 드려요."))
     return RedirectResponse(f"/review/evaluations/{evaluation_id}", status_code=303)
 
 
@@ -140,12 +141,12 @@ def handle_appeal(
     try:
         if action == "accept":
             appeal_service.accept(session, user, appeal_id, int(reviewer_id) if reviewer_id.isdigit() else None, note)
-            flash(request, "이의 신청을 받아들여 학과 교수에게 재판정을 배정했어요.")
+            flash(request, tr("이의 신청을 받아들여 학과 교수에게 재판정을 배정했어요."))
         elif action == "dismiss":
             appeal_service.dismiss(session, user, appeal_id, note)
-            flash(request, "이의 신청을 기각하고 학생에게 사유를 알렸어요.")
+            flash(request, tr("이의 신청을 기각하고 학생에게 사유를 알렸어요."))
         else:
-            raise CreditBridgeError("처리 방법을 선택해 주세요.")
+            raise CreditBridgeError(tr("처리 방법을 선택해 주세요."))
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
@@ -175,7 +176,7 @@ def review_privacy(
         flash(request, str(exc), "error")
     else:
         send_emails()
-        flash(request, "처리 완료로 표시했어요. 기관 관리자가 승인하면 삭제돼요.")
+        flash(request, tr("처리 완료로 표시했어요. 기관 관리자가 승인하면 삭제돼요."))
     return RedirectResponse("/review/privacy", status_code=303)
 
 
@@ -216,7 +217,9 @@ def import_equivalencies(
             columns=equivalency_service.COLUMNS,
             errors=result.errors,
         )
-    flash(request, f"동등 과목표 {result.imported}건을 가져왔어요. 과거 판정 이력에 함께 표시돼요.")
+    flash(
+        request, tr("동등 과목표 {imported}건을 가져왔어요. 과거 판정 이력에 함께 표시돼요.", imported=result.imported)
+    )
     return RedirectResponse("/review/equivalencies", status_code=303)
 
 

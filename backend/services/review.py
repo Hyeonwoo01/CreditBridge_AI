@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import utcnow
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import Assignment, Course, CourseEvaluation, Syllabus, TransferRequest, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
@@ -18,7 +20,13 @@ from backend.services import audit, notifications
 from backend.services.decisions import HistoryItem, ai_result, conflicts, history
 
 # 심사 큐 필터. all 외에는 겹치지 않는 신뢰도 구분이고, conflict는 과거 판정과 어긋나는 건만 따로 모아 본다
-TABS = {"all": "전체", "high": "고신뢰", "low": "저신뢰", "insufficient": "정보 부족", "conflict": "일관성 경보"}
+TABS = {
+    "all": N_("전체"),
+    "high": N_("고신뢰"),
+    "low": N_("저신뢰"),
+    "insufficient": N_("정보 부족"),
+    "conflict": N_("일관성 경보"),
+}
 PAGE_SIZE = 20
 
 
@@ -60,7 +68,7 @@ def tab_of(evaluation: CourseEvaluation) -> str:
 
 def ensure_evaluator(user: User) -> int:
     if user.role != Role.EVALUATOR or user.institution_id is None:
-        raise PermissionDeniedError("심사관 계정만 사용할 수 있어요.")
+        raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
     return user.institution_id
 
 
@@ -117,7 +125,7 @@ def queue(
                 syllabus=syllabus,
                 request=request,
                 course=course,
-                department=course.department if course else "미분류",
+                department=course.department if course else tr("미분류"),
                 assignment=assignment,
                 reviewer=reviewer,
                 delegated=bool(assignment and assignment.reassigned_from),
@@ -160,7 +168,7 @@ def pick_reviewer(session: Session, institution_id: int, department: str, today:
     """담당 교수 중 배정이 가장 적은 사람. 부재 중이면 대리 심사자 (반환: 실제 배정자, 원래 배정자)."""
     professors = user_repo.professors_in(session, institution_id, department)
     if not professors:
-        raise CreditBridgeError(f"{department} 학과에 등록된 심사 교수가 없어요.")
+        raise CreditBridgeError(tr("{department} 학과에 등록된 심사 교수가 없어요.", department=department))
     available = [p for p in professors if not p.is_away(today)] or professors
     chosen = min(available, key=lambda p: len(evaluation_repo.active_assignments_for(session, p.id)))
     if chosen.is_away(today) and chosen.delegate_user_id:
@@ -182,7 +190,7 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
             catalog_repo.get_course(session, evaluation.candidate_course_id) if evaluation.candidate_course_id else None
         )
         if course is None or course.institution_id != institution_id:
-            problems.append("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요.")
+            problems.append(tr("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요."))
             continue
         try:
             reviewer, original = pick_reviewer(session, institution_id, course.department, today)
@@ -202,8 +210,11 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
             session,
             [reviewer],
             "assignment.created",
-            f"새 심사가 배정됐어요: {_course(session, evaluation)} → {course.code}"
-            + (" (부재 교수 대리)" if original else ""),
+            (
+                N_("새 심사가 배정됐어요: {course} → {code} (부재 교수 대리)")
+                if original
+                else N_("새 심사가 배정됐어요: {course} → {code}")
+            ).format(course=_course(session, evaluation), code=course.code),
             f"/professor/evaluations/{evaluation.id}",
         )
         audit.record(
@@ -223,7 +234,7 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
 def set_away(session: Session, professor: User, days: int, delegate_id: int | None) -> int:
     """부재 기간을 설정하고, 진행 중인 배정을 대리 심사자에게 넘긴다. 넘긴 건수를 돌려준다."""
     if professor.role != Role.PROFESSOR:
-        raise PermissionDeniedError("교수 계정만 부재 기간을 설정할 수 있어요.")
+        raise PermissionDeniedError(tr("교수 계정만 부재 기간을 설정할 수 있어요."))
     if days <= 0:
         professor.away_until = None
         audit.record(session, professor, "professor.back", "user", str(professor.id))
@@ -240,7 +251,7 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
             None,
         )
         if delegate is None:
-            raise NotFoundError("같은 학과의 대리 심사 교수를 선택해 주세요.")
+            raise NotFoundError(tr("같은 학과의 대리 심사 교수를 선택해 주세요."))
         professor.delegate_user_id = delegate.id
     professor.away_until = utcnow().date() + timedelta(days=days)
     moved = 0
@@ -265,14 +276,16 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
                 session,
                 [target],
                 "assignment.delegated",
-                f"부재 중인 교수의 심사 {moved}건이 대리 배정됐어요.",
+                N_("부재 중인 교수의 심사 {n}건이 대리 배정됐어요.").format(n=moved),
                 "/professor",
             )
             notifications.notify(
                 session,
                 notifications.staff(session, professor.institution_id or 0, Role.EVALUATOR),
                 "assignment.delegated",
-                f"{professor.department or ''} 교수 부재로 진행 중인 심사 {moved}건이 대리 재배정됐어요.",
+                N_("{dept} 교수 부재로 진행 중인 심사 {n}건이 대리 재배정됐어요.").format(
+                    dept=professor.department or "", n=moved
+                ),
                 "/review",
             )
     audit.record(session, professor, "professor.away", "user", str(professor.id), days=days, moved=moved)
@@ -282,4 +295,4 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
 
 def _course(session: Session, evaluation: CourseEvaluation) -> str:
     syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
-    return (syllabus.course_code or syllabus.course_title).strip() if syllabus else "과목"
+    return (syllabus.course_code or syllabus.course_title).strip() if syllabus else N_("과목")

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import pymupdf
 
 from backend.errors import UploadRejectedError
+from backend.i18n import gettext as tr
 
 ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
 CONTENT_TYPES = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
@@ -57,26 +58,29 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
     ext = extension(filename)
     if ext not in ALLOWED:
         raise UploadRejectedError(
-            f"지원하지 않는 형식이에요 ({ext or '확장자 없음'}). PDF 또는 JPG·PNG 이미지만 올릴 수 있어요. "
-            "DOCX 같은 문서는 PDF로 저장해서 올려 주세요."
+            tr(
+                "지원하지 않는 형식이에요 ({ext}). PDF 또는 JPG·PNG 이미지만 올릴 수 있어요. "
+                "DOCX 같은 문서는 PDF로 저장해서 올려 주세요.",
+                ext=ext or tr("확장자 없음"),
+            )
         )
     if not data.strip():
-        raise UploadRejectedError("빈 파일이에요. 내용이 있는 파일을 올려 주세요.")
+        raise UploadRejectedError(tr("빈 파일이에요. 내용이 있는 파일을 올려 주세요."))
     if len(data) > max_mb * 1024 * 1024:
-        raise UploadRejectedError(f"파일이 {max_mb}MB를 넘어요.")
+        raise UploadRejectedError(tr("파일이 {mb}MB를 넘어요.", mb=max_mb))
     if ext == ".pdf":
         try:
             doc = pymupdf.open(stream=data, filetype="pdf")
         except Exception as exc:
-            raise UploadRejectedError("PDF를 열 수 없어요. 손상되지 않은 파일인지 확인해 주세요.") from exc
+            raise UploadRejectedError(tr("PDF를 열 수 없어요. 손상되지 않은 파일인지 확인해 주세요.")) from exc
         with doc:
             if doc.needs_pass:
-                raise UploadRejectedError("암호가 걸린 PDF예요. 암호를 해제한 뒤 올려 주세요.")
+                raise UploadRejectedError(tr("암호가 걸린 PDF예요. 암호를 해제한 뒤 올려 주세요."))
     else:
         try:
             pymupdf.Pixmap(data)
         except Exception as exc:
-            raise UploadRejectedError("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.") from exc
+            raise UploadRejectedError(tr("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.")) from exc
     return ext
 
 

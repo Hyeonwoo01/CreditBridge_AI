@@ -11,6 +11,7 @@ from backend.db.session import get_db
 from backend.documents.pdf import html_to_pdf
 from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
@@ -45,7 +46,10 @@ def report_pdf(evaluation_id: int, user: User = Depends(current_user), session: 
     pdf = html_to_pdf(
         html,
         title=f"Transfer Credit Evaluation Report #{evaluation_id}",
-        footer=f"CreditBridge AI 판정 근거 리포트 #{evaluation_id} · AI는 추천만 하고 최종 판정은 학과 교수가 합니다.",
+        footer=tr(
+            "CreditBridge AI 판정 근거 리포트 #{evaluation_id} · AI는 추천만 하고 최종 판정은 학과 교수가 합니다.",
+            evaluation_id=evaluation_id,
+        ),
         assets=LOGO_DIR,
     )
     return Response(
@@ -95,7 +99,7 @@ def add_note(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        flash(request, "메모를 남겼어요. 학생에게는 보이지 않아요.")
+        flash(request, tr("메모를 남겼어요. 학생에게는 보이지 않아요."))
     return RedirectResponse(f"{EVALUATION_PAGES[Role(user.role)]}{evaluation_id}#notes", status_code=303)
 
 

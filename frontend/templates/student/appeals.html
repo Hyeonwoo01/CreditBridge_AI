@@ -5,14 +5,14 @@
 {% set tone = {'submitted': 'badge-elective', 'accepted': 'badge-elective', 'dismissed': 'badge-reject', 'redecided': 'badge-approve'} %}
 <header class="grid gap-1">
   <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase">Appeals</p>
-  <h1 class="page-title">이의 신청</h1>
-  <p class="text-sm text-muted">판정이 끝난 과목에 이의를 신청하고, 낸 이의 신청의 처리 상황을 확인해요.</p>
+  <h1 class="page-title">{{ _("이의 신청") }}</h1>
+  <p class="text-sm text-muted">{{ _("판정이 끝난 과목에 이의를 신청하고, 낸 이의 신청의 처리 상황을 확인해요.") }}</p>
 </header>
 
 {% set open_count = rows | selectattr("appeal.status", "in", ["submitted", "accepted"]) | list | length %}
 {% if rows %}
-<section class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="처리 현황">
-  {% for label, value in [('전체', rows | length), ('처리 중', open_count), ('재판정 완료', rows | selectattr("appeal.status", "equalto", "redecided") | list | length), ('기각', rows | selectattr("appeal.status", "equalto", "dismissed") | list | length)] %}
+<section class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="{{ _('처리 현황') }}">
+  {% for label, value in [(_('전체'), rows | length), (_('처리 중'), open_count), (_('재판정 완료'), rows | selectattr("appeal.status", "equalto", "redecided") | list | length), (_('기각'), rows | selectattr("appeal.status", "equalto", "dismissed") | list | length)] %}
   <div class="grid gap-1 rounded-lg bg-parchment p-4"><span class="text-xs text-muted">{{ label }}</span><span class="text-[24px] font-semibold tabular-nums">{{ value }}</span></div>
   {% endfor %}
 </section>
@@ -21,17 +21,17 @@
 {% if appealable %}
 <section class="mt-8 grid gap-3" aria-labelledby="appealable-title">
   <div class="grid gap-1">
-    <h2 id="appealable-title" class="section-title">이의 신청할 수 있는 과목</h2>
-    <p class="text-sm text-muted">학과 교수의 판정이 확정됐고 처리 중인 이의 신청이 없는 과목이에요.</p>
+    <h2 id="appealable-title" class="section-title">{{ _("이의 신청할 수 있는 과목") }}</h2>
+    <p class="text-sm text-muted">{{ _("학과 교수의 판정이 확정됐고 처리 중인 이의 신청이 없는 과목이에요.") }}</p>
   </div>
   <ul class="grid divide-y divide-hairline rounded-lg border border-hairline bg-white">
     {% for c in appealable %}
     <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
       <div class="grid min-w-0 gap-0.5">
         <a href="/student/evaluations/{{ c.evaluation.id }}" class="font-semibold hover:text-primary">{{ c.syllabus.course_code }} {{ c.syllabus.course_title }}</a>
-        <span class="text-sm text-muted">판정 <strong class="font-semibold {{ 'text-approve' if c.decision.result in ('direct', 'elective') else 'text-reject' }}">{{ c.decision.result | rec }}</strong> · {{ time(c.decision.decided_at, "date") }}{% if c.decision.appeal_id %} · 이의 신청 재판정{% endif %}</span>
+        <span class="text-sm text-muted">{{ _("판정") }} <strong class="font-semibold {{ 'text-approve' if c.decision.result in ('direct', 'elective') else 'text-reject' }}">{{ c.decision.result | rec }}</strong> · {{ time(c.decision.decided_at, "date") }}{% if c.decision.appeal_id %} {{ _("· 이의 신청 재판정") }}{% endif %}</span>
       </div>
-      <a href="/student/evaluations/{{ c.evaluation.id }}/appeal" class="btn-secondary btn-sm">이의 신청 작성</a>
+      <a href="/student/evaluations/{{ c.evaluation.id }}/appeal" class="btn-secondary btn-sm">{{ _("이의 신청 작성") }}</a>
     </li>
     {% endfor %}
   </ul>
@@ -39,9 +39,9 @@
 {% endif %}
 
 {% if rows or appealable %}
-<h2 class="section-title mt-8">낸 이의 신청</h2>
+<h2 class="section-title mt-8">{{ _("낸 이의 신청") }}</h2>
 {% endif %}
-<section class="mt-3 grid gap-3" aria-label="이의 신청 목록">
+<section class="mt-3 grid gap-3" aria-label="{{ _('이의 신청 목록') }}">
   {% for r in rows %}
   {% set a = r.appeal %}
   <article class="card grid gap-4 p-5">
@@ -49,31 +49,31 @@
       <div class="grid min-w-0 gap-1">
         <span class="w-fit {{ tone.get(a.status, 'badge') }}">{{ a.status | appeal_status }}</span>
         <a href="/student/evaluations/{{ r.evaluation.id }}" class="text-[19px] font-semibold hover:text-primary">{{ r.syllabus.course_code }} {{ r.syllabus.course_title }}</a>
-        <span class="text-sm text-muted">{{ r.request.source_institution.name }} → {{ r.request.target_institution.name }} · 신청 {{ time(a.created_at) }}</span>
+        <span class="text-sm text-muted">{{ _("{name} → {name2} · 신청 {time}", name=(r.request.source_institution.name), name2=(r.request.target_institution.name), time=(time(a.created_at))) }}</span>
       </div>
       <div class="flex flex-wrap gap-2">
-        <a href="/student/evaluations/{{ r.evaluation.id }}" class="btn-secondary btn-sm">과목 결과 보기</a>
-        <a href="/evaluations/{{ r.evaluation.id }}/report" class="btn-secondary btn-sm border-hairline text-ink">판정 근거 리포트</a>
+        <a href="/student/evaluations/{{ r.evaluation.id }}" class="btn-secondary btn-sm">{{ _("과목 결과 보기") }}</a>
+        <a href="/evaluations/{{ r.evaluation.id }}/report" class="btn-secondary btn-sm border-hairline text-ink">{{ _("판정 근거 리포트") }}</a>
       </div>
     </div>
 
-    <ol class="grid gap-2 rounded-md bg-parchment px-4 py-3 text-sm" aria-label="처리 경과">
-      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">원 판정</span><span>{% if r.appealed %}<strong>{{ r.appealed.result | rec }}</strong> · {{ time(r.appealed.decided_at, "date") }}{% else %}–{% endif %}</span></li>
-      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">이의 신청</span><span class="min-w-0 break-words">{{ a.reason | truncate(160) }}</span></li>
-      {% if r.files %}<li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">근거 자료</span><span class="flex min-w-0 flex-wrap gap-x-3 gap-y-1">{% for f in r.files %}{% if f.file_key %}<a class="break-all text-primary underline-offset-2 hover:underline" href="/appeal-files/{{ f.id }}">{{ f.original_filename }}</a>{% else %}<span class="text-muted">{{ f.original_filename }} (삭제됨)</span>{% endif %}{% endfor %}</span></li>{% endif %}
+    <ol class="grid gap-2 rounded-md bg-parchment px-4 py-3 text-sm" aria-label="{{ _('처리 경과') }}">
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("원 판정") }}</span><span>{% if r.appealed %}<strong>{{ r.appealed.result | rec }}</strong> · {{ time(r.appealed.decided_at, "date") }}{% else %}–{% endif %}</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("이의 신청") }}</span><span class="min-w-0 break-words">{{ a.reason | truncate(160) }}</span></li>
+      {% if r.files %}<li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("근거 자료") }}</span><span class="flex min-w-0 flex-wrap gap-x-3 gap-y-1">{% for f in r.files %}{% if f.file_key %}<a class="break-all text-primary underline-offset-2 hover:underline" href="/appeal-files/{{ f.id }}">{{ f.original_filename }}</a>{% else %}<span class="text-muted">{{ _("{original_filename} (삭제됨)", original_filename=(f.original_filename)) }}</span>{% endif %}{% endfor %}</span></li>{% endif %}
       {% if a.status == 'submitted' %}
-      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">다음 단계</span><span>학사처가 검토하고 있어요. 받아들이면 학과 교수가 다시 판정해요.</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("다음 단계") }}</span><span>{{ _("학사처가 검토하고 있어요. 받아들이면 학과 교수가 다시 판정해요.") }}</span></li>
       {% elif a.status == 'accepted' %}
-      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">학사처</span><span>받아들였어요{% if a.handled_at %} · {{ time(a.handled_at, "date") }}{% endif %}. 학과 교수가 다시 판정하고 있어요.</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("학사처") }}</span><span>{{ _("받아들였어요") }}{% if a.handled_at %} · {{ time(a.handled_at, "date") }}{% endif %}{{ _(". 학과 교수가 다시 판정하고 있어요.") }}</span></li>
       {% elif a.status == 'dismissed' %}
-      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">학사처</span><span>기각했어요{% if a.handled_at %} · {{ time(a.handled_at, "date") }}{% endif %}{% if a.handler_note %} — {{ a.handler_note }}{% endif %}. 원 판정이 그대로 유지돼요.</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("학사처") }}</span><span>{{ _("기각했어요") }}{% if a.handled_at %} · {{ time(a.handled_at, "date") }}{% endif %}{% if a.handler_note %} — {{ a.handler_note }}{% endif %}{{ _(". 원 판정이 그대로 유지돼요.") }}</span></li>
       {% elif a.status == 'redecided' %}
-      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">재판정</span><span>{% if r.redecided %}<strong class="{{ 'text-approve' if r.redecided.result in ('direct', 'elective') else 'text-reject' }}">{{ r.redecided.result | rec }}</strong> · {{ time(r.redecided.decided_at, "date") }} · {{ '결과가 바뀌었어요' if r.changed else '원 판정과 같은 결과예요' }}{% else %}완료{% endif %}</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("재판정") }}</span><span>{% if r.redecided %}<strong class="{{ 'text-approve' if r.redecided.result in ('direct', 'elective') else 'text-reject' }}">{{ r.redecided.result | rec }}</strong> · {{ time(r.redecided.decided_at, "date") }} · {{ _('결과가 바뀌었어요') if r.changed else _('원 판정과 같은 결과예요') }}{% else %}{{ _("완료") }}{% endif %}</span></li>
       {% endif %}
     </ol>
   </article>
   {% else %}
-  <p class="rounded-md bg-parchment p-8 text-center text-muted">{% if appealable %}아직 낸 이의 신청이 없어요. 판정 결과에 동의하기 어렵다면 위 과목에서 이의 신청을 작성해 주세요.{% else %}아직 이의 신청한 과목이 없어요. 학과 교수의 판정이 확정되면 여기서 이의를 신청할 수 있어요.{% endif %}</p>
+  <p class="rounded-md bg-parchment p-8 text-center text-muted">{% if appealable %}{{ _("아직 낸 이의 신청이 없어요. 판정 결과에 동의하기 어렵다면 위 과목에서 이의 신청을 작성해 주세요.") }}{% else %}{{ _("아직 이의 신청한 과목이 없어요. 학과 교수의 판정이 확정되면 여기서 이의를 신청할 수 있어요.") }}{% endif %}</p>
   {% endfor %}
 </section>
 {% endblock %}

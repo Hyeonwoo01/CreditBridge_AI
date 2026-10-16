@@ -4,11 +4,11 @@
 {% block content %}
 {% set ev = v.evaluation %}
 {% set d = v.decision %}
-<p class="mb-4 text-sm text-muted"><a class="underline" href="/student/evaluations/{{ ev.id }}">← 과목 결과</a> · <a class="underline" href="/student/appeals">이의 신청 목록</a></p>
+<p class="mb-4 text-sm text-muted"><a class="underline" href="/student/evaluations/{{ ev.id }}">{{ _("← 과목 결과") }}</a> · <a class="underline" href="/student/appeals">{{ _("이의 신청 목록") }}</a></p>
 
 <header class="grid gap-1">
   <p class="text-xs font-semibold tracking-[0.08em] text-primary uppercase">Appeal</p>
-  <h1 class="page-title">이의 신청 작성</h1>
+  <h1 class="page-title">{{ _("이의 신청 작성") }}</h1>
   <p class="text-sm text-muted">{{ v.syllabus.course_code }} {{ v.syllabus.course_title }} · {{ v.request.source_institution.name }} → {{ v.request.target_institution.name }}</p>
 </header>
 
@@ -17,77 +17,77 @@
 {% endif %}
 
 <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-  <section class="card grid gap-4 p-5" aria-label="이의를 신청할 판정">
-    <h2 class="section-title">이의를 신청할 판정</h2>
+  <section class="card grid gap-4 p-5" aria-label="{{ _('이의를 신청할 판정') }}">
+    <h2 class="section-title">{{ _("이의를 신청할 판정") }}</h2>
     {% if d %}
     <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-      <dt class="text-muted">판정 결과</dt>
+      <dt class="text-muted">{{ _("판정 결과") }}</dt>
       <dd><strong class="{{ 'text-approve' if d.result in ('direct', 'elective') else 'text-reject' }}">{{ d.result | rec }}</strong>{% if v.decided_target %} · {{ v.decided_target.code }} {{ v.decided_target.title }}{% endif %}</dd>
-      <dt class="text-muted">판정</dt>
-      <dd>{{ v.users[d.decided_by].name if d.decided_by in v.users else '학과 교수' }} · {{ time(d.decided_at, "date") }}</dd>
+      <dt class="text-muted">{{ _("판정") }}</dt>
+      <dd>{{ v.users[d.decided_by].name if d.decided_by in v.users else _('학과 교수') }} · {{ time(d.decided_at, "date") }}</dd>
       {% if d.reason_codes %}
-      <dt class="text-muted">사유</dt>
+      <dt class="text-muted">{{ _("사유") }}</dt>
       <dd>{% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</dd>
       {% endif %}
-      <dt class="text-muted">AI 추천</dt>
-      <dd class="flex flex-wrap items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.coverage is not none and v.candidate %}<span class="text-muted">{{ v.candidate.code }} 커버리지 {{ ev.coverage | pct }}</span>{% endif %}</dd>
+      <dt class="text-muted">{{ _("AI 추천") }}</dt>
+      <dd class="flex flex-wrap items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.coverage is not none and v.candidate %}<span class="text-muted">{{ _("{code} 커버리지 {coverage}", code=(v.candidate.code), coverage=(ev.coverage | pct)) }}</span>{% endif %}</dd>
     </dl>
     {% set gaps = v.primary.concepts | selectattr("status", "in", ["not_taught", "unclear", "partial"]) | list if v.primary else [] %}
     {% if gaps %}
     <div class="grid gap-2 rounded-md bg-parchment p-4 text-sm">
-      <p class="font-semibold">근거가 약하다고 본 개념</p>
+      <p class="font-semibold">{{ _("근거가 약하다고 본 개념") }}</p>
       <ul class="grid gap-1">
         {% for k in gaps %}<li class="flex flex-wrap gap-x-2"><span>{{ k.concept }}</span><span class="text-xs font-semibold {{ 'text-reject' if k.status in ('not_taught', 'unclear') else 'text-muted' }}">{{ k.status | concept_status }}</span></li>{% endfor %}
       </ul>
-      <p class="text-xs text-muted">이 개념을 실제로 배웠다면 주차 계획, 강의 노트, 시험지 같은 자료로 보여 주세요.</p>
+      <p class="text-xs text-muted">{{ _("이 개념을 실제로 배웠다면 주차 계획, 강의 노트, 시험지 같은 자료로 보여 주세요.") }}</p>
     </div>
     {% endif %}
-    <p class="flex flex-wrap gap-2"><a href="/student/evaluations/{{ ev.id }}" class="btn-secondary btn-sm">분석 결과와 근거</a><a href="/evaluations/{{ ev.id }}/report" class="btn-secondary btn-sm border-hairline text-ink">판정 근거 리포트</a></p>
+    <p class="flex flex-wrap gap-2"><a href="/student/evaluations/{{ ev.id }}" class="btn-secondary btn-sm">{{ _("분석 결과와 근거") }}</a><a href="/evaluations/{{ ev.id }}/report" class="btn-secondary btn-sm border-hairline text-ink">{{ _("판정 근거 리포트") }}</a></p>
     {% else %}
-    <p class="text-sm text-muted">아직 판정이 끝나지 않았어요.</p>
+    <p class="text-sm text-muted">{{ _("아직 판정이 끝나지 않았어요.") }}</p>
     {% endif %}
   </section>
 
   {% if not d %}
   <section class="rounded-md bg-parchment p-6 text-sm text-ink-80">
-    <p class="font-semibold text-ink">아직 이의를 신청할 수 없어요</p>
-    <p class="mt-1">학과 교수의 판정이 확정된 뒤에 이의를 신청할 수 있어요. 판정이 나면 알림으로 알려 드려요.</p>
+    <p class="font-semibold text-ink">{{ _("아직 이의를 신청할 수 없어요") }}</p>
+    <p class="mt-1">{{ _("학과 교수의 판정이 확정된 뒤에 이의를 신청할 수 있어요. 판정이 나면 알림으로 알려 드려요.") }}</p>
   </section>
   {% elif v.open_appeal %}
   <section class="rounded-md bg-parchment p-6 text-sm text-ink-80">
-    <p class="font-semibold text-ink">이미 처리 중인 이의 신청이 있어요</p>
-    <p class="mt-1">{{ time(v.open_appeal.created_at, "date") }}에 낸 이의 신청이 {{ v.open_appeal.status | appeal_status }} 상태예요. 처리가 끝난 뒤에 다시 신청할 수 있어요.</p>
-    <p class="mt-3"><a href="/student/appeals" class="btn-secondary btn-sm">처리 상황 보기</a></p>
+    <p class="font-semibold text-ink">{{ _("이미 처리 중인 이의 신청이 있어요") }}</p>
+    <p class="mt-1">{{ _("{time}에 낸 이의 신청이 {status} 상태예요. 처리가 끝난 뒤에 다시 신청할 수 있어요.", time=(time(v.open_appeal.created_at, "date")), status=(v.open_appeal.status | appeal_status)) }}</p>
+    <p class="mt-3"><a href="/student/appeals" class="btn-secondary btn-sm">{{ _("처리 상황 보기") }}</a></p>
   </section>
   {% else %}
   <form method="post" action="/student/evaluations/{{ ev.id }}/appeal" enctype="multipart/form-data" class="card grid gap-5 p-5">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label class="field">
-      <span class="font-semibold">이의 사유</span>
+      <span class="font-semibold">{{ _("이의 사유") }}</span>
       <textarea class="textarea" name="reason" rows="9" minlength="{{ limits.min }}" maxlength="{{ limits.max }}" required data-count="reason-count" aria-describedby="reason-help reason-count">{{ reason or '' }}</textarea>
       <span class="flex flex-wrap justify-between gap-2 text-xs text-muted">
-        <span id="reason-help">어떤 개념을 실제로 배웠는지, 판정의 어느 부분이 사실과 다른지 구체적으로 적어 주세요 ({{ limits.min }}자 이상). 이름·학번은 적지 마세요.</span>
+        <span id="reason-help">{{ _("어떤 개념을 실제로 배웠는지, 판정의 어느 부분이 사실과 다른지 구체적으로 적어 주세요 ({min}자 이상). 이름·학번은 적지 마세요.", min=(limits.min)) }}</span>
         <span id="reason-count" class="tabular-nums" aria-live="polite">{{ (reason or '') | length }} / {{ limits.max }}</span>
       </span>
     </label>
 
     <div class="grid gap-2">
-      <span class="text-sm font-semibold">근거 자료 <span class="font-normal text-muted">(선택, 최대 {{ limits.files }}개)</span></span>
+      <span class="text-sm font-semibold">{{ _("근거 자료") }} <span class="font-normal text-muted">{{ _("(선택, 최대 {files}개)", files=(limits.files)) }}</span></span>
       <div class="dropzone p-5 md:p-5">
         <input type="file" name="files" multiple accept=".pdf,.jpg,.jpeg,.png" data-max-files="{{ limits.files }}" aria-describedby="files-help" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-parchment file:text-primary file:px-4 file:py-2 file:font-normal">
-        <span id="files-help" class="text-xs text-muted">PDF·JPG·PNG. 주차별 강의 계획, 강의 노트, 과제·시험지, 교재 목차처럼 배운 내용을 보여 주는 자료가 좋아요. 이름·학번이 보이면 가리고 올려 주세요.</span>
+        <span id="files-help" class="text-xs text-muted">{{ _("PDF·JPG·PNG. 주차별 강의 계획, 강의 노트, 과제·시험지, 교재 목차처럼 배운 내용을 보여 주는 자료가 좋아요. 이름·학번이 보이면 가리고 올려 주세요.") }}</span>
       </div>
     </div>
 
-    <ol class="grid gap-1.5 rounded-md bg-parchment px-4 py-3 text-sm text-ink-80" aria-label="처리 절차">
-      <li><span class="mr-2 tabular-nums text-muted">1</span>학사처가 사유와 자료를 검토해요.</li>
-      <li><span class="mr-2 tabular-nums text-muted">2</span>받아들이면 학과 교수가 다시 판정하고, 기각하면 사유를 알려 드려요.</li>
-      <li><span class="mr-2 tabular-nums text-muted">3</span>원 판정은 지워지지 않고 기록으로 남아요.</li>
+    <ol class="grid gap-1.5 rounded-md bg-parchment px-4 py-3 text-sm text-ink-80" aria-label="{{ _('처리 절차') }}">
+      <li><span class="mr-2 tabular-nums text-muted">1</span>{{ _("학사처가 사유와 자료를 검토해요.") }}</li>
+      <li><span class="mr-2 tabular-nums text-muted">2</span>{{ _("받아들이면 학과 교수가 다시 판정하고, 기각하면 사유를 알려 드려요.") }}</li>
+      <li><span class="mr-2 tabular-nums text-muted">3</span>{{ _("원 판정은 지워지지 않고 기록으로 남아요.") }}</li>
     </ol>
 
     <div class="flex flex-wrap gap-2">
-      <button class="btn-primary">이의 신청 제출</button>
-      <a href="/student/evaluations/{{ ev.id }}" class="btn-secondary">취소</a>
+      <button class="btn-primary">{{ _("이의 신청 제출") }}</button>
+      <a href="/student/evaluations/{{ ev.id }}" class="btn-secondary">{{ _("취소") }}</a>
     </div>
   </form>
   {% endif %}

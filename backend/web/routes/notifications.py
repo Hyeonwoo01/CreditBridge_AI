@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.security.session import current_user
 from backend.services import notifications
@@ -33,9 +34,9 @@ def workspace(user: User = Depends(current_user), session: Session = Depends(get
     if counts is None:
         return HTMLResponse("")
     chips = [
-        ("제출 요청", counts.submitted, ""),
-        ("심사 대기", counts.waiting, ""),
-        ("판정 완료", counts.decided, "approve"),
+        (tr("제출 요청"), counts.submitted, ""),
+        (tr("심사 대기"), counts.waiting, ""),
+        (tr("판정 완료"), counts.decided, "approve"),
     ]
     html = "".join(
         f'<span class="chip-count{" chip-count-" + tone if tone else ""}">{label} <b>{value}</b></span>'

@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -7,26 +8,41 @@ from fastapi.responses import Response
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
+from backend.i18n import LABELS, LOCALES, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).resolve().parents[2] / "frontend" / "templates")
 
-REC_LABEL = {"direct": "직접 인정", "elective": "선택 인정", "none": "불인정", "insufficient": "정보 부족"}
-CONF_LABEL = {"high": "상", "medium": "중", "low": "하"}
-STATUS_LABEL = {"taught": "다룸", "partial": "부분", "not_taught": "없음", "unclear": "판단 불가"}
-LEVEL_LABEL = {"same": "같은 수준", "lower": "낮은 수준", "higher": "높은 수준"}
-FIELD_LABEL = {
-    "learning_outcomes": "학습 목표",
-    "weekly_topics": "주차별 주제",
-    "textbooks": "교재",
-    "prerequisites": "선수과목",
-    "assessment": "평가 방식",
-    "credits": "학점·시수",
+REC_LABEL = {
+    "direct": N_("직접 인정"),
+    "elective": N_("선택 인정"),
+    "none": N_("불인정"),
+    "insufficient": N_("정보 부족"),
 }
-ACTION_LABEL = {"approve": "승인", "modify": "수정", "reject": "반려"}
-APPEAL_LABEL = {"submitted": "접수됨", "accepted": "재판정 중", "dismissed": "기각", "redecided": "재판정 완료"}
-PRIVACY_LABEL = {"requested": "요청됨", "reviewed": "심사관 처리 완료 · 승인 대기", "completed": "삭제 완료"}
+CONF_LABEL = {"high": N_("상"), "medium": N_("중"), "low": N_("하")}
+STATUS_LABEL = {"taught": N_("다룸"), "partial": N_("부분"), "not_taught": N_("없음"), "unclear": N_("판단 불가")}
+LEVEL_LABEL = {"same": N_("같은 수준"), "lower": N_("낮은 수준"), "higher": N_("높은 수준")}
+FIELD_LABEL = {
+    "learning_outcomes": N_("학습 목표"),
+    "weekly_topics": N_("주차별 주제"),
+    "textbooks": N_("교재"),
+    "prerequisites": N_("선수과목"),
+    "assessment": N_("평가 방식"),
+    "credits": N_("학점·시수"),
+}
+ACTION_LABEL = {"approve": N_("승인"), "modify": N_("수정"), "reject": N_("반려")}
+APPEAL_LABEL = {
+    "submitted": N_("접수됨"),
+    "accepted": N_("재판정 중"),
+    "dismissed": N_("기각"),
+    "redecided": N_("재판정 완료"),
+}
+PRIVACY_LABEL = {
+    "requested": N_("요청됨"),
+    "reviewed": N_("심사관 처리 완료 · 승인 대기"),
+    "completed": N_("삭제 완료"),
+}
 
 
 def highlight(text: str, marks: list[tuple[int, int]], prefix: str) -> Markup:
@@ -73,23 +89,37 @@ def utc(value: datetime | None) -> str:
     return "–" if value is None else value.strftime("%Y-%m-%d %H:%M") + " UTC"
 
 
+def _label(table: Mapping[Any, str], value: str | None, default: str | None = None) -> str:
+    """코드값의 화면 이름을 현재 언어로 (모르는 값은 그대로)."""
+    text = table.get(value or "", default if default is not None else (value or ""))
+    return gettext(text) if text else text
+
+
 TEMPLATES.env.filters.update(
-    rec=lambda v: REC_LABEL.get(v or "", "분석 중"),
-    conf=lambda v: CONF_LABEL.get(v or "", "–"),
-    concept_status=lambda v: STATUS_LABEL.get(v or "", v),
-    level=lambda v: LEVEL_LABEL.get(v or "", v),
-    field=lambda v: FIELD_LABEL.get(v, v),
-    action=lambda v: ACTION_LABEL.get(v, v),
+    rec=lambda v: _label(REC_LABEL, v, N_("분석 중")),
+    conf=lambda v: _label(CONF_LABEL, v, "–"),
+    concept_status=lambda v: _label(STATUS_LABEL, v),
+    level=lambda v: _label(LEVEL_LABEL, v),
+    field=lambda v: _label(FIELD_LABEL, v),
+    action=lambda v: _label(ACTION_LABEL, v),
     pct=pct,
     iso=iso,
     utc=utc,
-    reason=lambda v: REASON_LABELS.get(v, v),
+    reason=lambda v: _label(REASON_LABELS, v),
     highlight=highlight,
-    appeal_status=lambda v: APPEAL_LABEL.get(v, v),
-    privacy_status=lambda v: PRIVACY_LABEL.get(v, v),
+    appeal_status=lambda v: _label(APPEAL_LABEL, v),
+    privacy_status=lambda v: _label(PRIVACY_LABEL, v),
+    t=lambda v: translate_stored(v) if isinstance(v, str) else v,  # DB에 한국어로 저장된 글 번역
 )
-TEMPLATES.env.globals["reason_labels"] = REASON_LABELS
-TEMPLATES.env.globals["reason_hints"] = REASON_HINTS
+TEMPLATES.env.globals.update(
+    reason_labels=REASON_LABELS,
+    reason_hints=REASON_HINTS,
+    _=gettext_markup,
+    tr=gettext,  # 이스케이프하지 않은 글 (JSON 등)
+    current_locale=get_locale,
+    locales=LOCALES,
+    locale_labels=LABELS,
+)
 
 
 def render(request: Request, name: str, status_code: int = 200, **context: Any) -> Response:

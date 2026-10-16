@@ -10,6 +10,7 @@ from backend.config import get_settings
 from backend.db.session import get_db
 from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError
+from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
@@ -70,7 +71,7 @@ def approve_privacy(
         flash(request, str(exc), "error")
     else:
         send_emails()
-        flash(request, "삭제를 승인했어요. 원본 파일과 추출 텍스트를 지웠어요.")
+        flash(request, tr("삭제를 승인했어요. 원본 파일과 추출 텍스트를 지웠어요."))
     return RedirectResponse("/admin/privacy", status_code=303)
 
 
@@ -91,7 +92,7 @@ def sis_token(
     check_csrf(request, csrf_token)
     if action == "revoke":
         sis_service.revoke_token(session, user)
-        flash(request, "연동 토큰을 폐기했어요. 이 토큰으로는 더 이상 내보낼 수 없어요.")
+        flash(request, tr("연동 토큰을 폐기했어요. 이 토큰으로는 더 이상 내보낼 수 없어요."))
         return RedirectResponse("/admin/sis", status_code=303)
     token = sis_service.issue_token(session, user)
     return render(request, "admin/sis.html", user=user, has_token=True, token=token)
@@ -182,7 +183,10 @@ def import_courses(
         return RedirectResponse("/admin/data", status_code=303)
     if result.errors:
         return _data_page(request, user, session, status_code=422, course_errors=result.errors)
-    flash(request, f"과목 {result.created}건을 새로 만들고 {result.updated}건을 고쳤어요.")
+    flash(
+        request,
+        tr("과목 {created}건을 새로 만들고 {updated}건을 고쳤어요.", created=result.created, updated=result.updated),
+    )
     return RedirectResponse("/admin/data#courses", status_code=303)
 
 
@@ -202,7 +206,7 @@ def add_institution(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        flash(request, "출신 대학을 등록했어요. 학생이 편입 요청을 만들 때 고를 수 있어요.")
+        flash(request, tr("출신 대학을 등록했어요. 학생이 편입 요청을 만들 때 고를 수 있어요."))
     return RedirectResponse("/admin/data#institutions", status_code=303)
 
 
@@ -225,7 +229,7 @@ def upload_reference(
         flash(request, str(exc), "error")
     else:
         tasks.process_reference.delay(syllabus.id, course.id)
-        flash(request, f"{course.code} 기준 강의계획서를 받았어요. 글자를 읽으면 AI 비교에 쓰여요.")
+        flash(request, tr("{code} 기준 강의계획서를 받았어요. 글자를 읽으면 AI 비교에 쓰여요.", code=course.code))
     return RedirectResponse("/admin/data#courses", status_code=303)
 
 
@@ -241,7 +245,7 @@ def account_active(
     """계정 비활성화·다시 활성화. 계정은 지우지 않는다."""
     check_csrf(request, csrf_token)
     if action not in ("deactivate", "reactivate"):
-        raise CreditBridgeError("처리 방법을 골라 주세요.")
+        raise CreditBridgeError(tr("처리 방법을 골라 주세요."))
     try:
         change = institution_data.set_active(session, user, email, action == "reactivate")
     except CreditBridgeError as exc:
@@ -251,13 +255,17 @@ def account_active(
     send_emails()
     target = change.user
     if action == "reactivate":
-        flash(request, f"{target.email} 계정을 다시 활성화했어요. 이전 비밀번호로 로그인할 수 있어요.")
+        flash(request, tr("{email} 계정을 다시 활성화했어요. 이전 비밀번호로 로그인할 수 있어요.", email=target.email))
     else:
-        message = f"{target.email} 계정을 비활성화했어요. 로그인이 막히고 다른 기기의 로그인도 끊겼어요."
+        message = tr(
+            "{email} 계정을 비활성화했어요. 로그인이 막히고 다른 기기의 로그인도 끊겼어요.", email=target.email
+        )
         if change.moved:
-            message += f" 진행 중인 심사 {change.moved}건을 같은 학과 다른 교수에게 넘겼어요."
+            message += tr(" 진행 중인 심사 {moved}건을 같은 학과 다른 교수에게 넘겼어요.", moved=change.moved)
         if change.released:
-            message += f" 심사 {change.released}건은 넘길 교수가 없어 심사관이 다시 배정해야 해요."
+            message += tr(
+                " 심사 {released}건은 넘길 교수가 없어 심사관이 다시 배정해야 해요.", released=change.released
+            )
         flash(request, message)
     return RedirectResponse("/admin/data#account-active", status_code=303)
 
@@ -283,7 +291,10 @@ def reset_password(
         tasks.send_password_reset.delay(target.id, kind="admin")
         flash(
             request,
-            f"{target.email} 메일로 비밀번호 설정 링크(72시간 유효)를 보냈어요. 이전 비밀번호는 더 이상 쓸 수 없어요.",
+            tr(
+                "{email} 메일로 비밀번호 설정 링크(72시간 유효)를 보냈어요. 이전 비밀번호는 더 이상 쓸 수 없어요.",
+                email=target.email,
+            ),
         )
         return RedirectResponse("/admin/data#password-reset", status_code=303)
     reset = institution_data.CreatedAccount(target.email, target.name, target.role, password)

@@ -12,6 +12,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.errors import DecisionValidationError, NotFoundError, PermissionDeniedError
+from backend.i18n import N_
+from backend.i18n import gettext as tr
 from backend.models import Course, CourseEvaluation, Decision, Syllabus, User
 from backend.models.enums import AppealStatus, DecisionAction, DecisionResult, ReasonCode, RequestStatus, Role
 from backend.repositories import catalog as catalog_repo
@@ -27,19 +29,19 @@ from backend.services import audit, notifications
 # 강의계획서 내용이 이 비율 이상 같으면 '같은 강의계획서'로 본다. 첫 측정 후 확정한다 (기능명세서 FR-11).
 SIMILARITY_MIN = 0.80
 REASON_LABELS = {
-    ReasonCode.WEEKS_INSUFFICIENT: "주차 범위 부족",
-    ReasonCode.LEVEL_DIFFERENCE: "수준 차이",
-    ReasonCode.NO_LAB: "실험·실습 미포함",
-    ReasonCode.PREREQUISITE_DIFFERENCE: "선수과목 차이",
-    ReasonCode.OTHER: "기타",
+    ReasonCode.WEEKS_INSUFFICIENT: N_("주차 범위 부족"),
+    ReasonCode.LEVEL_DIFFERENCE: N_("수준 차이"),
+    ReasonCode.NO_LAB: N_("실험·실습 미포함"),
+    ReasonCode.PREREQUISITE_DIFFERENCE: N_("선수과목 차이"),
+    ReasonCode.OTHER: N_("기타"),
 }
 # 사유 선택 창에서 각 항목 아래에 보여주는 설명
 REASON_HINTS = {
-    ReasonCode.WEEKS_INSUFFICIENT: "핵심 개념을 다루는 주차가 대상 과목보다 적거나 범위가 좁아요.",
-    ReasonCode.LEVEL_DIFFERENCE: "입문·심화 등 과목 수준이 대상 과목과 달라요.",
-    ReasonCode.NO_LAB: "대상 과목에 필요한 실험·실습이 출신 과목에 없어요.",
-    ReasonCode.PREREQUISITE_DIFFERENCE: "선수과목 체계가 달라 같은 단계의 과목으로 보기 어려워요.",
-    ReasonCode.OTHER: "위 항목에 없는 사유예요. 메모에 구체적으로 적어 주세요.",
+    ReasonCode.WEEKS_INSUFFICIENT: N_("핵심 개념을 다루는 주차가 대상 과목보다 적거나 범위가 좁아요."),
+    ReasonCode.LEVEL_DIFFERENCE: N_("입문·심화 등 과목 수준이 대상 과목과 달라요."),
+    ReasonCode.NO_LAB: N_("대상 과목에 필요한 실험·실습이 출신 과목에 없어요."),
+    ReasonCode.PREREQUISITE_DIFFERENCE: N_("선수과목 체계가 달라 같은 단계의 과목으로 보기 어려워요."),
+    ReasonCode.OTHER: N_("위 항목에 없는 사유예요. 메모에 구체적으로 적어 주세요."),
 }
 
 
@@ -153,22 +155,22 @@ def snapshot(evaluation: CourseEvaluation, course: Course | None) -> dict[str, A
 
 def ensure_assigned(session: Session, professor: User, evaluation: CourseEvaluation) -> None:
     if professor.role != Role.PROFESSOR:
-        raise PermissionDeniedError("최종 판정은 배정된 학과 교수만 할 수 있어요.")
+        raise PermissionDeniedError(tr("최종 판정은 배정된 학과 교수만 할 수 있어요."))
     assignment = evaluation_repo.active_assignment(session, evaluation.id)
     if assignment is None or assignment.reviewer_id != professor.id:
-        raise PermissionDeniedError("본인에게 배정된 건만 판정할 수 있어요.")
+        raise PermissionDeniedError(tr("본인에게 배정된 건만 판정할 수 있어요."))
 
 
 def _validate_reasons(codes: list[str], memo: str, required: bool) -> tuple[list[str], str]:
     unknown = [c for c in codes if c not in ReasonCode.__members__.values()]
     if unknown:
-        raise DecisionValidationError("사유를 목록에서 골라 주세요.")
+        raise DecisionValidationError(tr("사유를 목록에서 골라 주세요."))
     codes = list(dict.fromkeys(codes))
     memo = memo.strip()
     if required and not codes:
-        raise DecisionValidationError("반려하거나 AI 추천과 다르게 판정할 때는 사유를 하나 이상 골라야 해요.")
+        raise DecisionValidationError(tr("반려하거나 AI 추천과 다르게 판정할 때는 사유를 하나 이상 골라야 해요."))
     if ReasonCode.OTHER in codes and not memo:
-        raise DecisionValidationError("'기타'를 고른 경우에는 메모를 적어 주세요.")
+        raise DecisionValidationError(tr("'기타'를 고른 경우에는 메모를 적어 주세요."))
     return codes, memo
 
 
@@ -185,14 +187,14 @@ def decide(
 ) -> Decision:
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
-        raise NotFoundError("심사 건을 찾을 수 없어요.")
+        raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
     ensure_assigned(session, professor, evaluation)
     current = decision_repo.for_evaluation(session, evaluation.id)
     appeal = appeal_service.accepted_for(session, evaluation.id) if current is not None else None
     if current is not None and (appeal is None or appeal.decision_id != current.id):
-        raise DecisionValidationError("이미 판정된 건이에요. 이의 신청으로 재심사를 진행해 주세요.")
+        raise DecisionValidationError(tr("이미 판정된 건이에요. 이의 신청으로 재심사를 진행해 주세요."))
     if action not in DecisionAction.__members__.values():
-        raise DecisionValidationError("승인·수정·반려 중 하나를 선택해 주세요.")
+        raise DecisionValidationError(tr("승인·수정·반려 중 하나를 선택해 주세요."))
 
     ai = ai_result(evaluation)
     ai_course = (
@@ -201,19 +203,19 @@ def decide(
     target: Course | None = None
     if action == DecisionAction.APPROVE:
         if ai == "insufficient":
-            raise DecisionValidationError("정보 부족 건은 그대로 승인할 수 없어요. 수정 또는 반려로 판정해 주세요.")
+            raise DecisionValidationError(tr("정보 부족 건은 그대로 승인할 수 없어요. 수정 또는 반려로 판정해 주세요."))
         final = ai
         target = ai_course if ai == DecisionResult.DIRECT else None
     elif action == DecisionAction.REJECT:
         final = DecisionResult.NONE
     else:
         if result not in DecisionResult.__members__.values():
-            raise DecisionValidationError("수정할 판정 등급을 선택해 주세요.")
+            raise DecisionValidationError(tr("수정할 판정 등급을 선택해 주세요."))
         final = str(result)
         if final == DecisionResult.DIRECT:
             target = catalog_repo.get_course(session, target_course_id) if target_course_id else None
             if target is None or target.institution_id != professor.institution_id:
-                raise DecisionValidationError("직접 인정할 대상 과목을 선택해 주세요.")
+                raise DecisionValidationError(tr("직접 인정할 대상 과목을 선택해 주세요."))
 
     # 대상 과목은 직접 인정일 때만 의미가 있다
     differs = final != ai or (
@@ -224,7 +226,10 @@ def decide(
     found = conflicts(history(session, evaluation), final)
     if found and not acknowledge_conflict:
         raise ConflictNeedsAcknowledgement(
-            f"같은 강의계획서로 내린 과거 판정 {len(found)}건과 결과가 달라요. 이력을 확인한 뒤 다시 확정해 주세요."
+            tr(
+                "같은 강의계획서로 내린 과거 판정 {n}건과 결과가 달라요. 이력을 확인한 뒤 다시 확정해 주세요.",
+                n=len(found),
+            )
         )
 
     decision = decision_repo.add(
@@ -270,13 +275,17 @@ def _notify_student(session: Session, evaluation: CourseEvaluation, result: str,
     student = user_repo.get_by_id(session, request.student_id) if request else None
     if student is None or syllabus is None:
         return
-    label = {"direct": "직접 인정", "elective": "선택 인정", "none": "불인정"}.get(result, result)
+    label = {"direct": N_("직접 인정"), "elective": N_("선택 인정"), "none": N_("불인정")}.get(result, result)
     course = (syllabus.course_code or syllabus.course_title).strip()
     notifications.notify(
         session,
         [student],
         "decision.redecided" if redecided else "decision.created",
-        f"{course} {'재판정' if redecided else '판정'} 결과가 확정됐어요: {label}",
+        (
+            N_("{course} 재판정 결과가 확정됐어요: {result}")
+            if redecided
+            else N_("{course} 판정 결과가 확정됐어요: {result}")
+        ).format(course=course, result=label),
         f"/student/evaluations/{evaluation.id}",
     )
 

@@ -1,7 +1,7 @@
 {% from "partials/macros.html" import nav_link with context %}
-{{ nav_link("/review", "심사 큐", exact=True) }}
-{{ nav_link("/review/appeals", "이의 신청") }}
-{{ nav_link("/review/privacy", "삭제 요청") }}
-{{ nav_link("/review/equivalencies", "동등 과목표") }}
-{{ nav_link("/review/stats", "통계") }}
-<a href="/review/export.csv" class="flex h-11 items-center text-xs tracking-[-0.12px] text-white/70 hover:text-white">CSV 내보내기</a>
+{{ nav_link("/review", _("심사 큐"), exact=True) }}
+{{ nav_link("/review/appeals", _("이의 신청")) }}
+{{ nav_link("/review/privacy", _("삭제 요청")) }}
+{{ nav_link("/review/equivalencies", _("동등 과목표")) }}
+{{ nav_link("/review/stats", _("통계")) }}
+<a href="/review/export.csv" class="flex h-11 items-center text-xs tracking-[-0.12px] text-white/70 hover:text-white">{{ _("CSV 내보내기") }}</a>

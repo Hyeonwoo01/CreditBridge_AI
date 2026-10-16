@@ -3,8 +3,8 @@
 {% block nav %}{% include "review/_nav.html" %}{% endblock %}
 {% block content %}
 <header class="grid gap-2">
-  <h1 class="page-title">이의 신청</h1>
-  <p class="text-muted">학생의 이의 사유와 원 판정을 확인한 뒤, 받아들이면 학과 교수에게 재판정을 배정하고 아니면 사유와 함께 기각해요. 원 판정은 지워지지 않고 기록으로 남아요.</p>
+  <h1 class="page-title">{{ _("이의 신청") }}</h1>
+  <p class="text-muted">{{ _("학생의 이의 사유와 원 판정을 확인한 뒤, 받아들이면 학과 교수에게 재판정을 배정하고 아니면 사유와 함께 기각해요. 원 판정은 지워지지 않고 기록으로 남아요.") }}</p>
 </header>
 <section class="mt-6 grid gap-4">
   {% for row in rows %}
@@ -14,27 +14,27 @@
       <a class="font-semibold underline-offset-2 hover:underline" href="/review/evaluations/{{ row.evaluation.id }}">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</a>
       <span class="badge {{ 'text-reject' if a.status == 'submitted' else '' }}">{{ a.status | appeal_status }}</span>
     </div>
-    <p class="text-sm text-muted">{{ row.request.source_institution.name }} · 신청 {{ time(a.created_at) }} · <a class="underline" href="/evaluations/{{ row.evaluation.id }}/report">판정 근거 리포트</a></p>
+    <p class="text-sm text-muted">{{ _("{name} · 신청 {time} ·", name=(row.request.source_institution.name), time=(time(a.created_at))) }} <a class="underline" href="/evaluations/{{ row.evaluation.id }}/report">{{ _("판정 근거 리포트") }}</a></p>
     <blockquote class="rounded-sm bg-parchment p-3 text-sm whitespace-pre-line">{{ a.reason }}</blockquote>
-    {% if row.files %}<div class="-mt-1 flex flex-wrap items-center gap-2 text-sm"><span class="text-muted">근거 자료</span><ul class="flex flex-wrap gap-2">{% for f in row.files %}<li>{% if f.file_key %}<a class="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1 text-sm hover:border-primary hover:text-primary" href="/appeal-files/{{ f.id }}">{{ f.original_filename }}</a>{% else %}<span class="inline-flex items-center rounded-full border border-hairline px-3 py-1 text-sm text-muted">{{ f.original_filename }} (삭제됨)</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
-    {% if a.handler_note %}<p class="text-sm"><span class="text-muted">처리 메모:</span> {{ a.handler_note }}</p>{% endif %}
+    {% if row.files %}<div class="-mt-1 flex flex-wrap items-center gap-2 text-sm"><span class="text-muted">{{ _("근거 자료") }}</span><ul class="flex flex-wrap gap-2">{% for f in row.files %}<li>{% if f.file_key %}<a class="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1 text-sm hover:border-primary hover:text-primary" href="/appeal-files/{{ f.id }}">{{ f.original_filename }}</a>{% else %}<span class="inline-flex items-center rounded-full border border-hairline px-3 py-1 text-sm text-muted">{{ _("{original_filename} (삭제됨)", original_filename=(f.original_filename)) }}</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.handler_note %}<p class="text-sm"><span class="text-muted">{{ _("처리 메모:") }}</span> {{ a.handler_note }}</p>{% endif %}
     {% if a.status == 'submitted' %}
     <form method="post" action="/review/appeals/{{ a.id }}" class="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label class="field"><span>재판정 교수</span>
+      <label class="field"><span>{{ _("재판정 교수") }}</span>
         <select name="reviewer_id" class="input h-11">
-          <option value="">선택</option>
-          {% for p in row.reviewer_options %}<option value="{{ p.id }}" {% if p.id == row.default_reviewer_id %}selected{% endif %}>{{ p.name }}{% if p.id == row.default_reviewer_id %} (원 판정·대리){% endif %}</option>{% endfor %}
+          <option value="">{{ _("선택") }}</option>
+          {% for p in row.reviewer_options %}<option value="{{ p.id }}" {% if p.id == row.default_reviewer_id %}selected{% endif %}>{{ p.name }}{% if p.id == row.default_reviewer_id %} {{ _("(원 판정·대리)") }}{% endif %}</option>{% endfor %}
         </select>
       </label>
-      <label class="field"><span>메모 (기각 시 필수, 학생에게 전달)</span><input class="input h-11" name="note" maxlength="1000"></label>
-      <button class="btn-primary h-11" name="action" value="accept">받아들이고 재판정 배정</button>
-      <button class="btn-secondary h-11" name="action" value="dismiss">기각</button>
+      <label class="field"><span>{{ _("메모 (기각 시 필수, 학생에게 전달)") }}</span><input class="input h-11" name="note" maxlength="1000"></label>
+      <button class="btn-primary h-11" name="action" value="accept">{{ _("받아들이고 재판정 배정") }}</button>
+      <button class="btn-secondary h-11" name="action" value="dismiss">{{ _("기각") }}</button>
     </form>
     {% endif %}
   </article>
   {% else %}
-  <p class="rounded-md bg-parchment p-6 text-center text-muted">접수된 이의 신청이 없어요.</p>
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("접수된 이의 신청이 없어요.") }}</p>
   {% endfor %}
 </section>
 {% endblock %}

@@ -3,6 +3,7 @@
 from sqlalchemy.orm import Session
 
 from backend.errors import PermissionDeniedError
+from backend.i18n import gettext as tr
 from backend.models import CourseEvaluation, User
 from backend.models.enums import Role
 from backend.repositories import decisions as decision_repo
@@ -29,4 +30,4 @@ def can_view_evaluation(session: Session, user: User, evaluation: CourseEvaluati
 
 def ensure_can_view_evaluation(session: Session, user: User, evaluation: CourseEvaluation) -> None:
     if not can_view_evaluation(session, user, evaluation):
-        raise PermissionDeniedError("이 심사 건을 볼 권한이 없어요.")
+        raise PermissionDeniedError(tr("이 심사 건을 볼 권한이 없어요."))

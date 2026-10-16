@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
+from backend.i18n import gettext as tr
 from backend.services import sis as sis_service
 
 router = APIRouter(tags=["sis"])
@@ -20,7 +21,7 @@ def sis_decisions(
     scheme, _, token = authorization.partition(" ")
     institution = sis_service.institution_for_token(session, token.strip()) if scheme.lower() == "bearer" else None
     if institution is None:
-        raise HTTPException(status_code=401, detail="유효한 연동 토큰이 필요해요.")
+        raise HTTPException(status_code=401, detail=tr("유효한 연동 토큰이 필요해요."))
     if since is not None and since.tzinfo is not None:
         since = since.astimezone(UTC).replace(tzinfo=None)  # DB는 UTC naive로 저장한다
     rows = sis_service.export_rows(session, institution.id, since)
