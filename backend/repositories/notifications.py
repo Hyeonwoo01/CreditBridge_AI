@@ -55,7 +55,7 @@ def pending_email(session: Session, since: datetime, limit: int = 100) -> list[t
     stmt = (
         select(Notification, User)
         .join(User, User.id == Notification.user_id)
-        .where(Notification.emailed_at.is_(None), Notification.created_at >= since)
+        .where(Notification.emailed_at.is_(None), Notification.created_at >= since, User.is_active.is_(True))
         .order_by(Notification.id)
         .limit(limit)
     )

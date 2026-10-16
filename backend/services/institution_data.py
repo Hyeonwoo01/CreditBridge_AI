@@ -16,15 +16,17 @@ from sqlalchemy.orm import Session
 from backend.ai.injection import detect
 from backend.ai.llm_client import LLMClient
 from backend.config import get_settings
+from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, LLMError, NotFoundError, PermissionDeniedError
-from backend.models import Course, Institution, Syllabus, User
+from backend.models import Assignment, Course, Institution, Syllabus, User
 from backend.models.enums import Role, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
+from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
-from backend.services import analysis, audit, csv_import
+from backend.services import analysis, audit, csv_import, notifications, review
 from backend.services.auth import RESET_AFTER, hash_password, temporary_password, unusable_password
 
 logger = logging.getLogger(__name__)
@@ -96,6 +98,7 @@ class Overview:
     role_counts: dict[str, int]
     pending_password: int
     locked_out: int  # 로그인 실패가 이어져 비밀번호가 초기화된 계정
+    inactive: int  # 비활성화된 계정 (역할별 계정 수에서 빠진다)
     courses: list[CourseRow]
     departments_without_professor: list[str]
     source_institutions: list[Institution]
@@ -125,6 +128,7 @@ def overview(session: Session, admin: User) -> Overview:
         role_counts=user_repo.role_counts(session, institution_id),
         pending_password=user_repo.pending_password_change(session, institution_id),
         locked_out=user_repo.locked_out_count(session, institution_id, RESET_AFTER),
+        inactive=user_repo.inactive_count(session, institution_id),
         courses=[CourseRow(c, uploads.get(c.code)) for c in courses],
         departments_without_professor=[d for d in departments if d not in staffed],
         source_institutions=catalog_repo.source_institutions(session),
@@ -132,6 +136,89 @@ def overview(session: Session, admin: User) -> Overview:
 
 
 # ---------- 계정 ----------
+
+
+@dataclass(frozen=True)
+class ActiveChange:
+    user: User
+    moved: int = 0  # 다른 교수에게 넘긴 진행 중 심사
+    released: int = 0  # 같은 학과에 다른 교수가 없어 배정을 비운 심사
+
+
+def set_active(session: Session, admin: User, email: str, active: bool) -> ActiveChange:
+    """계정 비활성화·다시 활성화. 계정은 지우지 않는다(판정·감사 기록이 그 사람을 가리킨다).
+
+    비활성화하면 로그인·배정·알림 메일에서 빠지고 다른 기기의 로그인도 끊긴다. 교수였다면 진행 중인 심사를
+    같은 학과의 다른 교수에게 넘기고, 넘길 사람이 없으면 배정을 비워 심사관이 다시 배정하게 한다."""
+    institution_id = ensure_admin(admin)
+    user = user_repo.get_by_email(session, email)
+    if user is None or user.institution_id != institution_id:
+        raise NotFoundError("우리 기관에 그 이메일의 계정이 없어요.")
+    if user.id == admin.id:
+        raise CreditBridgeError("본인 계정은 비활성화할 수 없어요.")
+    if user.is_active == active:
+        raise CreditBridgeError("이미 활성 상태인 계정이에요." if active else "이미 비활성화된 계정이에요.")
+    user.is_active = active
+    user.deactivated_at = None if active else utcnow()
+    session.flush()
+    moved = released = 0
+    if not active and user.role == Role.PROFESSOR:
+        moved, released = _hand_over_reviews(session, admin, user)
+    audit.record(
+        session,
+        admin,
+        "account.reactivate" if active else "account.deactivate",
+        "user",
+        str(user.id),
+        moved=moved,
+        released=released,
+    )
+    session.commit()
+    return ActiveChange(user, moved, released)
+
+
+def _hand_over_reviews(session: Session, admin: User, professor: User) -> tuple[int, int]:
+    today = utcnow().date()
+    moved, released = 0, 0
+    receivers: dict[int, tuple[User, int]] = {}
+    for a in evaluation_repo.active_assignments_for(session, professor.id):
+        try:
+            reviewer, _ = review.pick_reviewer(session, admin.institution_id or 0, professor.department or "", today)
+        except CreditBridgeError:
+            evaluation_repo.release_assignment(session, a)
+            released += 1
+            continue
+        evaluation_repo.add_assignment(
+            session,
+            Assignment(
+                course_evaluation_id=a.course_evaluation_id,
+                reviewer_id=reviewer.id,
+                assigned_by=admin.id,
+                reassigned_from=professor.id,
+            ),
+        )
+        receivers[reviewer.id] = (reviewer, receivers.get(reviewer.id, (reviewer, 0))[1] + 1)
+        moved += 1
+    for reviewer, n in receivers.values():
+        notifications.notify(
+            session,
+            [reviewer],
+            "assignment.delegated",
+            f"교수 계정 변경으로 진행 중인 심사 {n}건이 배정됐어요.",
+            "/professor",
+        )
+    if moved or released:
+        parts = [f"{moved}건은 같은 학과 다른 교수에게 넘겼어요"] if moved else []
+        if released:
+            parts.append(f"{released}건은 교수 배정이 필요해요")
+        notifications.notify(
+            session,
+            notifications.staff(session, admin.institution_id or 0, Role.EVALUATOR),
+            "assignment.delegated",
+            f"{professor.department or ''} 교수 계정이 비활성화돼 진행 중인 심사 중 {', '.join(parts)}.",
+            "/review",
+        )
+    return moved, released
 
 
 def import_accounts(session: Session, admin: User, filename: str, data: bytes, by_email: bool = False) -> AccountImport:

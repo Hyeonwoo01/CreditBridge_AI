@@ -15,7 +15,12 @@ def get_by_id(session: Session, user_id: int) -> User | None:
 def professors_in(session: Session, institution_id: int, department: str) -> list[User]:
     stmt = (
         select(User)
-        .where(User.institution_id == institution_id, User.role == "professor", User.department == department)
+        .where(
+            User.institution_id == institution_id,
+            User.role == "professor",
+            User.department == department,
+            User.is_active.is_(True),
+        )
         .order_by(User.id)
     )
     return list(session.scalars(stmt))
@@ -28,12 +33,20 @@ def add(session: Session, user: User) -> User:
 
 
 def staff_of(session: Session, institution_id: int, role: str) -> list[User]:
-    stmt = select(User).where(User.institution_id == institution_id, User.role == role).order_by(User.id)
+    stmt = (
+        select(User)
+        .where(User.institution_id == institution_id, User.role == role, User.is_active.is_(True))
+        .order_by(User.id)
+    )
     return list(session.scalars(stmt))
 
 
 def role_counts(session: Session, institution_id: int) -> dict[str, int]:
-    stmt = select(User.role, func.count()).where(User.institution_id == institution_id).group_by(User.role)
+    stmt = (
+        select(User.role, func.count())
+        .where(User.institution_id == institution_id, User.is_active.is_(True))
+        .group_by(User.role)
+    )
     return {role: count for role, count in session.execute(stmt).all()}
 
 
@@ -44,7 +57,10 @@ def pending_password_change(session: Session, institution_id: int) -> int:
 
 def professor_departments(session: Session, institution_id: int) -> set[str]:
     stmt = select(User.department).where(
-        User.institution_id == institution_id, User.role == "professor", User.department.is_not(None)
+        User.institution_id == institution_id,
+        User.role == "professor",
+        User.department.is_not(None),
+        User.is_active.is_(True),
     )
     return {d for d in session.scalars(stmt) if d}
 
@@ -57,4 +73,9 @@ def add_failed_login(session: Session, user_id: int) -> int:
 
 def locked_out_count(session: Session, institution_id: int, threshold: int) -> int:
     stmt = select(func.count()).where(User.institution_id == institution_id, User.failed_logins >= threshold)
+    return session.scalar(stmt) or 0
+
+
+def inactive_count(session: Session, institution_id: int) -> int:
+    stmt = select(func.count()).where(User.institution_id == institution_id, User.is_active.is_(False))
     return session.scalar(stmt) or 0

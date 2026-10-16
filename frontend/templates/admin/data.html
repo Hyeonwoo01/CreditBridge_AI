@@ -35,6 +35,7 @@
     <span class="text-sm text-muted">계정</span>
     <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.role_counts.values() | sum }}<span class="text-base font-normal text-muted"> 개</span></span>
     <span class="text-xs text-muted">{% for key in ['student', 'evaluator', 'professor', 'admin'] %}{{ role_names[key] }} {{ o.role_counts.get(key, 0) }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+    {% if o.inactive %}<span class="text-xs text-muted">비활성 계정 {{ o.inactive }}개는 빼고 셌어요</span>{% endif %}
   </div>
   <div class="card grid content-start gap-1 p-5">
     <span class="text-sm text-muted">첫 비밀번호 변경 대기</span>
@@ -157,6 +158,7 @@
     {% if account_errors %}{{ errors_box(account_errors) }}{% endif %}
   </form>
 
+  <div class="grid content-start gap-4">
   <form id="password-reset" method="post" action="/admin/data/password-reset" class="card grid scroll-mt-20 content-start gap-3" onsubmit="return confirm('이 계정의 지금 비밀번호를 무효로 할까요?')">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <h2 class="font-semibold">비밀번호 초기화</h2>
@@ -168,6 +170,23 @@
     <label class="field"><span>사용자 이메일</span><input class="input" type="email" name="email" required></label>
     <button class="btn-secondary w-fit">{{ '설정 링크 메일 보내기' if email_enabled else '임시 비밀번호 발급' }}</button>
   </form>
+
+  <form id="account-active" method="post" action="/admin/data/accounts/active" class="card grid scroll-mt-20 content-start gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h2 class="font-semibold">계정 비활성화</h2>
+    <p class="text-sm text-muted">졸업·퇴직·휴학한 사람의 로그인을 막아요. 계정은 지우지 않아서 판정·감사 기록은 그대로 남고, 언제든 다시 활성화할 수 있어요.</p>
+    <ul class="list-disc pl-5 text-sm text-muted">
+      <li>로그인과 비밀번호 재설정이 막히고, 다른 기기에 남은 로그인도 바로 끊겨요.</li>
+      <li>교수 배정·대리 심사자·알림 메일 대상에서 빠지고, 위 계정 수에서도 빠져요.</li>
+      <li>교수라면 진행 중인 심사를 같은 학과 다른 교수에게 넘겨요. 넘길 교수가 없으면 배정을 비워 심사관이 다시 배정하게 해요.</li>
+    </ul>
+    <label class="field"><span>사용자 이메일</span><input class="input" type="email" name="email" required></label>
+    <div class="flex flex-wrap gap-2">
+      <button class="btn-secondary w-fit" name="action" value="deactivate" onclick="return confirm('이 계정을 비활성화할까요? 로그인이 바로 막혀요.')">비활성화</button>
+      <button class="btn-secondary w-fit border-hairline text-ink" name="action" value="reactivate">다시 활성화</button>
+    </div>
+  </form>
+  </div>
 </section>
 
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">

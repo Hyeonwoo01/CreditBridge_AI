@@ -39,6 +39,7 @@ LOCK_AFTER = 5  # 연속 실패가 이 횟수가 되면
 LOCK_FOR = timedelta(minutes=1)  # 이만큼 로그인을 막는다
 RESET_AFTER = 10  # 연속 실패가 이 횟수가 되면 비밀번호를 무효로 하고 메일 재설정만 허용
 WRONG_PASSWORD = "이메일 또는 비밀번호가 맞지 않아요."
+INACTIVE = "비활성화된 계정이에요. 다시 쓰려면 소속 기관 관리자에게 요청해 주세요."
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,13 @@ def login_attempt(session: Session, email: str, password: str) -> LoginAttempt:
     if user is None:
         _hasher.hash(password)  # 존재하지 않는 계정도 같은 시간이 걸리게
         return LoginAttempt(error=WRONG_PASSWORD, status_code=401)
+    if not user.is_active:
+        # 비밀번호가 맞을 때만 비활성 안내를 보여 준다 (틀리면 일반 안내, 실패 횟수·재설정 메일 없음)
+        try:
+            _hasher.verify(user.password_hash, password)
+        except (VerificationError, InvalidHashError):
+            return LoginAttempt(error=WRONG_PASSWORD, status_code=401)
+        return LoginAttempt(error=INACTIVE, status_code=403)
     if user.failed_logins >= RESET_AFTER:
         _hasher.hash(password)
         return LoginAttempt(error=lockout_message(), status_code=423)
@@ -201,7 +209,7 @@ def user_for_reset_token(session: Session, token: str, settings: Settings | None
     if (datetime.now(signed_at.tzinfo) - signed_at).total_seconds() > limit:
         return None
     user = user_repo.get_by_id(session, data["u"])
-    if user is None or data.get("p") != password_fingerprint(user):
+    if user is None or not user.is_active or data.get("p") != password_fingerprint(user):
         return None
     return user
 
@@ -209,7 +217,7 @@ def user_for_reset_token(session: Session, token: str, settings: Settings | None
 def request_reset(session: Session, email: str) -> int | None:
     """재설정 메일을 보낼 사용자 id. 없는 이메일이거나 방금 보냈으면 None (화면에는 같은 안내를 보여준다)."""
     user = user_repo.get_by_email(session, email)
-    if user is None:
+    if user is None or not user.is_active:
         return None
     last = audit_repo.last_at(session, user.id, "auth.password_reset_request")
     if last is not None and utcnow() - last < RESET_COOLDOWN:
@@ -224,7 +232,7 @@ def send_reset_email(session: Session, user_id: int, settings: Settings | None =
     kind: reset(본인 요청) / lockout(로그인 실패 10회) / admin(관리자 초기화) / welcome(새 계정)."""
     settings = settings or get_settings()
     user = user_repo.get_by_id(session, user_id)
-    if user is None:
+    if user is None or not user.is_active:
         return False
     purpose, subject, intro, outro = _MAILS[kind]
     token = reset_token(user, settings, purpose)

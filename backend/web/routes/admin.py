@@ -227,6 +227,39 @@ def upload_reference(
     return RedirectResponse("/admin/data#courses", status_code=303)
 
 
+@router.post("/data/accounts/active")
+def account_active(
+    request: Request,
+    email: str = Form(...),
+    action: str = Form(...),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """계정 비활성화·다시 활성화. 계정은 지우지 않는다."""
+    check_csrf(request, csrf_token)
+    if action not in ("deactivate", "reactivate"):
+        raise CreditBridgeError("처리 방법을 골라 주세요.")
+    try:
+        change = institution_data.set_active(session, user, email, action == "reactivate")
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse("/admin/data#account-active", status_code=303)
+    send_emails()
+    target = change.user
+    if action == "reactivate":
+        flash(request, f"{target.email} 계정을 다시 활성화했어요. 이전 비밀번호로 로그인할 수 있어요.")
+    else:
+        message = f"{target.email} 계정을 비활성화했어요. 로그인이 막히고 다른 기기의 로그인도 끊겼어요."
+        if change.moved:
+            message += f" 진행 중인 심사 {change.moved}건을 같은 학과 다른 교수에게 넘겼어요."
+        if change.released:
+            message += f" 심사 {change.released}건은 넘길 교수가 없어 심사관이 다시 배정해야 해요."
+        flash(request, message)
+    return RedirectResponse("/admin/data#account-active", status_code=303)
+
+
 @router.post("/data/password-reset")
 def reset_password(
     request: Request,

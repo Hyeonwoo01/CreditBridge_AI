@@ -315,7 +315,9 @@ def files_for(session: Session, appeal_ids: list[int]) -> dict[int, list[AppealF
 
 
 def file_for_download(session: Session, user: User, file_id: int) -> AppealFile:
-    """근거 자료 내려받기: 그 심사 건을 볼 수 있는 사람(학생 본인·소속 심사관·담당 교수)만."""
+    """근거 자료 내려받기: 그 심사 건을 볼 수 있는 사람(학생 본인·소속 심사관·담당 교수)만.
+
+    열람할 때마다 감사 로그를 남긴다."""
     file = appeal_repo.get_file(session, file_id)
     appeal = appeal_repo.get(session, file.appeal_id) if file else None
     evaluation = evaluation_repo.get(session, appeal.course_evaluation_id) if appeal else None
@@ -325,6 +327,17 @@ def file_for_download(session: Session, user: User, file_id: int) -> AppealFile:
         raise PermissionDeniedError("이 파일을 볼 권한이 없어요.")
     if file.file_key is None:
         raise NotFoundError("개인정보 삭제 요청으로 지워진 파일이에요.")
+    # 누가 언제 학생 파일을 열어 봤는지 감사 로그에 남긴다 (파일 이름은 넣지 않는다)
+    audit.record(
+        session,
+        user,
+        "appeal_file.download",
+        "appeal_file",
+        str(file.id),
+        appeal=file.appeal_id,
+        evaluation=evaluation.id,
+    )
+    session.commit()
     return file
 
 

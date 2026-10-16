@@ -465,7 +465,7 @@ DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법�
 | 테이블 | 용도 | 핵심 컬럼 |
 | --- | --- | --- |
 | institutions | 출신 대학과 대상 대학 | name, country, is\_target, tuition\_per\_credit, degree\_credits, sis\_token\_hash |
-| users | 학생, 심사관, 교수, 관리자 | email(UNIQUE), password\_hash, role, institution\_id, department, delegate\_user\_id, away\_until, must\_change\_password, failed\_logins, locked\_until |
+| users | 학생, 심사관, 교수, 관리자 | email(UNIQUE), password\_hash, role, institution\_id, department, delegate\_user\_id, away\_until, must\_change\_password, failed\_logins, locked\_until, is\_active, deactivated\_at |
 | courses | 대상 대학 카탈로그 과목 | institution\_id, code, title, credits, department, level, concepts, reference\_syllabus\_id |
 | syllabi | 업로드된 강의계획서와 추출 결과 | transfer\_request\_id, owner\_id, source\_file\_key, content\_hash(요청 안에서 UNIQUE), raw\_text, extracted\_json, quality\_score, injection\_flags, status |
 | syllabus\_chunks | 주차·개념 단위로 나눈 텍스트 | syllabus\_id, week\_no, concept, text, char\_start, char\_end |
@@ -496,7 +496,7 @@ creditbridge/
 ├── docker-compose.yml
 ├── .env.example
 ├── alembic/
-│   └── versions/           # 0001 초기 스키마 … 0005 이의 신청 근거 자료
+│   └── versions/           # 0001 초기 스키마 … 0006 계정 비활성화
 ├── backend/                # 백엔드 (Python 패키지, import backend.*)
 │   ├── main.py             # FastAPI 앱 생성, 라우터 등록, /static 마운트
 │   ├── config.py           # pydantic-settings, 환경변수는 여기서만 읽음

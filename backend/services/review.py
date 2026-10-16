@@ -156,7 +156,7 @@ def queue(
     )
 
 
-def _pick_reviewer(session: Session, institution_id: int, department: str, today: date) -> tuple[User, User | None]:
+def pick_reviewer(session: Session, institution_id: int, department: str, today: date) -> tuple[User, User | None]:
     """담당 교수 중 배정이 가장 적은 사람. 부재 중이면 대리 심사자 (반환: 실제 배정자, 원래 배정자)."""
     professors = user_repo.professors_in(session, institution_id, department)
     if not professors:
@@ -165,7 +165,7 @@ def _pick_reviewer(session: Session, institution_id: int, department: str, today
     chosen = min(available, key=lambda p: len(evaluation_repo.active_assignments_for(session, p.id)))
     if chosen.is_away(today) and chosen.delegate_user_id:
         delegate = user_repo.get_by_id(session, chosen.delegate_user_id)
-        if delegate is not None:
+        if delegate is not None and delegate.is_active:
             return delegate, chosen
     return chosen, None
 
@@ -185,7 +185,7 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
             problems.append("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요.")
             continue
         try:
-            reviewer, original = _pick_reviewer(session, institution_id, course.department, today)
+            reviewer, original = pick_reviewer(session, institution_id, course.department, today)
         except CreditBridgeError as exc:
             problems.append(str(exc))
             continue
@@ -247,7 +247,7 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
     target = delegate or (
         user_repo.get_by_id(session, professor.delegate_user_id) if professor.delegate_user_id else None
     )
-    if target is not None:
+    if target is not None and target.is_active:
         for a in evaluation_repo.active_assignments_for(session, professor.id):
             evaluation_repo.add_assignment(
                 session,

@@ -13,6 +13,7 @@ from backend.models import (
     Appeal,
     AppealFile,
     Assignment,
+    AuditLog,
     CourseEvaluation,
     Decision,
     MaterialRequest,
@@ -554,6 +555,19 @@ def test_appeal_form_with_evidence_files(client: TestClient, seeded: Session, fa
     login(client, "senior@student.example")
     assert client.get(url).status_code == 403  # 다른 학생
     assert client.get(f"/student/evaluations/{ev.id}/appeal").status_code in (403, 404)
+
+    # 열람할 때마다 감사 로그 (권한 없는 시도는 남지 않음), 관리자 감사 로그에 표시
+    seeded.expire_all()
+    views = seeded.scalars(
+        select(AuditLog).where(AuditLog.action == "appeal_file.download").order_by(AuditLog.id)
+    ).all()
+    viewers = seeded.scalars(select(User).where(User.id.in_([v.actor_id for v in views]))).all()
+    assert len(views) == 3 and {u.email for u in viewers} == {"jiwon@student.example", "rachel@msu.example", prof.email}
+    assert all(v.target_id == str(files[0].id) and v.payload_json["appeal"] == appeal.id for v in views)
+    assert "강의노트" not in str([v.payload_json for v in views])  # 파일 이름은 남기지 않는다
+    login(client, "admin@msu.example")
+    assert "이의 신청 근거 자료 열람" in client.get("/admin/stats").text  # 관리자 콘솔 최근 감사 로그
+    assert "appeal_file.download" in client.get("/admin/audit").text
 
     # 개인정보 삭제 요청이 승인되면 근거 자료 원본도 지운다
     token = login(client, "jiwon@student.example")

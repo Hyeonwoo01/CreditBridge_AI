@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, false, text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, false, text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
@@ -24,6 +24,9 @@ class User(IdMixin, CreatedAtMixin, Base):
     # 연속 로그인 실패 (성공·재설정하면 0). 5번이면 1분 잠금, 10번이면 비밀번호를 무효로 하고 재설정 메일
     failed_logins: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
+    # 졸업·퇴직 등으로 비활성화된 계정: 지우지 않고(감사 기록 보존) 로그인·배정·알림 메일에서 뺀다
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    deactivated_at: Mapped[datetime | None] = mapped_column(default=None)
 
     institution: Mapped[Institution | None] = relationship(lazy="joined")
 

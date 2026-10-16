@@ -126,3 +126,9 @@ def carry_assignment(session: Session, from_evaluation_id: int, to_evaluation_id
         )
     )
     session.flush()
+
+
+def release_assignment(session: Session, assignment: Assignment) -> None:
+    """담당 교수를 비운다 (계정 비활성화 때 다른 교수가 없으면). 배정 기록은 남는다."""
+    assignment.is_active = False
+    session.flush()

@@ -32,8 +32,8 @@ def password_fingerprint(user: User) -> str:
 def current_user(request: Request, session: Session = Depends(get_db)) -> User:
     user_id = request.session.get("user_id")
     user = user_repo.get_by_id(session, int(user_id)) if user_id else None
-    if user is None or request.session.get("pwd") != password_fingerprint(user):
-        # 다른 곳에서 비밀번호를 바꾸거나 재설정했으면 이 세션은 끊는다
+    if user is None or not user.is_active or request.session.get("pwd") != password_fingerprint(user):
+        # 다른 곳에서 비밀번호를 바꾸거나 재설정했거나, 계정이 비활성화됐으면 이 세션은 끊는다
         request.session.clear()
         raise LoginRequired
     if user.must_change_password and request.url.path not in _ALLOWED_BEFORE_CHANGE:
