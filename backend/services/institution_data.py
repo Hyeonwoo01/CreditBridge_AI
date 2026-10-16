@@ -445,12 +445,11 @@ def process_reference(
     syllabus.status = SyllabusStatus.PROCESSING
     session.commit()
     try:
-        text, quality = analysis.document_to_text(
-            llm, storage.get(syllabus.source_file_key), syllabus.original_filename
-        )
+        doc = analysis.document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
     except (CreditBridgeError, LLMError) as exc:
         logger.warning("reference syllabus failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
-        text, quality = "", 0.0
+        doc = analysis.DocumentText("", 0.0, [])
+    text, quality = doc.text, doc.quality
     if not text.strip():
         syllabus.status = SyllabusStatus.FAILED
         syllabus.error_message = "문서에서 글자를 읽지 못했어요. 텍스트가 있는 PDF나 더 선명한 스캔본을 올려 주세요."
@@ -458,6 +457,7 @@ def process_reference(
         return
     syllabus.raw_text = text
     syllabus.quality_score = quality
+    syllabus.page_offsets = doc.page_offsets
     syllabus.injection_flags = [f"{f.line_no}행: {f.text}" for f in detect(text)]
     syllabus.status = SyllabusStatus.READY
     course.reference_syllabus_id = syllabus.id

@@ -6,6 +6,7 @@ Celery 작업(backend/workers/tasks.py)이 호출한다. 웹 요청 안에서 �
 
 import hashlib
 import logging
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from sqlalchemy.orm import Session
@@ -49,21 +50,55 @@ def content_hash(*parts: bytes) -> str:
 # ---------- 문서 → 텍스트 ----------
 
 
-def document_to_text(llm: LLMClient, data: bytes, filename: str) -> tuple[str, float]:
-    """텍스트와 인식 품질 점수. 스캔 페이지는 Claude가 전사한다."""
+@dataclass
+class DocumentText:
+    text: str
+    quality: float  # 인식 품질 점수 0~1
+    page_offsets: list[int]  # 원본 파일 페이지 위치표 (documents.text.join_pages)
+
+
+def document_to_text(llm: LLMClient, data: bytes, filename: str) -> DocumentText:
+    """텍스트·인식 품질 점수·페이지 위치표. 스캔 페이지는 Claude가 전사해 원래 페이지 자리에 넣는다."""
     doc = doc_text.extract(data, filename)
     if not doc.scanned_pages:
-        return doc.text, doc.quality
+        text, offsets = doc_text.join_pages(doc.pages)
+        return DocumentText(text, doc.quality, offsets)
     prompt = load_prompt("transcription").render()
-    parts = [doc.text] if doc.text.strip() else []
+    pages = list(doc.pages)
     legibility = []
-    for page in doc.scanned_pages:
+    for number, page in zip(doc.scanned_index, doc.scanned_pages, strict=True):
         result = llm.parse(prompt, PageTranscription, images=[page], effort="low")
-        parts.append(result.output.text)
+        pages[number] = result.output.text
         legibility.append(result.output.legibility)
     scanned_share = len(doc.scanned_pages) / max(len(doc.scanned_pages) + (1 if doc.text.strip() else 0), 1)
     quality = doc.quality + scanned_share * (sum(legibility) / len(legibility))
-    return "\n".join(parts), round(min(quality, 1.0), 3)
+    text, offsets = doc_text.join_pages(pages)
+    return DocumentText(text, round(min(quality, 1.0), 3), offsets)
+
+
+def backfill_page_offsets(session: Session, storage: ObjectStorage) -> tuple[int, int]:
+    """0007 이전에 올린 문서의 페이지 위치표를 채운다 (scripts/backfill_page_offsets.py). LLM은 부르지 않는다.
+
+    텍스트 레이어만 있는 PDF를 다시 읽어 저장된 원문과 글자까지 같을 때만 채우고(보완 자료가 덧붙은 경우 포함),
+    스캔 페이지가 있거나 원문이 달라진 문서는 건너뛴다. (채운 수, 건너뛴 수)를 돌려준다."""
+    filled = skipped = 0
+    for syllabus in syllabus_repo.without_page_offsets(session):
+        assert syllabus.source_file_key is not None
+        try:
+            doc = doc_text.extract(storage.get(syllabus.source_file_key), syllabus.original_filename)
+        except Exception:  # 지워졌거나 열 수 없는 파일은 건너뛴다
+            skipped += 1
+            continue
+        text, offsets = doc_text.join_pages(doc.pages)
+        if doc.scanned_pages or not (
+            syllabus.raw_text == text or syllabus.raw_text.startswith(f"{text}\n\n[보완 자료: ")
+        ):
+            skipped += 1
+            continue
+        syllabus.page_offsets = offsets
+        filled += 1
+    session.commit()
+    return filled, skipped
 
 
 # ---------- 강의계획서 처리 ----------
@@ -76,6 +111,7 @@ def _reuse_extraction(session: Session, syllabus: Syllabus) -> bool:
         return False
     for attr in (
         "raw_text",
+        "page_offsets",
         "quality_score",
         "injection_flags",
         "extracted_json",
@@ -105,9 +141,10 @@ def _reuse_extraction(session: Session, syllabus: Syllabus) -> bool:
 
 def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: ObjectStorage) -> None:
     if not syllabus.raw_text and syllabus.source_file_key:
-        text, quality = document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
-        syllabus.raw_text = text
-        syllabus.quality_score = quality
+        doc = document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
+        syllabus.raw_text = doc.text
+        syllabus.quality_score = doc.quality
+        syllabus.page_offsets = doc.page_offsets
     if len(syllabus.raw_text.strip()) < 40:
         raise LLMError("document has no readable text")
 
@@ -172,7 +209,8 @@ def add_supplement(
     if syllabus is None:
         return
     filename = file_key.rsplit("/", 1)[-1]
-    text, _ = document_to_text(llm, storage.get(file_key), filename)
+    text = document_to_text(llm, storage.get(file_key), filename).text
+    # 페이지 위치표는 원본 파일 것 그대로라 덧붙인 보완 자료 구절에는 페이지 링크가 없다
     syllabus.raw_text = f"{syllabus.raw_text}\n\n[보완 자료: {filename}]\n{text}"
     session.commit()
     process_syllabus(session, syllabus_id, llm=llm, storage=storage)
@@ -424,7 +462,7 @@ def process_transcript(session: Session, request_id: int, *, llm: LLMClient, sto
     if request is None or not request.transcript_file_key:
         return
     filename = request.transcript_file_key.rsplit("/", 1)[-1]
-    text, _ = document_to_text(llm, storage.get(request.transcript_file_key), filename)
+    text = document_to_text(llm, storage.get(request.transcript_file_key), filename).text
     masked = mask_pii(text)
     request.transcript_masked_name = masked.masked_name
     result = llm.parse(load_prompt("transcript").render(transcript=masked.text), TranscriptExtraction, effort="low")

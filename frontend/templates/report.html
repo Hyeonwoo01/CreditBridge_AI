@@ -6,7 +6,10 @@
 {% set ev = v.evaluation %}
 {# 역할별로 이 심사 건을 보던 화면으로 돌아간다 (인쇄할 때는 숨김) #}
 {% set back = {'student': ('/student/evaluations/', '과목 결과로'), 'evaluator': ('/review/evaluations/', '심사 건으로'), 'professor': ('/professor/evaluations/', '판정 화면으로')}.get(user.role) %}
-{% if back %}<p class="mb-4 print:hidden"><a href="{{ back[0] }}{{ ev.id }}" class="btn-text text-sm">← {{ back[1] }} 돌아가기</a></p>{% endif %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+  {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-text text-sm">← {{ back[1] }} 돌아가기</a>{% else %}<span></span>{% endif %}
+  <a href="/evaluations/{{ ev.id }}/report.pdf" class="btn-primary" download>PDF 내려받기</a>
+</div>
 <article class="grid gap-6 text-sm">
   <header class="grid gap-1">
     <img src="/static/img/logo.png" alt="CreditBridge AI" width="120" height="66" class="h-auto w-[120px]">
@@ -40,8 +43,8 @@
     {% for k in v.primary.concepts %}
     <div class="border-t border-divider pt-2">
       <p><strong>{{ k.concept }}</strong> {{ k.coverage | pct }} · {{ k.status | concept_status }}</p>
-      {% for e in k.source_evidence %}<p>학생: “{{ e.text }}” <span class="text-muted">[{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
-      {% for e in k.target_evidence %}<p>기준: “{{ e.text }}” <span class="text-muted">[{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
+      {% for e in k.source_evidence %}{% set page = v.source_page(e.char_start) %}<p>학생: “{{ e.text }}” <span class="text-muted">[{% if page %}원본 {{ page }}쪽 · {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
+      {% for e in k.target_evidence %}{% set page = v.target_page(e.char_start) %}<p>기준: “{{ e.text }}” <span class="text-muted">[{% if page %}원본 {{ page }}쪽 · {% endif %}{{ e.char_start }}–{{ e.char_end }}]</span></p>{% endfor %}
     </div>
     {% endfor %}
   </section>
@@ -52,7 +55,8 @@
   {% endif %}
   <div class="flex flex-wrap gap-2 print:hidden">
     {% if back %}<a href="{{ back[0] }}{{ ev.id }}" class="btn-primary">{{ back[1] }} 돌아가기</a>{% endif %}
-    <button class="btn-secondary w-fit" onclick="window.print()">인쇄 / PDF 저장</button>
+    <a href="/evaluations/{{ ev.id }}/report.pdf" class="btn-secondary w-fit" download>PDF 내려받기</a>
+    <button class="btn-secondary w-fit border-hairline text-ink" onclick="window.print()">인쇄</button>
   </div>
 </article>
 {% endblock %}

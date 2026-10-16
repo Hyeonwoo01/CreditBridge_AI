@@ -467,7 +467,7 @@ DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법�
 | institutions | 출신 대학과 대상 대학 | name, country, is\_target, tuition\_per\_credit, degree\_credits, sis\_token\_hash |
 | users | 학생, 심사관, 교수, 관리자 | email(UNIQUE), password\_hash, role, institution\_id, department, delegate\_user\_id, away\_until, must\_change\_password, failed\_logins, locked\_until, is\_active, deactivated\_at |
 | courses | 대상 대학 카탈로그 과목 | institution\_id, code, title, credits, department, level, concepts, reference\_syllabus\_id |
-| syllabi | 업로드된 강의계획서와 추출 결과 | transfer\_request\_id, owner\_id, source\_file\_key, content\_hash(요청 안에서 UNIQUE), raw\_text, extracted\_json, quality\_score, injection\_flags, status |
+| syllabi | 업로드된 강의계획서와 추출 결과 | transfer\_request\_id, owner\_id, source\_file\_key, content\_hash(요청 안에서 UNIQUE), raw\_text, page\_offsets(원본 PDF 페이지 위치표, FR-25), extracted\_json, quality\_score, injection\_flags, status |
 | syllabus\_chunks | 주차·개념 단위로 나눈 텍스트 | syllabus\_id, week\_no, concept, text, char\_start, char\_end |
 | transfer\_requests | 학생별 편입 심사 요청 묶음 | student\_id, source\_institution\_id, target\_institution\_id, major, status, submitted\_at, transcript\_file\_key, transcript\_masked\_name |
 | transcript\_entries | 성적표에서 추출한 과목과 연결된 강의계획서 | transfer\_request\_id, title, code, credits, grade, syllabus\_id, link\_score, link\_confirmed |
@@ -479,6 +479,7 @@ DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법�
 | supplement\_files | 학생이 낸 보완 자료 원본 | syllabus\_id, file\_key, material\_request\_id |
 | appeals | 이의 신청 (FR-23) | course\_evaluation\_id, decision\_id, student\_id, reason, status, handled\_by, handler\_note, handled\_at |
 | appeal\_files | 이의 신청 근거 자료 원본 | appeal\_id, file\_key, original\_filename, content\_type, size |
+| evaluation\_notes | 심사 건 내부 메모 (심사관·담당 교수, 학생에게 비공개) | syllabus\_id, course\_evaluation\_id, author\_id, body, created\_at |
 | notifications | 화면 알림과 알림 메일 | user\_id, kind, message, link, read\_at, emailed\_at |
 | privacy\_requests | 개인정보 삭제 요청 (FR-13) | transfer\_request\_id, student\_id, status, due\_at, reviewed\_by, approved\_by, completed\_at |
 | equivalencies | 기존 동등 과목표 (FR-26) | target\_institution\_id, source\_institution\_id, source\_course\_key, source\_course\_label, target\_course\_id, result, decided\_on |
@@ -496,7 +497,7 @@ creditbridge/
 ├── docker-compose.yml
 ├── .env.example
 ├── alembic/
-│   └── versions/           # 0001 초기 스키마 … 0006 계정 비활성화
+│   └── versions/           # 0001 초기 스키마 … 0006 계정 비활성화 · 0007 원본 PDF 페이지·내부 메모
 ├── backend/                # 백엔드 (Python 패키지, import backend.*)
 │   ├── main.py             # FastAPI 앱 생성, 라우터 등록, /static 마운트
 │   ├── config.py           # pydantic-settings, 환경변수는 여기서만 읽음
@@ -510,7 +511,8 @@ creditbridge/
 │   ├── schemas/            # Pydantic 스키마 (LLM 출력 검증 포함)
 │   ├── repositories/       # DB 접근, SQL은 여기만
 │   ├── services/           # 업무 로직: analysis · scoring · student · review · decisions · materials
-│   │                       #   appeals · privacy · notifications · reminders(기한 알림) · sis · equivalencies · precedents · stats
+│   │                       #   appeals · privacy · notifications · reminders(기한 알림) · notes(내부 메모) · originals(원본 파일)
+│   │                       #   sis · equivalencies · precedents · stats
 │   │                       #   auth · institution_data · csv_import · audit · views(화면 조회)
 │   ├── ai/
 │   │   ├── llm_client.py   # Anthropic SDK 호출 단일 진입점
@@ -520,7 +522,7 @@ creditbridge/
 │   │   ├── matching.py     # Claude 비교로 매핑, 커버리지
 │   │   ├── evidence.py     # 근거 구절 원문 검증
 │   │   └── injection.py    # 문서 속 지시 문구 탐지
-│   ├── documents/          # PyMuPDF 추출, 스캔본 전사, S3 저장
+│   ├── documents/          # PyMuPDF 추출·페이지 위치표, 리포트 PDF 만들기(pdf.py), S3 저장
 │   ├── workers/            # Celery 앱과 작업
 │   ├── security/           # 세션, 권한, CSRF, 마스킹
 │   └── web/
@@ -537,7 +539,7 @@ creditbridge/
 │   ├── unit/
 │   ├── integration/        # MariaDB 필요 (TEST_DATABASE_URL)
 │   └── eval/               # 골든셋 AI 품질 평가
-└── scripts/                # start.sh · build_css.sh · create_admin · seed_demo · create_bucket · demo_data/
+└── scripts/                # start.sh · build_css.sh · create_admin · seed_demo · create_bucket · backfill_page_offsets · demo_data/
 ```
 
 **코딩 규칙**

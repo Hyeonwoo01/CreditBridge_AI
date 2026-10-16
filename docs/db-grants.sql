@@ -22,4 +22,6 @@ GRANT SELECT, INSERT, UPDATE         ON creditbridge.appeals            TO 'cred
 GRANT SELECT, INSERT, UPDATE         ON creditbridge.appeal_files       TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON creditbridge.privacy_requests   TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT                 ON creditbridge.equivalencies      TO 'creditbridge_app'@'%';
+-- 내부 메모는 고치지 않고 새로 남기며, 개인정보 삭제 승인 때만 지운다
+GRANT SELECT, INSERT, DELETE         ON creditbridge.evaluation_notes   TO 'creditbridge_app'@'%';
 GRANT SELECT                         ON creditbridge.alembic_version    TO 'creditbridge_app'@'%';

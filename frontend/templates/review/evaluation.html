@@ -7,6 +7,7 @@
 <p class="mb-4 text-sm text-muted"><a class="underline" href="/review">← 심사 큐</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">판정 근거 리포트</a></p>
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
+{% include "partials/notes.html" %}
 {% if not v.decision %}{% include "partials/material_request_form.html" %}{% endif %}
 <section class="mt-10 grid gap-2 text-sm">
   <h2 class="section-title">처리 기록</h2>

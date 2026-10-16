@@ -2,6 +2,7 @@
 PDF 텍스트 레이어는 PyMuPDF로 읽고, 스캔 페이지와 이미지는 Claude가 전사한다."""
 
 import re
+from bisect import bisect_right
 from dataclasses import dataclass, field
 
 import pymupdf
@@ -20,6 +21,30 @@ class ExtractedDocument:
     # 텍스트 레이어가 있는 비율 0~1 (스캔본 전사 후 재계산)
     quality: float
     scanned_pages: list[bytes] = field(default_factory=list)
+    # 페이지별 텍스트 (스캔 페이지는 ""), scanned_index는 scanned_pages 각각의 페이지 번호(0부터)
+    pages: list[str] = field(default_factory=list)
+    scanned_index: list[int] = field(default_factory=list)
+
+
+def join_pages(pages: list[str]) -> tuple[str, list[int]]:
+    """페이지 텍스트를 줄바꿈으로 잇고 페이지 위치표를 돌려준다 (FR-25 원본 PDF 페이지로 이동).
+
+    위치표는 [1쪽 시작, 2쪽 시작, …, 마지막 쪽 끝]이라 페이지 수보다 하나 길다.
+    끝 위치 뒤(보완 자료로 덧붙인 글)는 원본 파일의 페이지가 아니다."""
+    offsets: list[int] = []
+    pos = 0
+    for i, page in enumerate(pages):
+        offsets.append(pos)
+        pos += len(page) + (1 if i < len(pages) - 1 else 0)
+    offsets.append(pos)
+    return "\n".join(pages), offsets
+
+
+def page_at(offsets: list[int] | None, position: int) -> int | None:
+    """원문 위치가 원본 파일의 몇 쪽(1부터)인지. 위치표가 없거나 원본 밖이면 None."""
+    if not offsets or len(offsets) < 2 or not 0 <= position < offsets[-1]:
+        return None
+    return bisect_right(offsets, position, hi=len(offsets) - 1)
 
 
 def extension(filename: str) -> str:
@@ -59,18 +84,24 @@ def extract(data: bytes, filename: str) -> ExtractedDocument:
     ext = extension(filename)
     if ext in (".jpg", ".jpeg", ".png"):
         pix = pymupdf.Pixmap(data)
-        return ExtractedDocument(text="", quality=0.0, scanned_pages=[pix.tobytes("png")])
+        return ExtractedDocument(
+            text="", quality=0.0, scanned_pages=[pix.tobytes("png")], pages=[""], scanned_index=[0]
+        )
 
     pages: list[str] = []
     scanned: list[bytes] = []
+    scanned_index: list[int] = []
     with pymupdf.open(stream=data, filetype="pdf") as doc:
-        for page in doc:
+        for number, page in enumerate(doc):
             text = page.get_text("text")
             if len(text.strip()) >= MIN_PAGE_CHARS:
                 pages.append(text)
             else:
                 scanned.append(page.get_pixmap(dpi=150).tobytes("png"))
+                scanned_index.append(number)
                 pages.append("")
         total = len(doc)
     quality = (total - len(scanned)) / total if total else 0.0
-    return ExtractedDocument(text="\n".join(pages), quality=quality, scanned_pages=scanned)
+    return ExtractedDocument(
+        text="\n".join(pages), quality=quality, scanned_pages=scanned, pages=pages, scanned_index=scanned_index
+    )

@@ -26,6 +26,8 @@ class Syllabus(IdMixin, CreatedAtMixin, Base):
     original_filename: Mapped[str] = mapped_column(String(255), default="")
     language: Mapped[str] = mapped_column(String(8), default="en")
     raw_text: Mapped[str] = mapped_column(LongText, default="")
+    # 원본 파일 페이지 위치표 [1쪽 시작, …, 마지막 쪽 끝] (FR-25 근거 구절 → 원본 PDF 페이지). 이전 업로드는 없음
+    page_offsets: Mapped[list[int] | None] = mapped_column(JSON(none_as_null=True))
     # 추출 결과에서 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 둔다
     course_code: Mapped[str] = mapped_column(String(50), default="", index=True)
     course_title: Mapped[str] = mapped_column(String(255), default="")

@@ -88,3 +88,14 @@ def latest_reference_uploads(session: Session, institution_id: int) -> dict[str,
         .order_by(Syllabus.id)
     )
     return {s.course_code: s for s in session.scalars(stmt)}
+
+
+def without_page_offsets(session: Session) -> list[Syllabus]:
+    """원본 파일은 있는데 페이지 위치표가 없는 문서 (0007 이전 업로드)."""
+    return list(
+        session.scalars(
+            select(Syllabus)
+            .where(Syllabus.page_offsets.is_(None), Syllabus.source_file_key.is_not(None), Syllabus.raw_text != "")
+            .order_by(Syllabus.id)
+        )
+    )

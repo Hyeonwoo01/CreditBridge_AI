@@ -217,6 +217,8 @@ ACTION_LABELS = {
     "account.deactivate": ("계정 비활성화", "reject"),
     "account.reactivate": ("계정 다시 활성화", "neutral"),
     "appeal_file.download": ("이의 신청 근거 자료 열람", "neutral"),
+    "syllabus.original_view": ("강의계획서 원본 열람", "neutral"),
+    "note.create": ("내부 메모 작성", "neutral"),
     "account.bootstrap": ("첫 관리자 생성", "neutral"),
     "course.import": ("과목 가져오기", "neutral"),
     "course.reference_upload": ("기준 강의계획서 등록", "neutral"),

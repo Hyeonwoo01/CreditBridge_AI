@@ -17,6 +17,7 @@ from backend.models import PrivacyRequest, TransferRequest, User
 from backend.models.enums import PrivacyStatus, Role, SyllabusStatus
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import materials as material_repo
+from backend.repositories import notes as note_repo
 from backend.repositories import privacy as privacy_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
@@ -133,7 +134,7 @@ def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: i
 
 
 def _delete_documents(session: Session, storage: ObjectStorage, request: TransferRequest) -> None:
-    """원본 파일(강의계획서·보완 자료·성적표·이의 신청 근거 자료)과 추출 텍스트를 지운다."""
+    """원본 파일(강의계획서·보완 자료·성적표·이의 신청 근거 자료)과 추출 텍스트·내부 메모를 지운다."""
     syllabi = syllabus_repo.of_request(session, request.id)
     for appeal_file in appeal_repo.files_of_request(session, request.id):
         if appeal_file.file_key:
@@ -143,11 +144,13 @@ def _delete_documents(session: Session, storage: ObjectStorage, request: Transfe
         if f.file_key:
             storage.delete(f.file_key)
         f.file_key = None
+    note_repo.delete_for_syllabi(session, [s.id for s in syllabi])
     for syllabus in syllabi:
         if syllabus.source_file_key:
             storage.delete(syllabus.source_file_key)
         syllabus.source_file_key = None
         syllabus.raw_text = ""
+        syllabus.page_offsets = None
         syllabus.extracted_json = None
         syllabus.status = SyllabusStatus.DELETED
         # 삭제한 문서는 재사용 출처가 되지 않게 하고, 같은 파일을 다시 올릴 수 있게 해시를 비운다

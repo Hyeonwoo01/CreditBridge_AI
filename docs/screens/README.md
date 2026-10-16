@@ -15,16 +15,16 @@
 | P01 | 로그인 | `/login` | 비로그인 | 역할별 홈으로 이동, 비밀번호 찾기 링크, 실패 5회 1분 잠금·10회 비밀번호 초기화 | [01-login.md](pages/01-login.md) |
 | P02 | 학생 홈(대시보드) | `/student` | 학생 | 편입 요청 만들기, 할 일, 요청별 예상 인정 학점·서류 준비율 | [02-student-home.md](pages/02-student-home.md) |
 | P03 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | FR-01·02·15·21 다크 히어로 예상치, 과목 필터, 정보 부족 진단, 심사 진행 단계 | [03-student-request.md](pages/03-student-request.md) |
-| P04 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | 학생 | FR-05~08 추천·근거, FR-22 보완 제출, FR-23 이의 신청 작성(P22)으로 이동 | [04-student-evaluation.md](pages/04-student-evaluation.md) |
+| P04 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | 학생 | FR-05~08 추천·근거, FR-25 원본 PDF 쪽 링크, FR-22 보완 제출, FR-23 이의 신청 작성(P22)으로 이동 | [04-student-evaluation.md](pages/04-student-evaluation.md) |
 | P05 | 심사 큐 | `/review` | 심사관 | FR-17 검색·신뢰도·일관성 경보·학과 필터, FR-18 일괄 배정, 커버리지 링, 경보 행 | [05-review-queue.md](pages/05-review-queue.md) |
-| P06 | 심사 건 상세(심사관) | `/review/evaluations/{id}` | 심사관 | 근거 확인, 보완 자료 요청, 처리 기록 | [06-review-evaluation.md](pages/06-review-evaluation.md) |
+| P06 | 심사 건 상세(심사관) | `/review/evaluations/{id}` | 심사관 | 근거 확인(원본 PDF 쪽), 내부 메모, 보완 자료 요청, 처리 기록 | [06-review-evaluation.md](pages/06-review-evaluation.md) |
 | P07 | 이의 신청 처리 | `/review/appeals` | 심사관 | FR-23 받아들임·기각, 학생 근거 자료 내려받기 | [07-review-appeals.md](pages/07-review-appeals.md) |
 | P08 | 문서 삭제 요청 | `/review/privacy`, `/admin/privacy` | 심사관·관리자 | FR-13 처리·승인, 기한 관리 | [08-privacy-requests.md](pages/08-privacy-requests.md) |
 | P09 | 기존 동등 과목표 | `/review/equivalencies` | 심사관 | FR-26 CSV 가져오기 | [09-review-equivalencies.md](pages/09-review-equivalencies.md) |
 | P10 | 관리자 콘솔 · 운영 통계 | `/admin/stats`, `/review/stats` | 관리자·심사관 | FR-27 수용률·학과별 지표, 오늘 기한 알림 대상, 최근 감사 로그, 보존·파기 정책 | [10-stats.md](pages/10-stats.md) |
 | P11 | 배정된 심사(교수 홈) | `/professor` | 교수 | 배정 목록, FR-19 부재 설정 | [11-professor-home.md](pages/11-professor-home.md) |
-| P12 | 판정 화면(교수) | `/professor/evaluations/{id}` | 교수 | FR-09 판정·불인정 사유 선택 창, FR-11 일관성 경보, FR-20 모바일 승인 | [12-professor-evaluation.md](pages/12-professor-evaluation.md) |
-| P13 | 판정 근거 리포트 | `/evaluations/{id}/report` | 학생·심사관·교수 | FR-10·23 감사용 리포트, 역할별 돌아가기 | [13-report.md](pages/13-report.md) |
+| P12 | 판정 화면(교수) | `/professor/evaluations/{id}` | 교수 | FR-09 판정·불인정 사유 선택 창, FR-11 일관성 경보, FR-20 모바일 승인, FR-25 원본 PDF 쪽, 내부 메모 | [12-professor-evaluation.md](pages/12-professor-evaluation.md) |
+| P13 | 판정 근거 리포트 | `/evaluations/{id}/report`, `…/report.pdf` | 학생·심사관·교수 | FR-10·23 감사용 리포트, 역할별 돌아가기, PDF 내려받기 | [13-report.md](pages/13-report.md) |
 | P14 | 알림 | `/notifications` | 전체 | FR-19·20 알림함, 매일 기한 알림 | [14-notifications.md](pages/14-notifications.md) |
 | P15 | 학사정보 연동 | `/admin/sis` | 관리자 | FR-24 토큰 발급·폐기 | [15-admin-sis.md](pages/15-admin-sis.md) |
 | P16 | 감사 로그 | `/admin/audit` | 관리자 | FR-10 추가 전용 기록(소속 기관만, 근거 자료 열람 포함) | [16-admin-audit.md](pages/16-admin-audit.md) |
@@ -65,6 +65,7 @@
 
 | 날짜 | 내용 |
 | --- | --- |
+| 2026-10-16 | P04·P12 근거 구절 옆 "원본 N쪽 ↗"(원본 PDF를 그 쪽으로 열기, FR-25)·원문 패널 원본 파일 안내, P06·P12 심사 건 내부 메모(`#notes`), P13 PDF 내려받기·근거 줄 원본 쪽 번호, P10 감사 로그 배지(강의계획서 원본 열람·내부 메모 작성)·보존 정책 삭제 대상 |
 | 2026-10-16 | P10 "기한 알림" 카드(오늘 자동 발송 대상 5칸, 관리자·심사관), P14 기한 알림 종류, P18 계정 비활성화 폼·계정 수에서 비활성 제외, P01 비활성 계정 로그인 상태, P16 소속 기관 기록만 표시·근거 자료 열람 기록, P10 감사 로그 배지(계정 비활성화·다시 활성화·근거 자료 열람) |
 | 2026-10-15 | 모든 화면의 상단 메뉴 스케치를 역할별 메뉴 + 숫자 배지로 통일(P04·P06·P07·P08·P09·P10·P13·P14·P15·P16·P17·P18·P19), P00 역할별 메뉴 표에 숫자 배지 열 추가 |
 | 2026-10-15 | P00 교직원 메뉴 숫자 배지(심사관: 교수 배정·이의 신청·삭제 요청, 교수: 판정할 심사, 관리자: 준비 항목·삭제 승인), P05·P07·P08·P10·P11·P12·P15·P18 메뉴 스케치 갱신 |

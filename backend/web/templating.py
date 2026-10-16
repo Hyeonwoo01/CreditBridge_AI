@@ -68,6 +68,11 @@ def iso(value: datetime | None) -> str:
     return "" if value is None else value.isoformat(timespec="seconds") + "Z"
 
 
+def utc(value: datetime | None) -> str:
+    """PDF처럼 브라우저가 시각을 바꿔 주지 않는 곳에 쓰는 UTC 표기."""
+    return "–" if value is None else value.strftime("%Y-%m-%d %H:%M") + " UTC"
+
+
 TEMPLATES.env.filters.update(
     rec=lambda v: REC_LABEL.get(v or "", "분석 중"),
     conf=lambda v: CONF_LABEL.get(v or "", "–"),
@@ -77,6 +82,7 @@ TEMPLATES.env.filters.update(
     action=lambda v: ACTION_LABEL.get(v, v),
     pct=pct,
     iso=iso,
+    utc=utc,
     reason=lambda v: REASON_LABELS.get(v, v),
     highlight=highlight,
     appeal_status=lambda v: APPEAL_LABEL.get(v, v),

@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.documents.text import page_at
 from backend.errors import NotFoundError, PermissionDeniedError
 from backend.models import (
     Appeal,
@@ -15,6 +16,7 @@ from backend.models import (
     Course,
     CourseEvaluation,
     Decision,
+    EvaluationNote,
     Institution,
     MaterialRequest,
     PrivacyRequest,
@@ -37,6 +39,7 @@ from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import appeals as appeal_service
 from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
+from backend.services import notes as note_service
 from backend.services import notifications as notification_service
 from backend.services import privacy as privacy_service
 from backend.services import reminders as reminder_service
@@ -69,6 +72,8 @@ class EvaluationView:
     material_requests: list[MaterialRequest] = field(default_factory=list)
     suggested_materials: list[str] = field(default_factory=list)
     target_text: str = ""  # 1순위 후보의 기준 강의계획서 원문 (근거 위치 이동, FR-25)
+    target_syllabus: Syllabus | None = None  # 1순위 후보의 기준 강의계획서 (원본 PDF 페이지, FR-25)
+    notes: list[EvaluationNote] = field(default_factory=list)  # 내부 메모 (교직원만, 오래된 순)
     users: dict[int, User] = field(default_factory=dict)  # 판정자·요청자 이름 표시용
 
     @property
@@ -86,6 +91,32 @@ class EvaluationView:
     @property
     def open_materials(self) -> list[MaterialRequest]:
         return [m for m in self.material_requests if m.status == "open"]
+
+    @property
+    def source_original(self) -> bool:
+        """학생 강의계획서 원본 파일을 열 수 있는지 (개인정보 삭제 뒤에는 없음)."""
+        return bool(self.syllabus.source_file_key)
+
+    @property
+    def target_original(self) -> bool:
+        return self.target_syllabus is not None and bool(self.target_syllabus.source_file_key)
+
+    @property
+    def source_pdf(self) -> bool:
+        return self.syllabus.original_filename.lower().endswith(".pdf")
+
+    @property
+    def target_pdf(self) -> bool:
+        return self.target_syllabus is not None and self.target_syllabus.original_filename.lower().endswith(".pdf")
+
+    def source_page(self, position: int) -> int | None:
+        """학생 원문 위치가 원본 파일의 몇 쪽인지 (FR-25). 보완 자료로 덧붙인 글이나 이전 업로드는 None."""
+        return page_at(self.syllabus.page_offsets, position) if self.source_original else None
+
+    def target_page(self, position: int) -> int | None:
+        if self.target_syllabus is None or not self.target_original:
+            return None
+        return page_at(self.target_syllabus.page_offsets, position)
 
     @property
     def source_marks(self) -> list[tuple[int, int]]:
@@ -146,8 +177,12 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
     if view.candidate is not None and view.candidate.reference_syllabus_id:
         reference = syllabus_repo.get(session, view.candidate.reference_syllabus_id)
         view.target_text = reference.raw_text if reference else ""
+        view.target_syllabus = reference
+    if user.role in (Role.EVALUATOR, Role.PROFESSOR):
+        view.notes = note_service.for_syllabus(session, syllabus.id)
     user_ids = {d.decided_by for d in view.decisions} | {m.requested_by for m in view.material_requests}
     user_ids |= {a.handled_by for a in view.appeals if a.handled_by}
+    user_ids |= {n.author_id for n in view.notes}
     view.users = {uid: u for uid in user_ids if (u := user_repo.get_by_id(session, uid)) is not None}
     return view
 

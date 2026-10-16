@@ -7,7 +7,8 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 | 데이터 | 저장 위치 | 비고 |
 | --- | --- | --- |
 | 원본 강의계획서·성적표·보완 자료·이의 신청 근거 자료 파일 | 객체 스토리지(S3 호환) | 운영은 `S3_SERVER_SIDE_ENCRYPTION=AES256` 또는 `aws:kms`로 저장 암호화. DB에는 파일 키만(`supplement_files`, `appeal_files`는 파일 키·원래 파일 이름·형식·크기) |
-| 강의계획서 추출 텍스트·구조화 결과 | `syllabi.raw_text`, `syllabi.extracted_json` | 강의 내용이며 학생 개인정보는 아님 |
+| 강의계획서 추출 텍스트·구조화 결과 | `syllabi.raw_text`, `syllabi.extracted_json`, `syllabi.page_offsets` | 강의 내용이며 학생 개인정보는 아님. `page_offsets`는 원본 PDF의 쪽별 글자 위치(숫자 목록)뿐 |
+| 심사 건 내부 메모 | `evaluation_notes` | 심사관·담당 교수가 쓴 메모(1000자). 학생 화면·판정 근거 리포트(화면·PDF)에는 나오지 않음. 메모 칸에 "이름·학번·성적은 적지 마세요"를 안내하고, 감사 로그(`note.create`)에는 메모 id만 남기고 내용은 넣지 않음 |
 | 성적표 과목·학점·성적 | `transcript_entries` | 이름·학번·생년월일은 저장하지 않고, 이름은 마스킹 값(`L** J****`)만 |
 | AI 분석 결과·근거 구절 | `course_evaluations`, `evidence_spans` | 강의계획서 구절과 원문 위치 |
 | 이의 신청 사유 | `appeals.reason` | 학생이 쓴 글(20~3000자). 작성 화면에 "이름·학번은 적지 마세요"를 안내하고, 근거 자료도 이름·학번을 가리고 올리도록 안내 |
@@ -30,7 +31,7 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 - 학생이 요청 화면에서 "내 문서 삭제 요청"을 누르면 처리 기한(`PRIVACY_DELETION_DAYS`, 기본 30일)이 정해지고 심사관에게 알림이 가요.
 - 심사관은 진행 중인 심사와 보관 의무를 확인한 뒤 "처리 완료"로 넘기고, 기관 관리자가 승인하면 그 즉시 삭제돼요. 기한이 급하면 관리자가 심사관 처리 전에 승인할 수도 있어요.
-- 지우는 것: 강의계획서·보완 자료·성적표·이의 신청 근거 자료 원본 파일, 추출 텍스트·구조화 결과, 성적표 과목 목록, 청크 (`services/privacy.py`, `test_privacy_request_review_and_admin_approval`, `test_appeal_form_with_evidence_files`). 이의 신청 근거 자료는 파일 이름만 "(삭제됨)"으로 남는다.
+- 지우는 것: 강의계획서·보완 자료·성적표·이의 신청 근거 자료 원본 파일, 추출 텍스트·구조화 결과·원본 쪽 위치표, 성적표 과목 목록, 청크, 심사 건 내부 메모 (`services/privacy.py`, `test_privacy_request_review_and_admin_approval`, `test_appeal_form_with_evidence_files`, `test_internal_notes_for_staff_only`). 지운 뒤에는 근거 구절의 "원본 N쪽" 링크도 사라진다. 이의 신청 근거 자료는 파일 이름만 "(삭제됨)"으로 남는다.
 - 기한이 지난 요청은 심사관·관리자 화면과 운영 통계에 "기한 초과"로 표시돼요.
 - 삭제한 문서는 같은 문서 결과 재사용(content_hash)의 출처에서도 빠져요.
 - 교수 판정과 감사 로그는 학사 기록이라 남아요. 여기에는 판정 결과와 판정 당시 AI 추천 요약만 있고 원본 문서는 없어요.
@@ -68,14 +69,15 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 | 문서 삭제 요청 처리 (`/review/privacy`, `/admin/privacy`) | 심사관, 기관 관리자 | 학생 계정 이메일 | 없음 | 요청한 본인인지 확인하는 용도 |
 | 기존 동등 과목표 (`/review/equivalencies`) | 소속 기관 심사관 | 없음 | 없음 | 기관 판정 기준표(출신 과목·결과·판정일·메모)만. 학생과 연결되지 않음 |
 | **학과 교수 화면** | | | | |
-| 교수 홈·판정 화면 (`/professor/...`) | 배정된 교수 | 없음 | 없음 | 강의계획서와 과목 정보만 보고 판정 (학생을 모르는 상태로 심사). 이의 신청 재판정 건은 사유와 근거 자료 파일 이름도 보임 |
+| 교수 홈·판정 화면 (`/professor/...`) | 배정된 교수 | 없음 | 없음 | 강의계획서와 과목 정보만 보고 판정 (학생을 모르는 상태로 심사). 이의 신청 재판정 건은 사유와 근거 자료 파일 이름도 보임. 내부 메모는 심사관과 함께 봄 |
 | **기관 관리자 화면** | | | | |
 | 관리자 콘솔·운영 통계 (`/admin/stats`, `/review/stats`) | 기관 관리자, 심사관 | 없음 | 없음 | 기관·학과 단위 집계만. 교수 개인별 지표는 만들지 않음. 최근 감사 로그의 처리자는 교직원만 이름·역할로, 학생은 "학생"으로 표시 (`test_admin_console_shows_recent_audit_without_student_names`) |
 | 계정·과목 관리 (`/admin/data`) | 기관 관리자 | 계정 CSV를 가져온 직후 그 결과 화면에서만 새 계정의 이메일·이름·임시 비밀번호 | 없음 | 평소에는 역할별 계정 수만 보여 줌 |
 | 학사정보 연동 (`/admin/sis`, `GET /api/sis/decisions`, 심사관 CSV 내보내기) | 기관 관리자(토큰 발급), 토큰을 받은 학사정보시스템, 심사관 | 내부 사용자 번호(`student_id`)만 — 이름·학번 없음 | 없음 | 확정 판정 한 줄씩(출신 과목·결과·대상 과목·학점·판정일). 학사정보시스템이 내부 번호를 학생과 대조. 토큰은 해시만 저장, 관리자가 폐기 가능 |
 | 전체 감사 로그 (`/admin/audit`) | 기관 관리자 | 없음 (사용자 id) | 없음 | 소속 기관 사용자가 남긴 기록만(다른 대학 기록은 보이지 않음, `test_audit_log_page_shows_only_own_institution`). 기록 내용은 id·행위·결과·사유 코드뿐, 소명 메모는 감사 로그에 넣지 않음 |
 | **여러 역할이 함께 쓰는 화면** | | | | |
-| 판정 근거 리포트 (`/evaluations/{id}/report`) | 학생 본인, 심사관, 담당 교수 | 없음 | 없음 | 판정 교수 이름, 선택형 사유, 소명 메모가 나옴 |
+| 판정 근거 리포트 (`/evaluations/{id}/report`, PDF `/evaluations/{id}/report.pdf`) | 학생 본인, 심사관, 담당 교수 (기관 관리자는 불가) | 없음 | 없음 | 판정 교수 이름, 선택형 사유, 소명 메모가 나옴. PDF도 같은 내용이고 내부 메모는 넣지 않음. PDF는 서버에 저장하지 않고 요청할 때마다 만들어 `Cache-Control: no-store`로 내려줌 (`test_report_pdf_download`) |
+| 근거 구절 원본 파일 (`/evaluations/{id}/original/source`, `…/target`) | 학생 본인, 소속 기관 심사관, 배정된 교수·그 과목을 판정한 교수 (기관 관리자는 불가) | 파일 내용에 따라 다름 | 없음 (강의계획서) | 근거 구절 옆 "원본 N쪽"으로 브라우저에서 바로 연다(`inline`, `no-store`, `nosniff`). 학생 강의계획서 원본을 열 때마다 감사 로그에 연 사람 id·강의계획서 id·심사 건 id를 남기고 파일 이름은 넣지 않음(`syllabus.original_view`). 기준 강의계획서(기관 문서)는 기록하지 않음. 삭제 요청이 승인되면 404 (`services/originals.py`, `test_evidence_links_open_original_pdf_page`) |
 | 이의 신청 근거 자료 내려받기 (`/appeal-files/{id}`) | 학생 본인, 소속 기관 심사관, 배정된 교수·그 과목을 판정한 교수 (기관 관리자는 불가) | 파일 내용에 따라 다름 | 파일 내용에 따라 다름 | 화면에 띄우지 않고 내려받기만(`Content-Disposition: attachment`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`). 교수가 학생을 모르는 상태로 심사하도록 학생에게 이름·학번을 가리고 올리게 안내. 열 때마다 감사 로그에 열어 본 사람 id·파일 id·이의 신청 id를 남기고 파일 이름은 넣지 않음(`appeal_file.download`, 권한 없는 시도는 403으로 막혀 기록되지 않음). 삭제 요청이 승인되면 원본을 지우고 이름만 "(삭제됨)" (`appeals.file_for_download`) |
 | 알림 (`/notifications`) | 본인 | 없음 | 없음 | 본인에게 온 알림만(과목 코드와 처리 내용). 열면 모두 읽음 |
 | 비밀번호 변경·찾기·재설정 (`/account/...`) | 본인 / 비로그인 | 없음 | 없음 | 찾기 화면은 이메일 등록 여부와 상관없이 같은 안내. 재설정 화면은 캐시·리퍼러를 막음 (아래 "계정 만들기와 비밀번호") |

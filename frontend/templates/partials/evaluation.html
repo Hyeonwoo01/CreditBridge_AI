@@ -1,4 +1,8 @@
 {% from "partials/macros.html" import rec_badge, conf_badge, time %}
+{# 근거 구절 옆 원본 파일 링크 (FR-25): PDF는 그 쪽(#page=N), 이미지는 원본 이미지. 새 탭으로 연다 #}
+{% macro original_link(side, page, is_pdf) -%}
+{% if page %}<a class="ml-1 whitespace-nowrap text-xs text-primary hover:underline" href="/evaluations/{{ v.evaluation.id }}/original/{{ side }}{% if is_pdf %}#page={{ page }}{% endif %}" target="_blank" rel="noopener" title="원본 파일에서 보기">{% if is_pdf %}원본 {{ page }}쪽{% else %}원본 이미지{% endif %} ↗</a>{% endif %}
+{%- endmacro %}
 {# 공용 분석 결과. v: EvaluationView, evidence_first: 교수 모바일 화면처럼 근거를 먼저 보여줄지 #}
 {% set ev = v.evaluation %}
 {% set r = v.result %}
@@ -125,11 +129,11 @@
         <div class="evidence grid gap-3 text-sm md:grid-cols-2">
           <div class="quote-block grid content-start gap-1.5">
             <span class="text-xs font-semibold text-muted">학생 강의계획서 <span class="font-normal">· 원문 일치 검증됨</span></span>
-            {% for e in k.source_evidence %}<p><a href="#src-{{ e.char_start }}-{{ e.char_end }}" data-jump="source-text" title="원문 위치로 이동"><mark>{{ e.text }}</mark></a></p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
+            {% for e in k.source_evidence %}<p><a href="#src-{{ e.char_start }}-{{ e.char_end }}" data-jump="source-text" title="원문 위치로 이동"><mark>{{ e.text }}</mark></a>{{ original_link('source', v.source_page(e.char_start), v.source_pdf) }}</p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
           </div>
           <div class="quote-block target grid content-start gap-1.5">
             <span class="text-xs font-semibold text-muted">{{ c.course_code }} 기준 강의계획서 <span class="font-normal">· 원문 일치 검증됨</span></span>
-            {% for e in k.target_evidence %}<p>{% if c.course_id == v.primary.course_id %}<a href="#tgt-{{ e.char_start }}-{{ e.char_end }}" data-jump="target-text" title="원문 위치로 이동"><mark>{{ e.text }}</mark></a>{% else %}<mark>{{ e.text }}</mark>{% endif %}</p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
+            {% for e in k.target_evidence %}<p>{% if c.course_id == v.primary.course_id %}<a href="#tgt-{{ e.char_start }}-{{ e.char_end }}" data-jump="target-text" title="원문 위치로 이동"><mark>{{ e.text }}</mark></a>{{ original_link('target', v.target_page(e.char_start), v.target_pdf) }}{% else %}<mark>{{ e.text }}</mark>{% endif %}</p>{% else %}<p class="text-muted">확인된 구절 없음</p>{% endfor %}
           </div>
         </div>
         {% endif %}
@@ -148,12 +152,14 @@
 {% if v.syllabus.raw_text %}
 <details id="source-text" class="mt-10 border-t border-hairline pt-6">
   <summary class="cursor-pointer list-none section-title">학생 강의계획서 원문 <span class="text-sm font-normal text-muted">근거 구절을 누르면 여기로 이동해요</span></summary>
+  {% if v.source_original %}<p class="mt-3 text-sm text-muted">추출한 글자예요. 표·그림은 <a class="text-primary hover:underline" href="/evaluations/{{ ev.id }}/original/source" target="_blank" rel="noopener">원본 파일({{ v.syllabus.original_filename }}) ↗</a>에서 확인하세요.{% if not v.syllabus.page_offsets %} 이 문서는 쪽 번호 정보가 없어 구절별 원본 쪽 링크가 없어요.{% endif %}</p>{% endif %}
   <pre class="source-text mt-4 max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-hairline bg-white p-6 font-sans text-[15px] leading-relaxed">{{ v.syllabus.raw_text | highlight(v.source_marks, "src") }}</pre>
 </details>
 {% endif %}
 {% if v.target_text and v.primary %}
 <details id="target-text" class="mt-6 border-t border-hairline pt-6">
   <summary class="cursor-pointer list-none section-title">{{ v.primary.course_code }} 기준 강의계획서 원문</summary>
+  {% if v.target_original %}<p class="mt-3 text-sm text-muted"><a class="text-primary hover:underline" href="/evaluations/{{ ev.id }}/original/target" target="_blank" rel="noopener">기준 강의계획서 원본 파일 ↗</a></p>{% endif %}
   <pre class="source-text target-text mt-4 max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-hairline bg-white p-6 font-sans text-[15px] leading-relaxed">{{ v.target_text | highlight(v.target_marks, "tgt") }}</pre>
 </details>
 {% endif %}
