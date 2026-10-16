@@ -6,7 +6,7 @@
 | 역할 | 심사관 (소속 기관, 제출된 요청만) |
 | 템플릿 | `review/evaluation.html` + 공용 `partials/evaluation.html`, `partials/history.html`, `partials/material_request_form.html` |
 | 최대 폭 | 확장형 `max-w-[1440px]` (좌우 원문 대조 칸을 넓게) |
-| 기능 | 근거 확인(P04와 같은 분석 결과, FR-25 원본 PDF 쪽 링크), FR-11 과거 판정 이력, 심사 건 내부 메모, FR-22 보완 자료 요청, 처리 기록 |
+| 기능 | 근거 확인(P04와 같은 분석 결과, FR-25 원본 PDF 쪽 링크, 다시 분석했으면 이전 분석과 비교), FR-11 과거 판정 이력, 심사 건 내부 메모, FR-22 보완 자료 요청, 처리 기록 |
 
 ## 위치
 

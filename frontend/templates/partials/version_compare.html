@@ -1,0 +1,73 @@
+{% from "partials/macros.html" import rec_badge, time %}
+{# 강의계획서 버전 비교: 보완 자료나 분석 기준이 바뀌어 다시 분석했을 때 바로 앞 분석과 달라진 점. cmp: versions.Comparison #}
+{% set cmp = v.comparison %}
+{% set trend_label = {'up': '좋아짐', 'down': '낮아짐', 'same': '그대로', 'new': '새 개념', 'gone': '빠진 개념'} %}
+{% set trend_class = {'up': 'text-approve', 'down': 'text-reject', 'same': 'text-muted', 'new': 'text-primary', 'gone': 'text-muted'} %}
+{% set arrow = {'up': '▲', 'down': '▼', 'same': '–', 'new': '+', 'gone': '−'} %}
+<details id="compare" class="mt-6 scroll-mt-16 rounded-lg border border-hairline bg-white" open>
+  <summary class="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-2 p-6">
+    <span class="font-semibold">이전 분석과 달라진 점</span>
+    <span class="text-xs text-muted">{{ time(cmp.previous.created_at) }} 분석 → {{ time(cmp.current.created_at) }} 분석{% if cmp.added %} · 보완 자료 {{ cmp.added | length }}개 덧붙임{% endif %}{% if cmp.prompt_changed %} · 분석 기준 {{ cmp.previous.prompt_version }} → {{ cmp.current.prompt_version }}{% endif %}</span>
+  </summary>
+  <div class="grid gap-5 border-t border-divider p-6">
+    <dl class="grid gap-3 sm:grid-cols-3">
+      <div class="grid gap-1 rounded-md bg-parchment px-4 py-3">
+        <dt class="text-xs text-muted">AI 추천</dt>
+        <dd class="flex flex-wrap items-center gap-1.5 text-sm">{{ rec_badge(cmp.previous.recommendation) }}<span class="text-muted" aria-label="에서">→</span>{{ rec_badge(cmp.current.recommendation) }}</dd>
+        <dd class="text-xs {{ trend_class[cmp.trend('rec')] }}">{{ arrow[cmp.trend('rec')] }} {{ trend_label[cmp.trend('rec')] }}</dd>
+      </div>
+      <div class="grid gap-1 rounded-md bg-parchment px-4 py-3">
+        <dt class="text-xs text-muted">1순위 커버리지</dt>
+        <dd class="text-[22px] leading-tight font-semibold tabular-nums">{{ cmp.previous.coverage | pct }} <span class="text-base font-normal text-muted">→</span> {{ cmp.current.coverage | pct }}</dd>
+        {% set diff = ((cmp.current.coverage or 0) - (cmp.previous.coverage or 0)) * 100 %}
+        <dd class="text-xs {{ trend_class[cmp.trend('coverage')] }}">{{ arrow[cmp.trend('coverage')] }} {% if cmp.trend('coverage') == 'same' %}그대로{% else %}{{ '%+d' % (diff | round | int) }}%p{% endif %}</dd>
+      </div>
+      <div class="grid gap-1 rounded-md bg-parchment px-4 py-3">
+        <dt class="text-xs text-muted">신뢰도</dt>
+        <dd class="text-[22px] leading-tight font-semibold">{{ cmp.previous.confidence | conf }} <span class="text-base font-normal text-muted">→</span> {{ cmp.current.confidence | conf }}</dd>
+        <dd class="text-xs {{ trend_class[cmp.trend('conf')] }}">{{ arrow[cmp.trend('conf')] }} {{ trend_label[cmp.trend('conf')] }}</dd>
+      </div>
+    </dl>
+
+    {% if not cmp.same_candidate %}
+    <p class="rounded-md border border-elective/40 bg-elective-subtle px-4 py-3 text-sm">1순위 후보가 <strong>{{ cmp.previous_primary.course_code if cmp.previous_primary else '없음' }}</strong>에서 <strong>{{ cmp.current_primary.course_code if cmp.current_primary else '없음' }}</strong>(으)로 바뀌었어요.{% if not cmp.concepts %} 같은 과목의 이전 결과가 없어 개념별로는 비교하지 않았어요.{% endif %}</p>
+    {% endif %}
+
+    {% if cmp.concepts %}
+    {% set n = cmp.counts %}
+    <div class="grid gap-2">
+      <p class="text-sm"><span class="font-semibold">{{ cmp.current_primary.course_code }} 개념별 변화</span> <span class="text-muted">· 좋아짐 {{ n.up }} · 낮아짐 {{ n.down }} · 그대로 {{ n.same }}{% if n.new %} · 새 개념 {{ n.new }}{% endif %}{% if n.gone %} · 빠진 개념 {{ n.gone }}{% endif %}</span></p>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[560px] text-sm">
+          <thead class="text-left text-xs text-muted"><tr class="border-b border-hairline"><th class="py-2 pr-3 font-normal">개념</th><th class="py-2 pr-3 font-normal">이전</th><th class="py-2 pr-3 font-normal">이번</th><th class="py-2 pr-3 font-normal">학생 근거 구절</th><th class="py-2 font-normal">변화</th></tr></thead>
+          <tbody>
+            {% for c in cmp.concepts %}
+            <tr class="border-b border-divider last:border-0">
+              <td class="py-2 pr-3">{{ c.concept }}</td>
+              <td class="py-2 pr-3 tabular-nums text-muted">{% if c.before %}{{ c.before.status | concept_status }} {{ c.before.coverage | pct }}{% else %}–{% endif %}</td>
+              <td class="py-2 pr-3 tabular-nums">{% if c.after %}{{ c.after.status | concept_status }} {{ c.after.coverage | pct }}{% else %}–{% endif %}</td>
+              <td class="py-2 pr-3 tabular-nums">{{ c.evidence_before }} → {{ c.evidence_after }}</td>
+              <td class="py-2 whitespace-nowrap {{ trend_class[c.trend] }}">{{ arrow[c.trend] }} {{ trend_label[c.trend] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if cmp.added %}
+    <div class="grid gap-2">
+      <p class="text-sm font-semibold">그 사이 덧붙인 보완 자료</p>
+      {% for a in cmp.added %}
+      <details class="rounded-md bg-parchment px-4 py-3 text-sm">
+        <summary class="cursor-pointer list-none">{{ a.filename }} <span class="text-muted">· 덧붙인 글 {{ a.text | length }}자</span></summary>
+        {% if a.text %}<pre class="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-ink-80">{{ a.text }}</pre>{% else %}<p class="mt-2 text-muted">읽어 낸 글이 없어요.</p>{% endif %}
+      </details>
+      {% endfor %}
+    </div>
+    {% elif not cmp.prompt_changed %}
+    <p class="text-sm text-muted">그 사이 덧붙인 보완 자료는 없어요. 분석 규칙이 바뀌었거나 다시 분석을 요청한 경우예요.</p>
+    {% endif %}
+  </div>
+</details>

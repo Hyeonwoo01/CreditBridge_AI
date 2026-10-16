@@ -511,7 +511,7 @@ creditbridge/
 │   ├── schemas/            # Pydantic 스키마 (LLM 출력 검증 포함)
 │   ├── repositories/       # DB 접근, SQL은 여기만
 │   ├── services/           # 업무 로직: analysis · scoring · student · review · decisions · materials
-│   │                       #   appeals · privacy · notifications · reminders(기한 알림) · notes(내부 메모) · originals(원본 파일)
+│   │                       #   appeals · privacy · notifications · reminders(기한 알림) · notes(내부 메모) · originals(원본 파일) · versions(버전 비교)
 │   │                       #   sis · equivalencies · precedents · stats
 │   │                       #   auth · institution_data · csv_import · audit · views(화면 조회)
 │   ├── ai/

@@ -78,6 +78,8 @@
 </section>
 {% endif %}
 
+{% if v.comparison %}{% include "partials/version_compare.html" %}{% endif %}
+
 {% if r and (r.warnings or r.injection_flags) %}
 <ul class="mt-4 grid gap-2 rounded-md bg-parchment p-4 text-sm text-ink-80">
   {% for w in r.warnings %}<li class="flex gap-2"><span class="text-reject">⚠</span>{{ w }}</li>{% endfor %}

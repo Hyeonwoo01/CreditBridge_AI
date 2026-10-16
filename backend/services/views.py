@@ -25,11 +25,12 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import Role
+from backend.models.enums import EvaluationStatus, Role
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
+from backend.repositories import materials as material_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
@@ -46,6 +47,7 @@ from backend.services import reminders as reminder_service
 from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import student as student_service
+from backend.services import versions as version_service
 from backend.services.decisions import HistoryItem, history
 
 
@@ -74,6 +76,7 @@ class EvaluationView:
     target_text: str = ""  # 1순위 후보의 기준 강의계획서 원문 (근거 위치 이동, FR-25)
     target_syllabus: Syllabus | None = None  # 1순위 후보의 기준 강의계획서 (원본 PDF 페이지, FR-25)
     notes: list[EvaluationNote] = field(default_factory=list)  # 내부 메모 (교직원만, 오래된 순)
+    comparison: version_service.Comparison | None = None  # 바로 앞 분석과 비교 (강의계획서 버전 비교)
     users: dict[int, User] = field(default_factory=dict)  # 판정자·요청자 이름 표시용
 
     @property
@@ -180,6 +183,10 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.target_syllabus = reference
     if user.role in (Role.EVALUATOR, Role.PROFESSOR):
         view.notes = note_service.for_syllabus(session, syllabus.id)
+    before = version_service.previous_done(evaluation, view.previous)
+    if before is not None and evaluation.status == EvaluationStatus.DONE:
+        files = material_repo.files_of(session, [syllabus.id])
+        view.comparison = version_service.compare(before, evaluation, syllabus, files)
     user_ids = {d.decided_by for d in view.decisions} | {m.requested_by for m in view.material_requests}
     user_ids |= {a.handled_by for a in view.appeals if a.handled_by}
     user_ids |= {n.author_id for n in view.notes}
