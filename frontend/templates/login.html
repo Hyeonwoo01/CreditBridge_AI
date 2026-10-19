@@ -15,5 +15,21 @@
     <button class="btn-primary w-full">{{ _("로그인") }}</button>
   </form>
   <p class="-mt-2 text-center text-sm"><a href="/account/forgot" class="btn-text">{{ _("비밀번호를 잊으셨나요?") }}</a></p>
+  {% if demo_mode() %}
+  <section class="card grid gap-3" aria-label="{{ _('데모 계정으로 둘러보기') }}">
+    <h2 class="font-semibold">{{ _("데모 계정으로 둘러보기") }}</h2>
+    <p class="text-sm text-muted">{{ _("버튼을 누르면 그 역할로 바로 로그인해요. 데모 계정 비밀번호는 모두 demo1234예요.") }}</p>
+    <div class="grid grid-cols-2 gap-2">
+      {% for email, label in [("jiwon@student.example", _("학생")), ("rachel@msu.example", _("학사처 심사관")), ("mbrown@msu.example", _("학과 교수")), ("admin@msu.example", _("기관 관리자"))] %}
+      <form method="post" action="/login">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="email" value="{{ email }}">
+        <input type="hidden" name="password" value="demo1234">
+        <button class="btn-secondary w-full">{{ label }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
+from backend.config import get_settings
 from backend.i18n import LABELS, LOCALES, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
@@ -165,6 +166,7 @@ TEMPLATES.env.globals.update(
     current_locale=get_locale,
     locales=LOCALES,
     locale_labels=LABELS,
+    demo_mode=lambda: get_settings().demo_mode,  # 공개 데모 안내·데모 계정 버튼
 )
 
 

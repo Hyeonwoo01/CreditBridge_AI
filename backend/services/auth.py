@@ -97,20 +97,32 @@ def login_attempt(session: Session, email: str, password: str) -> LoginAttempt:
     return LoginAttempt(user=user)
 
 
+def ensure_not_demo() -> None:
+    """공개 데모에서는 방문자 한 명이 데모 계정을 못 쓰게 만들 수 있는 동작을 막는다."""
+    if get_settings().demo_mode:
+        raise CreditBridgeError(tr("공개 데모에서는 비밀번호와 계정 상태를 바꿀 수 없어요."))
+
+
 def _failed(session: Session, user: User, now: datetime) -> LoginAttempt:
     count = user_repo.add_failed_login(session, user.id)
     session.refresh(user)
-    if count >= RESET_AFTER:
+    demo = get_settings().demo_mode
+    # 공개 데모는 비밀번호를 무효로 하지 않고 5번마다 1분 잠금만 한다 (데모 계정을 계속 쓸 수 있게)
+    if count >= RESET_AFTER and not demo:
         # 아무도 모르는 값으로 바꾼다: 비밀번호 지문이 바뀌어 이전 세션·재설정 링크도 모두 무효가 된다
         user.password_hash = unusable_password()
         user.locked_until = None
         audit.record(session, user, "auth.lockout_reset", "user", str(user.id), failed=count)
         session.commit()
         return LoginAttempt(error=lockout_message(), status_code=423, send_reset_to=user.id)
-    if count == LOCK_AFTER:
+    if count == LOCK_AFTER or (demo and count % LOCK_AFTER == 0):
         user.locked_until = now + LOCK_FOR
         audit.record(session, user, "auth.lockout", "user", str(user.id), failed=count)
         session.commit()
+        if demo:
+            return LoginAttempt(
+                error=tr("비밀번호를 {n}번 틀려 1분 동안 로그인할 수 없어요.", n=LOCK_AFTER), status_code=429
+            )
         return LoginAttempt(
             error=tr(
                 "비밀번호를 {n}번 틀려 1분 동안 로그인할 수 없어요. "
@@ -121,8 +133,8 @@ def _failed(session: Session, user: User, now: datetime) -> LoginAttempt:
             status_code=429,
         )
     session.commit()
-    if count < LOCK_AFTER:
-        left = LOCK_AFTER - count
+    if count < LOCK_AFTER or demo:
+        left = LOCK_AFTER - count % LOCK_AFTER
         hint = " " + tr("{n}번 더 틀리면 1분 동안 로그인할 수 없어요.", n=left) if left <= 2 else ""
     else:
         hint = " " + tr("{n}번 더 틀리면 비밀번호가 초기화돼요.", n=RESET_AFTER - count)
@@ -147,6 +159,7 @@ def _check_new(new: str, confirm: str) -> None:
 
 def change_password(session: Session, user: User, current: str, new: str, confirm: str) -> None:
     """현재 비밀번호를 확인하고 바꾼다. 임시 비밀번호로 만든 계정은 여기서 변경 표시가 풀린다."""
+    ensure_not_demo()
     try:
         _hasher.verify(user.password_hash, current)
     except (VerificationError, InvalidHashError):
@@ -283,6 +296,7 @@ def admin_reset_password(session: Session, admin: User, email: str, by_email: bo
     않는다. 메일을 쓸 수 없으면 임시 비밀번호를 만들어 돌려주고 다음 로그인 때 바꾸게 한다."""
     if admin.role != Role.ADMIN or admin.institution_id is None:
         raise PermissionDeniedError(tr("기관 관리자만 사용할 수 있어요."))
+    ensure_not_demo()
     user = user_repo.get_by_email(session, email)
     if user is None or user.institution_id != admin.institution_id:
         raise NotFoundError(tr("우리 기관에 그 이메일의 계정이 없어요."))

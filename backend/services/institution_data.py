@@ -29,7 +29,7 @@ from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import analysis, audit, csv_import, notifications, review
-from backend.services.auth import RESET_AFTER, hash_password, temporary_password, unusable_password
+from backend.services.auth import RESET_AFTER, ensure_not_demo, hash_password, temporary_password, unusable_password
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +159,7 @@ def set_active(session: Session, admin: User, email: str, active: bool) -> Activ
     비활성화하면 로그인·배정·알림 메일에서 빠지고 다른 기기의 로그인도 끊긴다. 교수였다면 진행 중인 심사를
     같은 학과의 다른 교수에게 넘기고, 넘길 사람이 없으면 배정을 비워 심사관이 다시 배정하게 한다."""
     institution_id = ensure_admin(admin)
+    ensure_not_demo()
     user = user_repo.get_by_email(session, email)
     if user is None or user.institution_id != institution_id:
         raise NotFoundError(tr("우리 기관에 그 이메일의 계정이 없어요."))

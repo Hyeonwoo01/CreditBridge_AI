@@ -139,4 +139,9 @@ class LLMClient:
 
 @lru_cache
 def get_llm() -> LLMClient:
-    return LLMClient(get_settings())
+    settings = get_settings()
+    if settings.demo_mode:
+        from backend.ai.demo_llm import DemoLLM  # demo_llm이 이 모듈을 가져오므로 여기서 가져온다
+
+        return DemoLLM()
+    return LLMClient(settings)

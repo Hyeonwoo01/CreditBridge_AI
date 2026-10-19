@@ -76,6 +76,10 @@ docker compose --profile app up -d --build
 - 끄기: `docker compose --profile app down` (데이터는 남음, 모두 지우려면 `down -v`)
 - 로그 보기: `docker compose --profile app logs -f web worker`
 
+### 예시용 공개 데모로 올리기 (Hugging Face Spaces)
+
+컨테이너 하나에 앱과 MariaDB를 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. 무료 Hugging Face Space에 올리면 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
+
 ### 개발용: 인프라만 Docker, 앱은 uv로
 
 사전 설치: Docker, [uv](https://docs.astral.sh/uv/)
@@ -183,6 +187,7 @@ tests/           unit · integration(MariaDB) · eval(골든셋)
 
 ## 운영 시 확인할 것
 
+- 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 Claude 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
 - 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.

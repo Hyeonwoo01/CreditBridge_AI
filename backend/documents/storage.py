@@ -1,7 +1,9 @@
-"""S3 호환 객체 스토리지 (개발 MinIO, 운영 AWS S3). 원본 문서는 DB나 로컬 디스크에 두지 않는다."""
+"""S3 호환 객체 스토리지 (개발 MinIO, 운영 AWS S3). 원본 문서는 DB나 로컬 디스크에 두지 않는다.
+(예외: 공개 데모 모드의 DiskStorage — 예시 자료만 다루고 다시 시작하면 지워진다)"""
 
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -48,6 +50,36 @@ class ObjectStorage:
             self._client.create_bucket(Bucket=self._bucket)
 
 
+class DiskStorage(ObjectStorage):
+    """공개 데모용: S3 대신 로컬 폴더에 저장한다 (Settings.demo_mode). 컨테이너를 다시 시작하면 지워진다."""
+
+    def __init__(self, root: str) -> None:  # S3 클라이언트를 만들지 않는다
+        self._root = Path(root)
+
+    def _path(self, key: str) -> Path:
+        path = (self._root / key).resolve()
+        if not path.is_relative_to(self._root.resolve()):
+            raise ValueError("invalid storage key")
+        return path
+
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def get(self, key: str) -> bytes:
+        return self._path(key).read_bytes()
+
+    def delete(self, key: str) -> None:
+        self._path(key).unlink(missing_ok=True)
+
+    def ensure_bucket(self) -> None:
+        self._root.mkdir(parents=True, exist_ok=True)
+
+
 @lru_cache
 def get_storage() -> ObjectStorage:
-    return ObjectStorage(get_settings())
+    settings = get_settings()
+    if settings.demo_mode:
+        return DiskStorage(settings.demo_storage_dir)
+    return ObjectStorage(settings)

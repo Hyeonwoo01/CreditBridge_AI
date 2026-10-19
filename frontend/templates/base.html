@@ -80,6 +80,9 @@
     </div>
   </div>
   {% endif %}
+  {% if demo_mode() %}
+  <p class="border-b border-elective/30 bg-elective-subtle px-4 py-2 text-center text-xs text-ink-80" role="note">{{ _("예시용 공개 데모예요. AI 분석은 미리 정해 둔 예시 AI가 하고, 서버가 다시 시작하면 처음 상태로 돌아가요. 실제 개인정보나 자료는 올리지 마세요.") }}</p>
+  {% endif %}
   <main class="mx-auto w-full {% block width %}max-w-[1280px]{% endblock %} flex-1 px-4 pt-8 pb-20 md:px-10 md:pt-10">
     {% for f in flashes %}
     <div role="status" class="mb-4 rounded-md px-4 py-3 text-sm {{ 'bg-reject-subtle text-reject' if f.kind == 'error' else 'bg-parchment text-ink-80' }}">{{ f.message }}</div>
