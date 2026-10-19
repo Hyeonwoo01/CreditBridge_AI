@@ -13,7 +13,7 @@
 
 역할별 화면과 메뉴는 아래 [주요 화면](#주요-화면), 화면별 세부는 [화면 명세서](docs/screens/README.md)에 있습니다.
 
-기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·화면 버튼 대응) · [ERD](docs/ERD.md)(엔티티·속성·관계)
+기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·화면 버튼 대응) · [ERD](docs/ERD.md)(엔티티·속성·관계) · [미결 사항](docs/open-issues.md)(확정 안 된 규칙·지금 어려운 일)
 
 ## AI가 판정을 추천하는 방식
 
@@ -70,7 +70,7 @@ cp .env.example .env                      # Windows PowerShell: copy .env.exampl
 docker compose --profile app up -d --build
 ```
 
-처음에는 이미지 내려받기와 빌드에 몇 분 걸립니다. 웹 컨테이너가 시작하면서 DB 테이블, 문서 버킷, 데모 계정을 자동으로 만듭니다.
+처음에는 이미지 내려받기와 빌드에 몇 분 걸립니다. DB(PostgreSQL 17)는 볼륨이 비어 있을 때 `db/init.sql`(테이블)과 `db/data.sql`(데모 계정·과목 초기 데이터)로 한 번 초기화되고, 웹 컨테이너가 시작하면서 문서 버킷을 만듭니다.
 브라우저에서 http://localhost:8000 을 엽니다. 모든 포트를 127.0.0.1에만 열어 같은 네트워크의 다른 기기에서는 접속할 수 없습니다.
 
 - 끄기: `docker compose --profile app down` (데이터는 남음, 모두 지우려면 `down -v`)
@@ -78,7 +78,7 @@ docker compose --profile app up -d --build
 
 ### 예시용 공개 데모로 올리기 (Render 무료)
 
-컨테이너 하나에 앱과 MariaDB를 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
+컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
 
 ### 개발용: 인프라만 Docker, 앱은 uv로
 
@@ -87,10 +87,10 @@ docker compose --profile app up -d --build
 ```bash
 uv sync                                   # Python 3.12와 의존성 설치
 cp .env.example .env                      # ANTHROPIC_API_KEY, CLAUDE_MODEL 입력
-docker compose up -d db redis minio       # MariaDB 11.8, Redis 7, MinIO
-uv run alembic upgrade head
+docker compose up -d db redis minio       # PostgreSQL 17(db/init.sql·data.sql로 초기화), Redis 7, MinIO
+uv run alembic upgrade head               # init.sql로 이미 최신이면 아무것도 안 함
 uv run python -m scripts.create_bucket
-uv run python -m scripts.seed_demo        # 데모 카탈로그·계정
+uv run python -m scripts.seed_demo        # 데모 카탈로그·계정 (data.sql로 이미 있으면 건너뜀)
 uv run fastapi dev backend/main.py        # http://localhost:8000
 uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 터미널 (Windows는 --pool=solo 추가)
 uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 터미널: 매일 기한 알림 (하나만 띄움)
@@ -115,7 +115,7 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
 
 코드를 고치기 전에 [CLAUDE.md](CLAUDE.md)를 먼저 읽어 주세요. 사람과 Claude Code가 함께 따르는 규칙이며, Claude Code는 이 파일을 자동으로 읽습니다. 핵심만 옮기면:
 
-- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, MariaDB + PyMySQL, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
+- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, PostgreSQL 17 + psycopg 3, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
 - **구조**: web → services → repositories → models. SQL은 `backend/repositories`에만, LLM 호출은 `backend/ai/llm_client.py`로만, 프롬프트는 `backend/ai/prompts/*.md`(바꾸면 버전 올림), 추천 규칙은 `backend/services/scoring.py` 한 곳(바꾸면 `RULES_VERSION` 올림).
 - **사람이 최종 판정**: AI는 추천만 합니다. 판정 확률(%)은 계산·표시하지 않고, 확정 판정에는 `decided_by`가 필수이며, `decisions`·`audit_logs`는 INSERT만 합니다(재판정도 새 행).
 - **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.
@@ -150,7 +150,7 @@ CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니�
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy backend
-uv run pytest tests/unit tests/integration   # 통합 테스트는 MariaDB 필요 (TEST_DATABASE_URL, 기본 creditbridge_test)
+uv run pytest tests/unit tests/integration   # 통합 테스트는 PostgreSQL 필요 (TEST_DATABASE_URL, 기본 creditbridge_test)
 uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 Claude API 호출, 비용 발생
 ```
 
@@ -176,9 +176,10 @@ frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   templates/     Jinja2 + HTMX 템플릿: base · student · review · professor · admin · partials · stats · report
   static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘) · samples/(CSV 예시)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
-alembic/         마이그레이션 (MySQL 8.0 호환 문법만)
+alembic/         마이그레이션 (PostgreSQL 17, 기준점 0001에 이전 MariaDB 마이그레이션을 합침)
+db/              init.sql(스키마, alembic --sql로 생성) · data.sql(데모 초기 데이터, pg_dump로 생성) — scripts/export_db_sql.sh로 다시 만듦
 scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · demo_data/
-tests/           unit · integration(MariaDB) · eval(골든셋)
+tests/           unit · integration(PostgreSQL) · eval(골든셋)
 ```
 
 백엔드와 프론트엔드는 폴더만 나뉘어 있고 하나의 앱으로 함께 실행됩니다. FastAPI가 `frontend/templates`로 HTML을 그려 보내고 `frontend/static`을 `/static`으로 내보냅니다.

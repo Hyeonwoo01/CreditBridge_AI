@@ -1,4 +1,4 @@
-"""테스트 공통 설정. 통합 테스트는 실제 MariaDB(TEST_DATABASE_URL)에 마이그레이션을 적용해 실행한다."""
+"""테스트 공통 설정. 통합 테스트는 실제 PostgreSQL(TEST_DATABASE_URL)에 마이그레이션을 적용해 실행한다."""
 
 import os
 import re
@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 os.environ["DATABASE_URL"] = os.environ.get(
-    "TEST_DATABASE_URL", "mysql+pymysql://creditbridge:change-me@localhost:3306/creditbridge_test?charset=utf8mb4"
+    "TEST_DATABASE_URL", "postgresql+psycopg://creditbridge:change-me@localhost:5432/creditbridge_test"
 )
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
 os.environ["CLAUDE_MODEL"] = "fake-claude"
@@ -31,10 +31,8 @@ def migrated() -> None:
     from backend.db.session import engine
 
     with engine.begin() as conn:
-        conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
-        for (table,) in conn.execute(text("SHOW TABLES")).all():
-            conn.execute(text(f"DROP TABLE `{table}`"))
-        conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
     cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
     cfg.attributes["database_url"] = os.environ["DATABASE_URL"]
     command.upgrade(cfg, "head")
@@ -45,11 +43,11 @@ def db(migrated: None) -> Iterator[Session]:
     from backend.db.session import SessionLocal, engine
 
     with engine.begin() as conn:
-        conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
-        for (table,) in conn.execute(text("SHOW TABLES")).all():
-            if table != "alembic_version":
-                conn.execute(text(f"TRUNCATE TABLE `{table}`"))
-        conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+        tables = conn.execute(
+            text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'alembic_version'")
+        ).scalars()
+        quoted = ", ".join(f'"{t}"' for t in tables)
+        conn.execute(text(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE"))
     # 앱이 다른 연결에서 커밋한 결과를 바로 읽을 수 있게 테스트 세션은 READ COMMITTED로
     with SessionLocal(bind=engine.execution_options(isolation_level="READ COMMITTED")) as session:
         yield session

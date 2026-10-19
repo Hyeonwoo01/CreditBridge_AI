@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "local"
-    database_url: str = "mysql+pymysql://creditbridge:change-me@localhost:3306/creditbridge?charset=utf8mb4"
+    database_url: str = "postgresql+psycopg://creditbridge:change-me@localhost:5432/creditbridge"
     redis_url: str = "redis://localhost:6379/0"
 
     s3_endpoint_url: str | None = None

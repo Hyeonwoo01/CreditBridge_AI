@@ -6,7 +6,7 @@ AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한�
 기준 문서: docs/spec.md(페르소나·테스트 명세·기술스택·기능 명세 통합본), docs/DESIGN.md(화면 디자인 시스템: 단일 Action Blue, 1px 헤어라인, 그림자 없음),
 docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개인정보 처리),
 docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문구),
-docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API), docs/ERD.md(데이터베이스 구조: 엔티티·속성·관계).
+docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API), docs/ERD.md(데이터베이스 구조: 엔티티·속성·관계), docs/open-issues.md(확정 안 된 규칙·지금 어려운 일).
 
 ## 고정 스택 (이 목록 밖의 라이브러리를 추가하지 말 것)
 - Python 3.12 / uv (pip install 금지, uv add 사용)
@@ -15,8 +15,8 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
   - 금지: .dict(), parse_obj, @validator, class Config
 - SQLAlchemy 2.0 문법만: Mapped, mapped_column, select(), session.execute()
   - 금지: session.query(), declarative_base(), SQLModel
-- MariaDB 11.8 + PyMySQL (mysql+pymysql://), 비동기 드라이버 금지
-- Alembic으로만 스키마 변경, SQL은 MySQL 8.0 호환 문법만
+- PostgreSQL 17 + psycopg 3 (postgresql+psycopg://, 동기 모드만), 비동기 드라이버(asyncpg 등) 금지
+- Alembic으로만 스키마 변경 (db/init.sql·db/data.sql은 scripts/export_db_sql.sh로 다시 만든다)
 - Celery 5 + Redis 7: 오래 걸리는 작업은 모두 Celery로
 - Anthropic 공식 SDK만 사용, LangChain/LlamaIndex 금지
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
@@ -54,7 +54,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 ## 작업 완료 전 확인
 - uv run ruff check . && uv run ruff format --check .
 - uv run mypy backend
-- uv run pytest tests/unit tests/integration   (통합 테스트는 MariaDB 필요: TEST_DATABASE_URL)
+- uv run pytest tests/unit tests/integration   (통합 테스트는 PostgreSQL 필요: TEST_DATABASE_URL)
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
 - 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
 - 화면 문구를 추가·수정했다면 backend/locales/en.json에 영어를 넣고 uv run python -m scripts.i18n_check 통과 (테스트 tests/unit/test_i18n.py도 같은 검사)

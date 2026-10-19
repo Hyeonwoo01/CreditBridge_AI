@@ -1,9 +1,10 @@
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, Computed, ForeignKey, Index, Numeric, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of, ratio
+from backend.db.types import JSONB
 from backend.models.enums import Confidence, EvaluationStatus, Recommendation
 
 
@@ -14,6 +15,8 @@ class CourseEvaluation(IdMixin, CreatedAtMixin, Base):
     __table_args__ = (
         # 강의계획서의 최신 분석 찾기 (재분석하면 이전 결과는 is_latest=False로 남는다)
         Index("ix_course_evaluations_syllabus_latest", "syllabus_id", "is_latest"),
+        # 강의계획서당 최신 분석은 하나 (조건부 유니크 인덱스)
+        Index("uq_course_evaluations_latest_syllabus", "syllabus_id", unique=True, postgresql_where=text("is_latest")),
         CheckConstraint(one_of("status", EvaluationStatus), name="status_valid"),
         CheckConstraint(one_of("recommendation", Recommendation, nullable=True), name="recommendation_valid"),
         CheckConstraint(one_of("confidence", Confidence, nullable=True), name="confidence_valid"),
@@ -31,7 +34,7 @@ class CourseEvaluation(IdMixin, CreatedAtMixin, Base):
     confidence: Mapped[str | None] = mapped_column(String(10), index=True)
     level_flag: Mapped[str | None] = mapped_column(String(10))  # same / lower / higher
     # 상위 후보 3개와 개념별 커버리지, 정보 부족 진단, 경고
-    coverage_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    coverage_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     summary: Mapped[str] = mapped_column(Text, default="")
     # 같은 입력이면 같은 결과를 재사용하기 위한 키 (반복 실행 동일성)
     input_hash: Mapped[str | None] = mapped_column(String(64), index=True)
@@ -39,7 +42,3 @@ class CourseEvaluation(IdMixin, CreatedAtMixin, Base):
     model: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(String(500))
     is_latest: Mapped[bool] = mapped_column(default=True, index=True)
-    # 강의계획서당 최신 분석은 하나 (assignments.active_evaluation_id와 같은 방식)
-    latest_syllabus_id: Mapped[int | None] = mapped_column(
-        IdType, Computed("IF(is_latest, syllabus_id, NULL)", persisted=True), unique=True
-    )

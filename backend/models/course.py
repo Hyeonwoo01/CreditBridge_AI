@@ -1,7 +1,8 @@
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
+from backend.db.types import JSONB
 from backend.models.department import Department
 
 
@@ -23,7 +24,7 @@ class Course(IdMixin, CreatedAtMixin, Base):
     level: Mapped[str] = mapped_column(Text, default="")
     reference_syllabus_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("syllabi.id", use_alter=True))
     # 학과가 정한 필수 개념 (과목 CSV). 비어 있으면 기준 강의계획서 청크의 개념을 쓴다
-    concepts: Mapped[list[str] | None] = mapped_column(JSON, default=None)
+    concepts: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
 
     dept: Mapped[Department] = relationship(lazy="joined")
 

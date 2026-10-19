@@ -1,7 +1,8 @@
-"""공통 커스텀 타입. (파일럿에서 임베딩 검색을 붙일 때 VECTOR 타입을 이 파일에 추가한다)"""
+"""공통 커스텀 타입. (파일럿에서 임베딩 검색을 붙일 때 VECTOR 타입을 이 파일에 추가한다)
 
-from sqlalchemy.dialects.mysql import LONGTEXT
-from sqlalchemy.types import Text
+긴 글(강의계획서 원문 등)은 PostgreSQL TEXT를 그대로 쓴다(길이 제한 없음). JSON 값은 JSONB.
+"""
 
-# 강의계획서 원문처럼 긴 텍스트 (MariaDB/MySQL: LONGTEXT)
-LongText = Text().with_variant(LONGTEXT(), "mysql", "mariadb")
+from sqlalchemy.dialects.postgresql import JSONB
+
+__all__ = ["JSONB"]

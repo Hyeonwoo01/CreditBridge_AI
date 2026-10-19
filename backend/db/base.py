@@ -2,7 +2,6 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import BigInteger, DateTime, MetaData
-from sqlalchemy.dialects.mysql import BIGINT, DATETIME
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 NAMING = {
@@ -13,8 +12,8 @@ NAMING = {
     "pk": "pk_%(table_name)s",
 }
 
-# 내부 PK/FK: BIGINT UNSIGNED (테스트 등 다른 방언에서는 BIGINT)
-IdType = BigInteger().with_variant(BIGINT(unsigned=True), "mysql", "mariadb")
+# 내부 PK/FK: BIGINT (PostgreSQL은 기본키에 IDENTITY 자동 증가)
+IdType = BigInteger()
 
 
 def utcnow() -> datetime:
@@ -23,12 +22,12 @@ def utcnow() -> datetime:
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING)
-    # 모든 시각은 UTC, DATETIME(6)
-    type_annotation_map = {datetime: DateTime().with_variant(DATETIME(fsp=6), "mysql", "mariadb")}  # noqa: RUF012
+    # 모든 시각은 UTC, 시간대 없는 TIMESTAMP(마이크로초까지)
+    type_annotation_map = {datetime: DateTime()}  # noqa: RUF012
 
 
 def one_of(column: str, values: Iterable[str], *, nullable: bool = False) -> str:
-    """CHECK 제약 식: 값이 허용 목록 안에 있어야 한다 (MySQL 8.0.16+, MariaDB)."""
+    """CHECK 제약 식: 값이 허용 목록 안에 있어야 한다."""
     listed = f"{column} IN ({', '.join(repr(str(v)) for v in values)})"
     return f"{column} IS NULL OR {listed}" if nullable else listed
 

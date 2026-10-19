@@ -382,7 +382,7 @@ E2E 시나리오 5개는 페르소나 문서의 실제 사건을 그대로 재�
 
 ## 1. 기술 선택 원칙
 
-CreditBridge AI는 Python 3.12와 MariaDB 11.8 LTS를 기반으로, 계층마다 정답을 하나만 두고 대안은 금지 목록에 명시한다. AI 코딩 도구는 선택지가 열려 있을 때 라이브러리와 문법을 섞어 쓰는 실수를 가장 많이 하므로, 이 문서가 그 선택지를 미리 닫아두는 역할을 한다.
+CreditBridge AI는 Python 3.12와 PostgreSQL 17을 기반으로, 계층마다 정답을 하나만 두고 대안은 금지 목록에 명시한다. AI 코딩 도구는 선택지가 열려 있을 때 라이브러리와 문법을 섞어 쓰는 실수를 가장 많이 하므로, 이 문서가 그 선택지를 미리 닫아두는 역할을 한다.
 
 1. **계층당 하나의 정답:** ORM, 큐, PDF 처리 등 계층마다 기술을 하나만 쓴다. 대안 라이브러리는 2장의 사용 금지 열에 적고 쓰지 않는다.
 2. **버전 고정:** 메이저 버전을 문서에 고정하고 실제 버전은 uv.lock으로 잠근다. 버전을 올릴 때는 이 문서를 먼저 고친다.
@@ -391,7 +391,7 @@ CreditBridge AI는 Python 3.12와 MariaDB 11.8 LTS를 기반으로, 계층마다
 5. **Python 한 언어:** 화면도 Jinja2 템플릿과 HTMX로 만들어 MVP 단계에서는 JavaScript 프레임워크를 쓰지 않는다. 하나의 언어와 하나의 저장소에서 AI가 전체 흐름을 읽을 수 있게 한다.
 6. **추상화 계층 최소화:** LangChain 같은 LLM 프레임워크 없이 공식 SDK를 직접 호출한다. 감싸는 계층이 적을수록 AI가 생성하는 코드의 정답이 하나로 수렴한다.
 
-**MySQL과 MariaDB 중 MariaDB 11.8 LTS를 단일 표준으로 정한다.** MVP는 벡터 검색을 쓰지 않으므로 모든 SQL을 MySQL 8.0 호환 문법으로 작성해 MySQL과 MariaDB 어느 쪽에서도 돌아가게 한다. 그래도 MariaDB를 표준으로 두는 이유는, 파일럿에서 임베딩 검색을 붙일 때 별도 벡터 DB 없이 같은 DB의 VECTOR 기능을 쓸 수 있기 때문이다.
+**PostgreSQL 17을 단일 표준으로 정한다** (2026년 10월 MariaDB 11.8에서 전환). "심사 건당 활성 배정 하나" 같은 규칙을 부분 유니크 인덱스(`WHERE is_active`)로 바로 걸 수 있고, JSON 컬럼을 JSONB로 형식 검사·저장한다. 강의 실습 환경(Docker + PostgreSQL)과도 맞춘다. 파일럿에서 임베딩 검색을 붙일 때는 별도 벡터 DB 없이 같은 DB의 pgvector 확장을 검토한다(도입 시 이 표에 먼저 추가).
 
 버전 정보는 2026년 중반 기준이다. 착수 시점에 각 기술의 최신 안정 패치 버전을 확인한 뒤 uv.lock에 고정한다.
 
@@ -406,9 +406,9 @@ CreditBridge AI는 Python 3.12와 MariaDB 11.8 LTS를 기반으로, 계층마다
 | 웹 프레임워크 | FastAPI (fastapi\[standard\]) | 0.115 이상, 고정 | 화면 라우트와 JSON API | Django, Flask, async def 엔드포인트 |
 | 데이터 검증·설정 | Pydantic + pydantic-settings | 2.x | 요청·응답 스키마, LLM 출력 검증, 환경변수 설정 | v1 문법(@validator, class Config, .dict(), parse\_obj) |
 | ORM | SQLAlchemy | 2.0.x | 모델 정의와 쿼리(Mapped, mapped\_column, select) | session.query(), 구식 declarative\_base, SQLModel, Django ORM |
-| DB 드라이버 | PyMySQL | 1.x | MariaDB 접속(mysql+pymysql) | aiomysql, asyncmy, mysql-connector-python |
+| DB 드라이버 | psycopg (psycopg\[binary\]) | 3.x | PostgreSQL 접속(postgresql+psycopg, 동기 모드) | asyncpg, psycopg2, PyMySQL·MySQL 계열 드라이버 |
 | 마이그레이션 | Alembic | 1.x | 모든 스키마 변경 | 수기 DDL, 운영 환경 create\_all |
-| 데이터베이스 | MariaDB | 11.8 LTS | 업무 데이터, 판정 이력(벡터 검색은 파일럿 이후) | MySQL 서버, PostgreSQL, 별도 벡터 DB(Pinecone, Chroma 등) |
+| 데이터베이스 | PostgreSQL | 17.x | 업무 데이터, 판정 이력(벡터 검색은 파일럿 이후) | MariaDB·MySQL 서버, 별도 벡터 DB(Pinecone, Chroma 등) |
 | 캐시·메시지 브로커 | Redis | 7.x | Celery 브로커, 단기 캐시 | RabbitMQ |
 | 백그라운드 작업 | Celery (+ beat 스케줄러) | 5.x | 문서 추출, 후보 과목 비교·판정 추천, 기준 강의계획서 처리, 알림·비밀번호 재설정 메일, 매일 기한 알림 | FastAPI BackgroundTasks(긴 작업), RQ, 스레드 직접 생성 |
 | LLM | Anthropic Claude API, 공식 anthropic Python SDK | SDK 최신 안정판 고정 | 구조화 추출, 후보 과목 비교·판정 추론, 스캔본 전사 | LangChain, LlamaIndex, 모델 ID 하드코딩 |
@@ -421,7 +421,7 @@ CreditBridge AI는 Python 3.12와 MariaDB 11.8 LTS를 기반으로, 계층마다
 | 테스트 | pytest + pytest-cov | 8.x | 단위·통합 테스트, 골든셋 평가 | unittest 스타일 클래스 |
 | 린트·포맷 | Ruff | 최신 안정판 | 린트와 포맷 단일 도구 | Black, Flake8, isort 조합 |
 | 타입 검사 | mypy | 최신 안정판 | backend 디렉터리 일반 모드 검사(backend/workers 제외, MVP 기준) | 타입 힌트 없는 함수 |
-| 실행 환경 | Docker + Docker Compose v2 | docker compose 명령 | 로컬 인프라(MariaDB, Redis, MinIO)와 배포 이미지 | docker-compose v1 명령 |
+| 실행 환경 | Docker + Docker Compose v2 | docker compose 명령 | 로컬 인프라(PostgreSQL, Redis, MinIO)와 배포 이미지 | docker-compose v1 명령 |
 
 ## 3. 아키텍처
 
@@ -430,7 +430,7 @@ flowchart LR
   B["브라우저<br/>학생·심사관·교수"] <-->|HTTPS| W["FastAPI 웹 앱<br/>Jinja2 + HTMX · JSON API"]
   W -->|내보내기| SIS["학사정보시스템<br/>Banner 등"]
   W -->|원본 저장| S3[("S3 · MinIO<br/>원본 문서(암호화)")]
-  W -->|조회·저장| DB[("MariaDB 11.8 LTS<br/>업무 데이터 · 판정 이력")]
+  W -->|조회·저장| DB[("PostgreSQL 17<br/>업무 데이터 · 판정 이력")]
   W -->|작업 등록| R["Redis 7<br/>작업 큐"]
   R -->|작업 수신| C["Celery 워커<br/>문서 추출 · 후보 과목 필터<br/>개념 매핑 · 근거 원문 검증"]
   C -->|원본 읽기| S3
@@ -442,23 +442,23 @@ flowchart LR
 
 ## 4. 데이터베이스 규칙
 
-DB는 MariaDB 11.8 LTS 하나만 쓰고, 모든 SQL은 MySQL 8.0 호환 문법으로 작성한다. 판정 이력과 감사 로그는 수정·삭제가 불가능한 추가 전용 테이블로 둔다.
+DB는 PostgreSQL 17 하나만 쓰고, SQL은 SQLAlchemy 2.0 식(select() 등)으로 backend/repositories에만 작성한다. 판정 이력과 감사 로그는 수정·삭제가 불가능한 추가 전용 테이블로 둔다.
 
 **작성 규칙**
 
 | 항목 | 규칙 |
 | --- | --- |
-| 버전·이미지 | 운영 MariaDB 11.8 LTS, 로컬은 공식 Docker 이미지 mariadb:11.8 |
-| 문자셋 | utf8mb4, 콜레이션 utf8mb4\_unicode\_ci (DB·테이블·연결 모두 명시) |
-| 시간 | DATETIME(6), UTC로 저장하고 화면에서만 현지 시각으로 변환 |
+| 버전·이미지 | 운영 PostgreSQL 17, 로컬은 공식 Docker 이미지 postgres:17 (docker-compose.yml이 db/init.sql·db/data.sql로 처음 한 번 초기화) |
+| 문자셋 | UTF8 (DB 생성 시 인코딩 UTF8) |
+| 시간 | TIMESTAMP WITHOUT TIME ZONE(마이크로초), UTC로 저장하고 화면에서만 현지 시각으로 변환 |
 | 테이블·컬럼 명명 | snake\_case, 테이블은 복수형(syllabi, decisions), 외래키는 단수형\_id |
-| 기본키 | id BIGINT UNSIGNED AUTO\_INCREMENT 하나만 사용. 외부 노출 시 보호는 권한 검사(FR-12)가 담당 |
-| JSON | MariaDB의 JSON은 LONGTEXT 별칭이므로 구조 검증은 Pydantic이 담당하고 DB는 JSON\_VALID 체크만 둔다. 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 뺀다 |
-| 벡터 | MVP는 사용하지 않음. 파일럿에서 도입할 때 VECTOR(1024) 컬럼과 VECTOR INDEX(DISTANCE=cosine)를 쓰고, SQLAlchemy용 타입은 backend/db/types.py 한 곳에서만 정의 |
-| 마이그레이션 | Alembic으로만 변경. autogenerate 결과는 사람이 검토 |
+| 기본키 | id BIGSERIAL(BIGINT + 시퀀스) 하나만 사용. 외부 노출 시 보호는 권한 검사(FR-12)가 담당 |
+| JSON | JSONB(형식은 DB가 검사). 구조 검증은 Pydantic이 담당하고, 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 뺀다 |
+| 벡터 | MVP는 사용하지 않음. 파일럿에서 도입할 때 pgvector의 vector(1024) 컬럼과 코사인 인덱스를 검토하고, SQLAlchemy용 타입은 backend/db/types.py 한 곳에서만 정의 |
+| 마이그레이션 | Alembic으로만 변경. autogenerate 결과는 사람이 검토. 바꾸면 scripts/export_db_sql.sh로 db/init.sql·db/data.sql을 다시 만든다 |
 | 추가 전용 테이블 | decisions, audit\_logs는 INSERT만 허용. 앱 DB 계정에 UPDATE·DELETE 권한을 주지 않음 |
 | 개인정보 | 원본 성적표는 객체 스토리지에 암호화 저장, DB에는 마스킹된 값과 파일 키만 저장 |
-| 금지 문법 | MariaDB 전용 SEQUENCE, RETURNING, 시스템 버전 테이블 등 MySQL 비호환 문법 |
+| 금지 | 트리거·저장 프로시저로 업무 규칙 구현(규칙은 앱 + CHECK·유니크 인덱스), 비동기 드라이버 |
 
 **핵심 테이블**
 
@@ -539,7 +539,7 @@ creditbridge/
 ├── docs/                   # spec · DESIGN · traceability · privacy · db-grants.sql · screens/(화면 명세서)
 ├── tests/
 │   ├── unit/
-│   ├── integration/        # MariaDB 필요 (TEST_DATABASE_URL)
+│   ├── integration/        # PostgreSQL 필요 (TEST_DATABASE_URL)
 │   └── eval/               # 골든셋 AI 품질 평가
 └── scripts/                # start.sh · build_css.sh · create_admin · seed_demo · create_bucket · backfill_page_offsets · i18n_check · demo_data/
 ```
@@ -581,8 +581,8 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
   - 금지: .dict(), parse_obj, @validator, class Config
 - SQLAlchemy 2.0 문법만: Mapped, mapped_column, select(), session.execute()
   - 금지: session.query(), declarative_base(), SQLModel
-- MariaDB 11.8 + PyMySQL (mysql+pymysql://), 비동기 드라이버 금지
-- Alembic으로만 스키마 변경, SQL은 MySQL 8.0 호환 문법만
+- PostgreSQL 17 + psycopg 3 (postgresql+psycopg://, 동기 모드만), 비동기 드라이버(asyncpg 등) 금지
+- Alembic으로만 스키마 변경 (db/init.sql·db/data.sql은 scripts/export_db_sql.sh로 다시 만든다)
 - Celery 5 + Redis 7: 오래 걸리는 작업은 모두 Celery로
 - Anthropic 공식 SDK만 사용, LangChain/LlamaIndex 금지
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
@@ -620,7 +620,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 ## 작업 완료 전 확인
 - uv run ruff check . && uv run ruff format --check .
 - uv run mypy backend
-- uv run pytest tests/unit tests/integration   (통합 테스트는 MariaDB 필요: TEST_DATABASE_URL)
+- uv run pytest tests/unit tests/integration   (통합 테스트는 PostgreSQL 필요: TEST_DATABASE_URL)
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
 - 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
 - 화면 문구를 추가·수정했다면 backend/locales/en.json에 영어를 넣고 uv run python -m scripts.i18n_check 통과 (테스트 tests/unit/test_i18n.py도 같은 검사)
@@ -639,10 +639,10 @@ uv sync
 # 2. 환경변수 파일 준비
 cp .env.example .env
 
-# 3. 로컬 인프라 실행: MariaDB, Redis, MinIO
+# 3. 로컬 인프라 실행: PostgreSQL(처음에 db/init.sql·db/data.sql로 초기화), Redis, MinIO
 docker compose up -d db redis minio
 
-# 4. DB 마이그레이션
+# 4. DB 마이그레이션 (init.sql로 이미 최신이면 아무것도 하지 않음)
 uv run alembic upgrade head
 
 # 5. 개발 서버
@@ -660,7 +660,7 @@ uv run python -m scripts.create_admin --institution "대학 이름" --country KR
 # 8. 품질 검사
 uv run ruff check . && uv run ruff format --check .
 uv run mypy backend
-uv run pytest tests/unit tests/integration   # 통합 테스트는 MariaDB 필요 (TEST_DATABASE_URL)
+uv run pytest tests/unit tests/integration   # 통합 테스트는 PostgreSQL 필요 (TEST_DATABASE_URL)
 bash scripts/build_css.sh                    # 템플릿에 새 Tailwind 클래스를 썼을 때
 
 # 9. 골든셋 AI 품질 평가 (실제 API 호출, 비용 발생)
@@ -671,7 +671,7 @@ uv run pytest tests/eval -m eval
 
 ```text
 APP_ENV=local
-DATABASE_URL=mysql+pymysql://creditbridge:change-me@localhost:3306/creditbridge?charset=utf8mb4
+DATABASE_URL=postgresql+psycopg://creditbridge:change-me@localhost:5432/creditbridge
 REDIS_URL=redis://localhost:6379/0
 S3_ENDPOINT_URL=http://localhost:9000
 S3_BUCKET=creditbridge-documents

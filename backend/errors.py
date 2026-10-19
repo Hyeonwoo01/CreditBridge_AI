@@ -26,9 +26,9 @@ class DuplicateRowError(Exception):
 
 
 def is_duplicate(exc: Exception) -> bool:
-    """IntegrityError가 유니크 키 중복(MySQL·MariaDB 1062)인지."""
+    """IntegrityError가 유니크 키 중복(PostgreSQL SQLSTATE 23505)인지."""
     orig = getattr(exc, "orig", None)
-    return bool(orig is not None and orig.args and orig.args[0] == 1062)
+    return getattr(orig, "sqlstate", None) == "23505"
 
 
 class LLMError(Exception):

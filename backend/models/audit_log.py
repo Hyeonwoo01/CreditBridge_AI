@@ -1,9 +1,10 @@
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, Index, String
+from sqlalchemy import ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
+from backend.db.types import JSONB
 
 
 class AuditLog(IdMixin, CreatedAtMixin, Base):
@@ -21,4 +22,4 @@ class AuditLog(IdMixin, CreatedAtMixin, Base):
     action: Mapped[str] = mapped_column(String(50), index=True)
     target_type: Mapped[str] = mapped_column(String(50))
     target_id: Mapped[str] = mapped_column(String(36))
-    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

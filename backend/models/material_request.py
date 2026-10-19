@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of
+from backend.db.types import JSONB
 from backend.models.enums import MaterialRequestStatus
 
 
@@ -16,7 +17,7 @@ class MaterialRequest(IdMixin, CreatedAtMixin, Base):
     syllabus_id: Mapped[int] = mapped_column(IdType, ForeignKey("syllabi.id"), index=True)
     course_evaluation_id: Mapped[int] = mapped_column(IdType, ForeignKey("course_evaluations.id"))
     requested_by: Mapped[int] = mapped_column(IdType, ForeignKey("users.id"))
-    items: Mapped[list[str]] = mapped_column(JSON, default=list)
+    items: Mapped[list[str]] = mapped_column(JSONB, default=list)
     note: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
     fulfilled_at: Mapped[datetime | None] = mapped_column(default=None)

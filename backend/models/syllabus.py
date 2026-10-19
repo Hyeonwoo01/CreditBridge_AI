@@ -1,10 +1,10 @@
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of, ratio
-from backend.db.types import LongText
+from backend.db.types import JSONB
 from backend.models.enums import SyllabusStatus
 
 
@@ -13,7 +13,6 @@ class Syllabus(IdMixin, CreatedAtMixin, Base):
 
     __tablename__ = "syllabi"
     __table_args__ = (
-        CheckConstraint("extracted_json IS NULL OR JSON_VALID(extracted_json)", name="extracted_json_valid"),
         CheckConstraint(one_of("status", SyllabusStatus), name="status_valid"),
         CheckConstraint(ratio("quality_score"), name="quality_score_range"),
         CheckConstraint("credits IS NULL OR credits >= 0", name="credits_range"),
@@ -29,18 +28,18 @@ class Syllabus(IdMixin, CreatedAtMixin, Base):
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
     original_filename: Mapped[str] = mapped_column(String(255), default="")
     language: Mapped[str] = mapped_column(String(8), default="en")
-    raw_text: Mapped[str] = mapped_column(LongText, default="")
+    raw_text: Mapped[str] = mapped_column(Text, default="")
     # 원본 파일 페이지 위치표 [1쪽 시작, …, 마지막 쪽 끝] (FR-25 근거 구절 → 원본 PDF 페이지). 이전 업로드는 없음
-    page_offsets: Mapped[list[int] | None] = mapped_column(JSON(none_as_null=True))
+    page_offsets: Mapped[list[int] | None] = mapped_column(JSONB(none_as_null=True))
     # 추출 결과에서 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 둔다
     course_code: Mapped[str] = mapped_column(String(50), default="", index=True)
     course_title: Mapped[str] = mapped_column(String(255), default="")
     credits: Mapped[float | None] = mapped_column(Numeric(4, 1, asdecimal=False))
-    extracted_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    extracted_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     extraction_model: Mapped[str | None] = mapped_column(String(100))
     # 문서 인식 품질 점수 0~1 (FR-01)
     quality_score: Mapped[float | None] = mapped_column(Numeric(4, 3, asdecimal=False))
     # 판정 유도 문구 탐지 결과 (FR-14)
-    injection_flags: Mapped[list[str] | None] = mapped_column(JSON)
+    injection_flags: Mapped[list[str] | None] = mapped_column(JSONB)
     status: Mapped[str] = mapped_column(String(20), default="uploaded")
     error_message: Mapped[str | None] = mapped_column(String(500))

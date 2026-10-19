@@ -1,4 +1,4 @@
-"""DB가 직접 지키는 규칙 (docs/ERD.md 6절): 값 허용 목록·범위 CHECK, "하나만" 유니크(생성 컬럼)."""
+"""DB가 직접 지키는 규칙 (docs/ERD.md 6절): 값 허용 목록·범위 CHECK, "하나만" 유니크(부분 유니크 인덱스)."""
 
 from datetime import timedelta
 
@@ -32,10 +32,13 @@ def test_check_constraints_reject_unknown_codes_and_out_of_range_values(seeded: 
     user = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
     assert rejected(seeded, "UPDATE users SET role = 'root' WHERE id = :id", id=user.id)
     assert rejected(seeded, "UPDATE users SET locale = 'fr' WHERE id = :id", id=user.id)
-    assert rejected(seeded, "UPDATE courses SET credits = -1 LIMIT 1")
-    assert rejected(seeded, "UPDATE course_evaluations SET coverage = 1.5 LIMIT 1")
-    assert rejected(seeded, "UPDATE course_evaluations SET recommendation = 'maybe' LIMIT 1")
-    assert rejected(seeded, "UPDATE decisions SET result = 'partial' LIMIT 1")
+    for table, change in [
+        ("courses", "credits = -1"),
+        ("course_evaluations", "coverage = 1.5"),
+        ("course_evaluations", "recommendation = 'maybe'"),
+        ("decisions", "result = 'partial'"),
+    ]:
+        assert rejected(seeded, f"UPDATE {table} SET {change} WHERE id = (SELECT min(id) FROM {table})")
     # 허용 값은 그대로 들어간다
     assert not rejected(seeded, "UPDATE users SET locale = 'en' WHERE id = :id", id=user.id)
 
