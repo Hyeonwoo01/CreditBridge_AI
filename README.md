@@ -87,7 +87,7 @@ docker compose --profile app up -d --build
 ```bash
 uv sync                                   # Python 3.12와 의존성 설치
 cp .env.example .env                      # ANTHROPIC_API_KEY, CLAUDE_MODEL 입력
-docker compose up -d db redis minio       # PostgreSQL 17(db/init.sql·data.sql로 초기화), Redis 7, MinIO
+docker compose up -d db redis s3          # PostgreSQL 17(db/init.sql·data.sql로 초기화), Redis 7, S3 호환 저장소(SeaweedFS)
 uv run alembic upgrade head               # init.sql로 이미 최신이면 아무것도 안 함
 uv run python -m scripts.create_bucket
 uv run python -m scripts.seed_demo        # 데모 카탈로그·계정 (data.sql로 이미 있으면 건너뜀)

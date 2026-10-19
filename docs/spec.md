@@ -417,12 +417,12 @@ CreditBridge AI는 Python 3.12와 PostgreSQL 17을 기반으로, 계층마다 �
 | 웹 푸시 | pywebpush (+ 브라우저 표준 Push API·서비스 워커) | 2.x | FR-20 모바일 알림: VAPID 서명·내용 암호화 후 브라우저 푸시 서비스로 발송 (VAPID 키 설정 시) | Firebase SDK, OneSignal 등 외부 푸시 SaaS, 직접 구현한 암호화 |
 | 화면 | Jinja2 + HTMX + Tailwind CSS(standalone CLI) | Jinja2 3.x, HTMX 2.x, Tailwind 4.x | 서버 렌더링 화면, 부분 갱신, 모바일 대응 | React, Vue, Next.js, jQuery(MVP 단계) |
 | 인증·보안 | Starlette SessionMiddleware + argon2-cffi + itsdangerous | 최신 안정판 | 서명 쿠키 세션, 비밀번호 해시, 비밀번호 재설정 링크 서명(서버에 토큰 저장 안 함) | 자체 JWT 구현, passlib, 평문 저장 |
-| 파일 저장 | S3 호환 객체 스토리지 + boto3 | 개발 MinIO, 운영 AWS S3 | 원본 성적표·강의계획서·보완 자료·이의 신청 근거 자료 암호화 저장 | DB BLOB 저장, 서버 로컬 디스크 |
+| 파일 저장 | S3 호환 객체 스토리지 + boto3 | 개발 SeaweedFS(S3 호환, docker compose), 운영 AWS S3 | 원본 성적표·강의계획서·보완 자료·이의 신청 근거 자료 암호화 저장 | DB BLOB 저장, 서버 로컬 디스크 |
 | 메일 | Python 표준 smtplib (Celery 작업) | 표준 라이브러리 | 알림 메일, 계정 설정·비밀번호 재설정 링크 (SMTP_HOST를 설정했을 때만) | 외부 메일 SDK 추가 |
 | 테스트 | pytest + pytest-cov | 8.x | 단위·통합 테스트, 골든셋 평가 | unittest 스타일 클래스 |
 | 린트·포맷 | Ruff | 최신 안정판 | 린트와 포맷 단일 도구 | Black, Flake8, isort 조합 |
 | 타입 검사 | mypy | 최신 안정판 | backend 디렉터리 일반 모드 검사(backend/workers 제외, MVP 기준) | 타입 힌트 없는 함수 |
-| 실행 환경 | Docker + Docker Compose v2 | docker compose 명령 | 로컬 인프라(PostgreSQL, Redis, MinIO)와 배포 이미지 | docker-compose v1 명령 |
+| 실행 환경 | Docker + Docker Compose v2 | docker compose 명령 | 로컬 인프라(PostgreSQL, Redis, S3 호환 저장소)와 배포 이미지 | docker-compose v1 명령 |
 
 ## 3. 아키텍처
 
@@ -430,7 +430,7 @@ CreditBridge AI는 Python 3.12와 PostgreSQL 17을 기반으로, 계층마다 �
 flowchart LR
   B["브라우저<br/>학생·심사관·교수"] <-->|HTTPS| W["FastAPI 웹 앱<br/>Jinja2 + HTMX · JSON API"]
   W -->|내보내기| SIS["학사정보시스템<br/>Banner 등"]
-  W -->|원본 저장| S3[("S3 · MinIO<br/>원본 문서(암호화)")]
+  W -->|원본 저장| S3[("S3 (개발 SeaweedFS)<br/>원본 문서(암호화)")]
   W -->|조회·저장| DB[("PostgreSQL 17<br/>업무 데이터 · 판정 이력")]
   W -->|작업 등록| R["Redis 7<br/>작업 큐"]
   R -->|작업 수신| C["Celery 워커<br/>문서 추출 · 후보 과목 필터<br/>개념 매핑 · 근거 원문 검증"]
@@ -641,8 +641,8 @@ uv sync
 # 2. 환경변수 파일 준비
 cp .env.example .env
 
-# 3. 로컬 인프라 실행: PostgreSQL(처음에 db/init.sql·db/data.sql로 초기화), Redis, MinIO
-docker compose up -d db redis minio
+# 3. 로컬 인프라 실행: PostgreSQL(처음에 db/init.sql·db/data.sql로 초기화), Redis, S3 호환 저장소(SeaweedFS)
+docker compose up -d db redis s3
 
 # 4. DB 마이그레이션 (init.sql로 이미 최신이면 아무것도 하지 않음)
 uv run alembic upgrade head
@@ -679,7 +679,7 @@ S3_ENDPOINT_URL=http://localhost:9000
 S3_BUCKET=creditbridge-documents
 S3_ACCESS_KEY=change-me
 S3_SECRET_KEY=change-me-please
-# 운영 S3는 AES256 또는 aws:kms. KMS가 없는 로컬 MinIO는 비워 둔다.
+# 운영 S3는 AES256 또는 aws:kms. KMS가 없는 로컬 저장소(SeaweedFS)는 비워 둔다.
 S3_SERVER_SIDE_ENCRYPTION=
 ANTHROPIC_API_KEY=
 # 착수 시점에 쓸 Claude 모델 ID (코드에 하드코딩하지 않는다)

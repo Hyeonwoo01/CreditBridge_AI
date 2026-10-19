@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_region: str = "us-east-1"
-    # 운영 S3는 "AES256"(SSE-S3) 또는 "aws:kms". KMS가 없는 로컬 MinIO는 비워둔다.
+    # 운영 S3는 "AES256"(SSE-S3) 또는 "aws:kms". KMS가 없는 로컬 저장소(SeaweedFS)는 비워둔다.
     s3_server_side_encryption: str = ""
 
     anthropic_api_key: str = ""
