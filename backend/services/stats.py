@@ -202,6 +202,7 @@ ACTION_LABELS = {
     "privacy.review": (N_("삭제 요청 처리"), "neutral"),
     "privacy.delete_documents": (N_("문서 삭제 완료"), "reject"),
     "request.submit": (N_("심사 요청"), "neutral"),
+    "request.delete": (N_("빈 편입 요청 삭제"), "neutral"),
     "syllabus.upload": (N_("강의계획서 업로드"), "neutral"),
     "syllabus.supplement": (N_("보완 자료 업로드"), "neutral"),
     "sis.token_issue": (N_("연동 토큰 발급"), "neutral"),

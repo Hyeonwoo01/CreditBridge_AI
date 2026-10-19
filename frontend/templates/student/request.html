@@ -11,7 +11,15 @@
     <h1 class="page-title">{{ _("{name} 님의 편입 학점 시뮬레이션 리포트", name=(user.name)) }}</h1>
     <p class="text-sm text-muted">{{ req.source_institution.name }} → {{ req.target_institution.name }}{% if req.major %} · {{ req.major }}{% endif %}{% if view.last_analyzed %} {{ _("· 최근 분석 {time}", time=(time(view.last_analyzed))) }}{% endif %}</p>
   </div>
+  <div class="flex flex-wrap items-center gap-2">
+  {% if view.empty %}
+  <form method="post" action="/student/requests/{{ req.id }}/delete" data-confirm="{{ _('서류를 올리지 않은 이 요청을 지울까요?') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn-secondary btn-sm">{{ _("빈 요청 지우기") }}</button>
+  </form>
+  {% endif %}
   {% if req.status == 'draft' %}<a href="#upload" class="btn-primary btn-sm"><svg class="size-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke-linecap="round"/></svg>{{ _("새 강의계획서 추가 업로드") }}</a>{% endif %}
+  </div>
 </header>
 
 {% set cr = (sim.credits_low | round(1)) ~ ('' if sim.credits_high == sim.credits_low else '~' ~ (sim.credits_high | round(1))) %}

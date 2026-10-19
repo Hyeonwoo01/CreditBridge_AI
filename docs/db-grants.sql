@@ -11,7 +11,7 @@ GRANT SELECT, INSERT, UPDATE         ON departments        TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON courses            TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON syllabi            TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON syllabus_chunks    TO creditbridge_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON transfer_requests  TO creditbridge_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON transfer_requests  TO creditbridge_app;  -- DELETE: 서류 없는 빈 초안만 (student.delete_empty_request)
 GRANT SELECT, INSERT, UPDATE, DELETE ON transcript_entries TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON course_evaluations TO creditbridge_app;
 GRANT SELECT, INSERT                 ON evidence_spans     TO creditbridge_app;

@@ -216,8 +216,9 @@ def test_source_institution_registration(client: TestClient, seeded: Session) ->
     seeded.expire_all()
     added = seeded.scalars(select(Institution).where(Institution.name == "Seoul Tech (서울공대)")).one()
     assert added.country == "KR" and not added.is_target
-    login(client, "jiwon@student.example")
-    assert "Seoul Tech (서울공대)" in client.get("/student").text
+    # 등록한 출신 대학은 관리자가 학생 계정에 정할 때 고를 수 있다 (학생은 고르지 않는다)
+    jiwon = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
+    assert "Seoul Tech (서울공대)" in client.get(f"/admin/accounts/{jiwon.id}").text
 
 
 # ---------- 첫 기관·관리자 ----------

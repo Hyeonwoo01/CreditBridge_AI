@@ -33,7 +33,13 @@ DEMO_DATA = Path(__file__).parent / "demo_data"
 
 
 def _user(
-    session: Session, email: str, name: str, role: str, institution: Institution | None, department: str | None = None
+    session: Session,
+    email: str,
+    name: str,
+    role: str,
+    institution: Institution | None,
+    department: str | None = None,
+    source: Institution | None = None,
 ) -> User:
     user = session.scalars(select(User).where(User.email == email)).first()
     if user is None:
@@ -46,6 +52,7 @@ def _user(
             department_id=department_named(session, institution.id, department).id
             if institution and department
             else None,
+            source_institution_id=source.id if source else None,
         )
         session.add(user)
         session.flush()
@@ -102,8 +109,9 @@ def seed(session: Session) -> None:
         )
     session.flush()
 
-    # MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다
-    _user(session, "jiwon@student.example", "이지원", "student", msu)
+    # MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다. 출신 대학·편입 전공은 학교가 계정에 정해 둔다
+    cse = "Computer Science and Engineering"
+    _user(session, "jiwon@student.example", "이지원", "student", msu, cse, hankuk)
     _user(session, "rachel@msu.example", "Rachel Morgan", "evaluator", msu)
     _user(session, "admin@msu.example", "MSU Admin", "admin", msu)
     professors = {
@@ -119,7 +127,7 @@ def seed(session: Session) -> None:
     }
 
     # 작년에 다른 학생의 같은 선형대수 강의계획서가 직접 인정된 이력 (일관성 경보 시나리오, TS-05)
-    senior = _user(session, "senior@student.example", "선배 학생", "student", msu)
+    senior = _user(session, "senior@student.example", "선배 학생", "student", msu, cse, hankuk)
     retired = _user(session, "retired@msu.example", "Prof. Emeritus Hall", "professor", msu, "Retired")
     last_year = utcnow() - timedelta(days=365)
     past_request = TransferRequest(

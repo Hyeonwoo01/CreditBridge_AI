@@ -492,5 +492,31 @@ ALTER TABLE notifications ADD COLUMN pushed_at TIMESTAMP WITHOUT TIME ZONE;
 
 UPDATE alembic_version SET version_num='0002' WHERE alembic_version.version_num = '0001';
 
+-- Running upgrade 0002 -> 0003
+
+ALTER TABLE users ADD COLUMN source_institution_id BIGINT;
+
+ALTER TABLE users ADD CONSTRAINT fk_users_source_institution_id_institutions FOREIGN KEY(source_institution_id) REFERENCES institutions (id);
+
+UPDATE users AS u
+        SET source_institution_id = latest.source_institution_id
+        FROM (
+            SELECT DISTINCT ON (student_id) student_id, source_institution_id
+            FROM transfer_requests ORDER BY student_id, created_at DESC, id DESC
+        ) AS latest
+        WHERE u.id = latest.student_id AND u.role = 'student' AND u.source_institution_id IS NULL;
+
+UPDATE users AS u
+        SET department_id = d.id
+        FROM (
+            SELECT DISTINCT ON (student_id) student_id, major
+            FROM transfer_requests ORDER BY student_id, created_at DESC, id DESC
+        ) AS latest
+        JOIN departments AS d ON d.name = latest.major
+        WHERE u.id = latest.student_id AND u.role = 'student' AND u.department_id IS NULL
+          AND d.institution_id = u.institution_id;
+
+UPDATE alembic_version SET version_num='0003' WHERE alembic_version.version_num = '0002';
+
 COMMIT;
 

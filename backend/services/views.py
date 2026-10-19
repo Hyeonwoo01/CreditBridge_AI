@@ -38,6 +38,7 @@ from backend.repositories import users as user_repo
 from backend.schemas.extraction import SyllabusExtraction
 from backend.schemas.results import CandidateResult, EvaluationResult
 from backend.security.permissions import ensure_can_view_evaluation
+from backend.services import accounts as account_service
 from backend.services import appeals as appeal_service
 from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
@@ -215,6 +216,7 @@ class RequestView:
     processing: bool
     privacy: PrivacyRequest | None = None
     show: str = "all"  # 과목 목록 필터: all / approved / supplement / review
+    empty: bool = False  # 서류를 하나도 올리지 않은 초안 (지울 수 있음)
 
     @property
     def open_materials(self) -> int:
@@ -269,6 +271,7 @@ def request_view(
         processing,
         privacy_service.latest_for_request(session, request),
         show if show in ("all", "approved", "supplement", "review") else "all",
+        student_service.is_empty_draft(session, request),
     )
 
 
@@ -281,14 +284,15 @@ class RequestSummary:
     readiness: student_service.Readiness
     courses: int
     decided: int
+    empty: bool = False  # 서류를 하나도 올리지 않은 초안 (지울 수 있음)
 
 
 @dataclass
 class StudentHome:
     requests: list[TransferRequest]
-    sources: list[Institution]
     target: Institution | None  # 입학이 확정된 소속 대학
-    majors: list[str]
+    source: Institution | None  # 계정에 등록된 출신 대학 (관리자가 정함)
+    major: str | None  # 계정에 등록된 편입 전공
     summaries: list[RequestSummary] = field(default_factory=list)
     unread_results: int = 0  # 아직 열어 보지 않은 판정 결과 알림
 
@@ -313,13 +317,14 @@ def student_home(session: Session, student: User) -> StudentHome:
                 student_service.readiness(session, r),
                 len(rows),
                 sum(1 for row in rows if row.decision is not None),
+                student_service.is_empty_draft(session, r),
             )
         )
     return StudentHome(
         requests=requests,
-        sources=catalog_repo.source_institutions(session),
         target=target,
-        majors=catalog_repo.departments_of(session, target.id) if target else [],
+        source=student.source_institution,
+        major=student.department_name,
         summaries=summaries,
         unread_results=notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
     )
@@ -459,6 +464,7 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
         setup = overview.missing_reference + len(overview.departments_without_professor)
         privacy = privacy_service.pending_count(session, user)
         unassigned = review_service.unassigned_count(session, user)
+        accounts = account_service.attention_count(session, user)
         return {
             "/admin/data": [
                 (
@@ -471,6 +477,13 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
                         courses=overview.missing_reference,
                         departments=len(overview.departments_without_professor),
                     ),
+                )
+            ],
+            "/admin/accounts": [
+                (
+                    accounts,
+                    "todo",
+                    tr("확인이 필요한 계정 {accounts}개 (비밀번호 재발급·편입 정보 등록)", accounts=accounts),
                 )
             ],
             "/admin/assignments": [

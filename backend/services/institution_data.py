@@ -33,7 +33,8 @@ from backend.services.auth import RESET_AFTER, ensure_not_demo, hash_password, t
 
 logger = logging.getLogger(__name__)
 
-ACCOUNT_COLUMNS = ["email", "name", "role", "department"]
+# department: 교수·심사관은 소속 학과, 학생은 편입 전공. source_institution: 학생의 출신 대학(등록된 이름 그대로)
+ACCOUNT_COLUMNS = ["email", "name", "role", "department", "source_institution"]
 COURSE_COLUMNS = ["code", "title", "credits", "department", "level", "concepts"]
 ROLES = {
     "student": Role.STUDENT,
@@ -244,7 +245,7 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
     institution_id = ensure_admin(admin)
     departments = set(catalog_repo.departments_of(session, institution_id))
     result = AccountImport()
-    pending: list[tuple[str, str, Role, str | None]] = []
+    pending: list[tuple[str, str, Role, str | None, int | None]] = []
     seen: set[str] = set()
     for line_no, row in csv_import.read_rows(filename, data, ACCOUNT_COLUMNS, ACCOUNT_COLUMNS[:3], MAX_ACCOUNT_ROWS):
         problems = []
@@ -252,6 +253,8 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
         name = row.get("name", "")
         role = ROLES.get(row.get("role", "").lower()) or ROLES.get(row.get("role", ""))
         department = row.get("department", "") or None
+        source_name = row.get("source_institution", "")
+        source_id: int | None = None
         if not _EMAIL.match(email) or len(email) > 255:
             problems.append(tr("이메일 형식이 아님"))
         elif email in seen:
@@ -274,6 +277,28 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
                         department=department,
                     )
                 )
+        if role == Role.STUDENT:
+            # 학생의 department는 편입 전공: 과목이 있는 학과여야 후보 과목·배정이 맞는다
+            if department and departments and department not in departments:
+                problems.append(
+                    tr(
+                        "과목 목록에 없는 편입 전공({department}). 과목 CSV의 학과명과 똑같이 써 주세요",
+                        department=department,
+                    )
+                )
+            if source_name:
+                source = catalog_repo.source_institution_by_name(session, source_name)
+                if source is None:
+                    problems.append(
+                        tr(
+                            "등록되지 않은 출신 대학({source}). ④ 출신 대학에 먼저 등록해 주세요",
+                            source=source_name,
+                        )
+                    )
+                else:
+                    source_id = source.id
+        elif source_name:
+            problems.append(tr("출신 대학은 학생 계정에만 적어요"))
         if not problems:
             existing = user_repo.get_by_email(session, email)
             if existing is not None and existing.institution_id != institution_id:
@@ -286,12 +311,12 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
         if problems or role is None:
             result.errors.append(tr("{line_no}행: {problems}", line_no=line_no, problems=", ".join(problems)))
             continue
-        pending.append((email, name, role, department))
+        pending.append((email, name, role, department, source_id))
     if result.errors:
         return result
     if not pending and not result.skipped:
         raise CreditBridgeError(tr("가져올 행이 없어요."))
-    for email, name, role, department in pending:
+    for email, name, role, department, source_id in pending:
         password = "" if by_email else temporary_password()
         created = user_repo.add(
             session,
@@ -301,6 +326,7 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
                 role=role,
                 institution_id=institution_id,
                 department_id=department_named(session, institution_id, department).id if department else None,
+                source_institution_id=source_id,
                 password_hash=unusable_password() if by_email else hash_password(password),
                 must_change_password=True,
             ),

@@ -46,7 +46,7 @@
   <div class="card grid content-start gap-1 p-5">
     <span class="text-sm text-muted">{{ _("출신 대학") }}</span>
     <span class="text-[28px] leading-none font-semibold tabular-nums">{{ o.source_institutions | length }}<span class="text-base font-normal text-muted"> {{ _("곳") }}</span></span>
-    <span class="text-xs text-muted">{{ _("학생이 편입 요청을 만들 때 고르는 목록") }}</span>
+    <span class="text-xs text-muted">{{ _("학생 계정에 정해 두는 출신 대학 목록") }}</span>
   </div>
 </section>
 
@@ -150,6 +150,7 @@
     <ul class="list-disc pl-5 text-sm text-muted">
       <li>{{ _("role: student·evaluator·professor·admin (또는 학생·심사관·교수·관리자)") }}</li>
       <li>{{ _("교수는") }} <strong class="text-ink">department</strong>{{ _("가 필수예요. 과목 CSV의 학과명과 똑같이 적어야 그 학과 과목이 배정돼요.") }}</li>
+      <li>{{ _("학생은") }} <strong class="text-ink">department</strong>{{ _("에 편입 전공(과목 CSV의 학과명), ") }}<strong class="text-ink">source_institution</strong>{{ _("에 출신 대학(④에 등록된 이름)을 적어요. 학생은 이 두 값으로 편입 요청을 만들고 직접 고르지 않아요. 비우면 나중에 계정 목록에서 정할 수 있어요.") }}</li>
       <li>{{ _("비밀번호 열은 없어요.") }} {% if email_enabled %}{{ _("새 계정마다 본인 메일로") }} <strong class="text-ink">{{ _("비밀번호 설정 링크") }}</strong>{{ _("(72시간 유효)를 자동으로 보내요") }}{% else %}{{ _("메일 발송이 설정되지 않아 새 계정마다 임시 비밀번호를 만들어 가져온 직후 한 번만 보여드려요") }}{% endif %}{{ _(". 이미 있는 이메일은 건너뛰어요.") }}</li>
     </ul>
     <a href="/static/samples/accounts.csv" download class="btn-text w-fit text-sm">{{ _("예시 파일 받기") }}</a>
@@ -193,7 +194,7 @@
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
   <div class="grid gap-3">
     <h2 class="section-title">{{ _("④ 출신 대학") }}</h2>
-    <p class="text-sm text-muted">{{ _("학생이 편입 요청을 만들 때 고르는 대학 목록이에요. 기존 동등 과목표 CSV의 출신 대학 이름도 여기 등록된 이름과 똑같아야 해요.") }}</p>
+    <p class="text-sm text-muted">{{ _("학생 계정에 정해 두는 출신 대학 목록이에요(계정 CSV의 source_institution, 계정 수정). 계정 CSV와 기존 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 해요.") }}</p>
     <ul class="card grid gap-0 p-0 text-sm">
       {% for i in o.source_institutions %}<li class="flex justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0"><span>{{ i.name }}</span><span class="font-mono text-xs text-muted">{{ i.country }}</span></li>
       {% else %}<li class="px-5 py-6 text-center text-muted">{{ _("아직 등록된 출신 대학이 없어요.") }}</li>{% endfor %}

@@ -1,7 +1,8 @@
 """공개 데모용 예시 시나리오 (DEMO_MODE=true에서만). 실행: uv run python -m scripts.demo_scenario
 
 데모 카탈로그·계정(scripts.seed_demo)을 넣은 뒤, 화면을 실제로 눌러 진행한 것처럼 앱 경로를 차례로 부른다.
-- 학생 이지원: 심사 요청 1건(미적분·선형대수(자료 부족)·자료구조·일반물리·한국사) + 사전 시뮬레이션 초안 1건
+- 학생 이지원(출신 대학·편입 전공은 계정에 정해 둠): 심사 요청 1건(미적분·선형대수(자료 부족)·자료구조·일반물리·한국사)
+  + 사전 시뮬레이션 초안 1건
 - 심사관: 학과 교수 일괄 배정, 정보가 부족한 선형대수에 보완 자료 요청
 - 교수: 미적분 승인, 자료구조는 선택 인정으로 수정 → 학생이 자료구조 판정에 이의 신청
 - 일반물리는 Mike Brown 교수(데모 교수 계정)가 판정할 차례로, 한국사는 대응 과목이 없어 미배정으로 남는다
@@ -17,7 +18,7 @@ from sqlalchemy import select
 
 from backend.config import get_settings
 from backend.db.session import SessionLocal
-from backend.models import Assignment, CourseEvaluation, Institution, Syllabus, TransferRequest, User
+from backend.models import Assignment, CourseEvaluation, Syllabus, TransferRequest, User
 from scripts.seed_demo import seed
 
 DEMO = Path(__file__).parent / "demo_data"
@@ -45,12 +46,9 @@ def _ok(response_status: int, step: str) -> None:
         raise RuntimeError(f"demo step failed ({response_status}): {step}")
 
 
-def _request(client: TestClient, token: str, source_id: int, major: str, files: list[str], submit: bool) -> int:
-    r = client.post(
-        "/student/requests",
-        data={"source_institution_id": source_id, "major": major, "csrf_token": token},
-        follow_redirects=False,
-    )
+def _request(client: TestClient, token: str, files: list[str], submit: bool) -> int:
+    # 출신 대학·편입 전공은 계정에 정해진 값(Hankuk University, Computer Science and Engineering)을 쓴다
+    r = client.post("/student/requests", data={"csrf_token": token}, follow_redirects=False)
     _ok(r.status_code, "create request")
     rid = int(r.headers["location"].rsplit("/", 1)[-1])
     uploads = [("files", (f"{name}.pdf", (DEMO / f"{name}.pdf").read_bytes(), "application/pdf")) for name in files]
@@ -93,17 +91,14 @@ def run() -> None:
         if session.scalars(select(TransferRequest).where(TransferRequest.student_id == jiwon)).first() is not None:
             print("demo scenario already exists")
             return
-        source_id = session.scalars(select(Institution.id).where(Institution.is_target.is_(False))).one()
 
     from backend.main import app
 
     with TestClient(app) as client:
         token = _login(client, "jiwon@student.example")
         courses = ["calculus", "linear_algebra_sparse", "data_structures", "general_physics", "korean_history"]
-        rid = _request(client, token, source_id, "Computer Science and Engineering", courses, submit=True)
-        _request(
-            client, token, source_id, "Mathematics", ["linear_algebra_detailed", "general_chemistry"], submit=False
-        )
+        rid = _request(client, token, courses, submit=True)
+        _request(client, token, ["linear_algebra_detailed", "general_chemistry"], submit=False)
         calc, sparse, ds = (_latest(rid, f"{n}.pdf") for n in ("calculus", "linear_algebra_sparse", "data_structures"))
         physics = _latest(rid, "general_physics.pdf")
 

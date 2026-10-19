@@ -39,15 +39,36 @@ def index(request: Request, user: User = Student, session: Session = Depends(get
 @router.post("/requests")
 def create_request(
     request: Request,
-    source_institution_id: int = Form(...),
-    major: str = Form(...),
     csrf_token: str = Form(""),
     user: User = Student,
     session: Session = Depends(get_db),
 ) -> Response:
+    """새 편입 요청. 출신 대학·편입 전공은 계정에 등록된 값을 쓴다."""
     check_csrf(request, csrf_token)
-    created = student_service.create_request(session, user, source_institution_id, major)
+    created, is_new = student_service.create_request(session, user)
+    if not is_new:
+        flash(request, tr("아직 서류를 올리지 않은 요청이 있어 그 요청을 열었어요. 여기에 서류를 올려 주세요."))
     return RedirectResponse(f"/student/requests/{created.id}", status_code=303)
+
+
+@router.post("/requests/{request_id}/delete")
+def delete_request(
+    request: Request,
+    request_id: int,
+    csrf_token: str = Form(""),
+    user: User = Student,
+    session: Session = Depends(get_db),
+) -> Response:
+    """서류를 하나도 올리지 않은 빈 초안 지우기."""
+    check_csrf(request, csrf_token)
+    try:
+        student_service.delete_empty_request(session, user, request_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
+    flash(request, tr("빈 편입 요청을 지웠어요."))
+    return RedirectResponse("/student", status_code=303)
 
 
 @router.get("/requests/{request_id}")

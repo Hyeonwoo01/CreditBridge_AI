@@ -3,7 +3,7 @@
 {% block crumb %}{{ _("관리자 콘솔 · 계정 목록 · 계정 수정") }}{% endblock %}
 {% block content %}
 {% set role_names = {"student": _("학생"), "evaluator": _("심사관"), "professor": _("교수"), "admin": _("관리자")} %}
-{% set states = {"active": (_("활성"), "badge-approve"), "pending": (_("첫 비밀번호 변경 대기"), "badge"), "locked": (_("로그인 실패로 초기화"), "badge-reject"), "inactive": (_("비활성"), "badge")} %}
+{% set states = {"active": (_("활성"), "badge-approve"), "pending": (_("첫 비밀번호 변경 대기"), "badge"), "locked": (_("로그인 실패로 초기화"), "badge-reject"), "incomplete": (_("편입 정보 없음"), "badge-elective"), "inactive": (_("비활성"), "badge")} %}
 {% set u = form.user %}{% set st = states[form.row.state] %}
 <a href="/admin/accounts" class="btn-text text-sm">‹ {{ _("계정 목록") }}</a>
 <header class="mt-2 grid gap-2">
@@ -35,6 +35,25 @@
     </label>
     <p class="text-xs text-muted">{{ _("교수가 부재 기간을 설정하면 진행 중인 심사가 대리 심사자에게 넘어가요. 교수 본인도 배정된 심사 화면에서 바꿀 수 있어요.") }}</p>
     {% endif %}
+    <button class="btn-primary w-fit">{{ _("저장") }}</button>
+  </form>
+  {% elif u.role == 'student' %}
+  <form method="post" action="/admin/accounts/{{ u.id }}" class="card grid content-start gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h2 class="font-semibold">{{ _("편입 정보") }}</h2>
+    <label class="field"><span>{{ _("출신 대학") }}</span>
+      <select name="source_institution_id" class="input h-11">
+        <option value="">{{ _("없음") }}</option>
+        {% for i in form.sources %}<option value="{{ i.id }}" {% if i.id == u.source_institution_id %}selected{% endif %}>{{ i.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>{{ _("편입 전공") }}</span>
+      <select name="department_id" class="input h-11">
+        <option value="">{{ _("없음") }}</option>
+        {% for d in form.departments %}<option value="{{ d.id }}" {% if d.id == u.department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <p class="text-xs text-muted">{{ _("학생은 이 두 값으로 편입 요청을 만들고 직접 바꾸지 않아요. 둘 중 하나라도 없으면 새 요청을 만들 수 없어요. 바꿔도 이미 만든 요청은 그때 값이 남아요. 학생 이름은 여기서 보거나 고치지 않아요.") }}</p>
     <button class="btn-primary w-fit">{{ _("저장") }}</button>
   </form>
   {% else %}

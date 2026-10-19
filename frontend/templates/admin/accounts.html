@@ -3,7 +3,7 @@
 {% block crumb %}{{ _("관리자 콘솔 · 계정 목록") }}{% endblock %}
 {% block content %}
 {% set role_names = {"student": _("학생"), "evaluator": _("심사관"), "professor": _("교수"), "admin": _("관리자")} %}
-{% set states = {"active": (_("활성"), "badge-approve"), "pending": (_("첫 비밀번호 변경 대기"), "badge"), "locked": (_("로그인 실패로 초기화"), "badge-reject"), "inactive": (_("비활성"), "badge")} %}
+{% set states = {"active": (_("활성"), "badge-approve"), "pending": (_("첫 비밀번호 변경 대기"), "badge"), "locked": (_("로그인 실패로 초기화"), "badge-reject"), "incomplete": (_("편입 정보 없음"), "badge-elective"), "inactive": (_("비활성"), "badge")} %}
 {% macro qlink(p=1, status=view.status) -%}?q={{ view.query | urlencode }}&role={{ view.role }}&status={{ status }}&page={{ p }}{%- endmacro %}
 <header class="grid gap-1">
   <h1 class="page-title">{{ _("계정 목록") }}</h1>
@@ -23,7 +23,7 @@
 </form>
 
 <nav class="mt-4 flex flex-wrap gap-2" aria-label="{{ _('계정 상태') }}">
-  {% for key, label in [('active', _('활성')), ('inactive', _('비활성')), ('all', _('전체'))] %}
+  {% for key, label in [('active', _('활성')), ('attention', _('확인 필요')), ('inactive', _('비활성')), ('all', _('전체'))] %}
   <a href="{{ qlink(status=key) }}" class="inline-flex min-h-9 items-center rounded-full border px-3.5 text-sm {{ 'border-ink bg-ink text-white' if view.status == key else 'border-hairline bg-white text-ink-80' }}" {% if view.status == key %}aria-current="page"{% endif %}>{{ label }}</a>
   {% endfor %}
 </nav>

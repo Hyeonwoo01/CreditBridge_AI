@@ -8,23 +8,19 @@ from backend.models import (
     Course,
     CourseEvaluation,
     EvidenceSpan,
-    Institution,
     Syllabus,
     TranscriptEntry,
     TransferRequest,
+    User,
 )
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import demo_pdf, demo_text, login
 from tests.fakes import FABRICATED_QUOTE, FakeLLM, FakeStorage
 
 
-def new_request(client: TestClient, db: Session, token: str, major: str = "Computer Science and Engineering") -> int:
-    src = db.scalars(select(Institution).where(Institution.is_target.is_(False))).one()
-    r = client.post(
-        "/student/requests",
-        data={"source_institution_id": src.id, "major": major, "csrf_token": token},
-        follow_redirects=False,
-    )
+def new_request(client: TestClient, db: Session, token: str) -> int:
+    """출신 대학·편입 전공은 계정에 정해진 값으로 (데모 학생: Hankuk University, Computer Science and Engineering)."""
+    r = client.post("/student/requests", data={"csrf_token": token}, follow_redirects=False)
     assert r.status_code == 303, r.text
     return int(r.headers["location"].rsplit("/", 1)[-1])
 
@@ -256,17 +252,63 @@ def test_transcript_is_masked_before_llm_and_linked(client: TestClient, seeded: 
     assert "확인 필요" in page and "성적 A" in page
 
 
-def test_request_needs_affiliated_student_and_valid_major(client: TestClient, seeded: Session) -> None:
+def test_request_uses_source_and_major_from_account(client: TestClient, seeded: Session) -> None:
     token = login(client, "jiwon@student.example")
-    src = seeded.scalars(select(Institution).where(Institution.is_target.is_(False))).one()
+    home = client.get("/student").text
+    assert "Hankuk University" in home and 'name="major"' not in home and 'name="source_institution_id"' not in home
+    # 폼에 다른 값을 넣어 보내도 계정 값을 쓴다
     r = client.post(
-        "/student/requests", data={"source_institution_id": src.id, "major": "Astrology", "csrf_token": token}
+        "/student/requests",
+        data={"source_institution_id": 999, "major": "Astrology", "csrf_token": token},
+        follow_redirects=False,
     )
-    assert r.status_code == 400 and "전공" in r.text
-    rid = new_request(client, seeded, token, major="Mathematics")
+    rid = int(r.headers["location"].rsplit("/", 1)[-1])
     request = seeded.get(TransferRequest, rid)
-    assert request is not None and request.major == "Mathematics"
+    assert request is not None and request.major == "Computer Science and Engineering"
+    assert request.source_institution.name.startswith("Hankuk University")
     assert request.target_institution.name == "Midwest State University"  # 소속 대학이 대상 대학
+
+    # 계정 정보를 바꿔도 이미 만든 요청은 그때 값이 남는다
+    student = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
+    student.department_id = None
+    seeded.commit()
+    home = client.get("/student").text
+    assert "학사처(기관 관리자)에 등록을 요청해 주세요" in home and "새 요청 만들기" not in home
+    r = client.post("/student/requests", data={"csrf_token": token})
+    assert r.status_code == 400 and "출신 대학·편입 전공" in r.text
+    seeded.expire_all()
+    request = seeded.get(TransferRequest, rid)
+    assert request is not None and request.major == "Computer Science and Engineering"
+
+
+def test_empty_draft_is_reused_and_can_be_deleted(client: TestClient, seeded: Session) -> None:
+    token = login(client, "jiwon@student.example")
+    first = new_request(client, seeded, token)
+    # 서류 없이 또 누르면 새로 만들지 않고 그 요청을 연다
+    r = client.post("/student/requests", data={"csrf_token": token})
+    assert r.url.path == f"/student/requests/{first}" and "그 요청을 열었어요" in r.text
+    assert "빈 요청 지우기" in r.text
+    student = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
+    assert len(seeded.scalars(select(TransferRequest).where(TransferRequest.student_id == student.id)).all()) == 1
+
+    # 서류를 올린 요청은 지울 수 없고, 다음 요청은 새로 만든다
+    upload(client, first, token, "calculus.txt")
+    r = client.post(f"/student/requests/{first}/delete", data={"csrf_token": token})
+    assert "지울 수 없어요" in r.text and seeded.get(TransferRequest, first) is not None
+    second = new_request(client, seeded, token)
+    assert second != first
+    page = client.get("/student").text
+    assert page.count("빈 요청 지우기") == 1
+    r = client.post(f"/student/requests/{second}/delete", data={"csrf_token": token})
+    assert r.url.path == "/student" and "빈 편입 요청을 지웠어요" in r.text
+    seeded.expire_all()
+    assert seeded.get(TransferRequest, second) is None
+
+    # 다른 학생의 요청은 지울 수 없다
+    third = new_request(client, seeded, token)
+    other = login(client, "senior@student.example")
+    assert client.post(f"/student/requests/{third}/delete", data={"csrf_token": other}).status_code == 403
+    assert seeded.get(TransferRequest, third) is not None
 
 
 def test_request_page_shows_simulation_and_stage(client: TestClient, seeded: Session) -> None:

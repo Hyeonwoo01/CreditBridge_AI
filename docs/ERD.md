@@ -2,7 +2,7 @@
 
 [API 명세서](API_Spec.md)가 읽고 쓰는 데이터를 [기획 통합본](spec.md) 4장 기능 명세(FR-01~FR-27)에 맞춰 엔티티·속성·관계로 정리했다. 마지막 절에 구조 검토 결과가 있다.
 
-- 기준: 2026-10-19 main, Alembic 0001(PostgreSQL 기준점 — MariaDB 시절 0001~0011을 하나로 합침)~0002(웹 푸시). 실행 가능한 스키마는 `db/init.sql`, 초기 데이터는 `db/data.sql`(둘 다 `scripts/export_db_sql.sh`로 생성). 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
+- 기준: 2026-10-19 main, Alembic 0001(PostgreSQL 기준점 — MariaDB 시절 0001~0011을 하나로 합침)~0003(0002 웹 푸시, 0003 학생 출신 대학). 실행 가능한 스키마는 `db/init.sql`, 초기 데이터는 `db/data.sql`(둘 다 `scripts/export_db_sql.sh`로 생성). 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
@@ -40,6 +40,7 @@
 ```mermaid
 erDiagram
     institutions ||--o{ users : "소속"
+    institutions ||--o{ users : "학생 출신 대학"
     institutions ||--o{ departments : "학과"
     departments ||--o{ courses : "개설 학과"
     departments |o--o{ users : "소속 교수"
@@ -98,6 +99,7 @@ erDiagram
         varchar role
         bigint institution_id FK
         bigint department_id FK
+        bigint source_institution_id FK
         bigint delegate_user_id FK
         date away_until
         boolean is_active
@@ -294,7 +296,8 @@ erDiagram
 | name | VARCHAR(100) | NN | 이름 |
 | role | VARCHAR(20) | NN, IX | student · evaluator · professor · admin (FR-12) |
 | institution_id | BIGINT | FK→institutions, null | 소속 기관 |
-| department_id | BIGINT | FK→departments, IX, null | 교수의 학과 (과목과 같은 학과 행이어야 자동 배정, FR-18). 심사관은 선택, 학생·관리자는 비움 |
+| department_id | BIGINT | FK→departments, IX, null | 교수의 학과 (과목과 같은 학과 행이어야 자동 배정, FR-18). 심사관은 선택, 관리자는 비움. 학생은 편입 전공(관리자가 정함, 편입 요청의 `major`로 복사) |
+| source_institution_id | BIGINT | FK→institutions, null | 학생의 출신(전적) 대학. 관리자가 계정 CSV·계정 수정에서 정하고 학생은 바꾸지 않는다. 교직원은 비움 (Alembic 0003, 기존 학생은 최근 요청 값으로 채움) |
 | delegate_user_id | BIGINT | FK→users, null | 부재 시 대리 심사자 (FR-19) |
 | away_until | DATE | null | 부재 종료일 (FR-19) |
 | must_change_password | BOOLEAN | NN | 임시 비밀번호 → 첫 로그인 때 변경 |
@@ -324,9 +327,9 @@ erDiagram
 | 속성 | 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
 | student_id | BIGINT | FK→users, NN, IX | 학생 |
-| source_institution_id | BIGINT | FK→institutions, NN | 출신 대학 |
+| source_institution_id | BIGINT | FK→institutions, NN | 출신 대학 (만들 때 학생 계정의 값을 복사 — 나중에 계정이 바뀌어도 그대로) |
 | target_institution_id | BIGINT | FK→institutions, NN, IX | 대상 대학 |
-| major | VARCHAR(100) | NN | 편입 전공 |
+| major | VARCHAR(100) | NN | 편입 전공 (만들 때 학생 계정의 학과명을 복사) |
 | status | VARCHAR(20) | NN, IX | draft(사전 시뮬레이션) · submitted · decided (FR-21) |
 | submitted_at | TIMESTAMP | null | 학사처에 심사 요청한 시각 |
 | transcript_file_key | VARCHAR(255) | null | 성적표 원본 파일 키 (삭제 승인 후 null) |

@@ -283,7 +283,7 @@ def test_role_based_access(client: TestClient, seeded: Session) -> None:
 
 def test_csrf_required(client: TestClient, seeded: Session) -> None:
     login(client, "jiwon@student.example")
-    r = client.post("/student/requests", data={"source_institution_id": 1, "major": "Mathematics", "csrf_token": "bad"})
+    r = client.post("/student/requests", data={"csrf_token": "bad"})
     assert r.status_code == 403
 
 

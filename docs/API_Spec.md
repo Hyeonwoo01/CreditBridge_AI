@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 77개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 78개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -15,11 +15,11 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- |
 | 화면 조회 | `GET` → HTML | 28 | 화면 하나에 조회 API 하나. 화면에 보이는 데이터를 서버가 모아 HTML에 넣어 보낸다 (조회 함수는 5절) |
 | 이동 | `GET` → 303 | 2 | `GET /`(역할별 홈으로), `GET /student/syllabi/{id}`(최신 분석으로) |
-| 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 35 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
+| 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 36 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
 | 파일 내려받기 | `GET` → PDF·CSV·원본 파일·스크립트 | 5 | 리포트 PDF, 원본 강의계획서, 이의 신청 근거 자료, SIS CSV, 웹 푸시 서비스 워커(`/sw.js`) |
 | HTMX 조각 | `GET` → HTML 조각 | 2 | 알림 배지 숫자, 상단 보조 바 집계 칩 |
 | JSON API | `GET`/`POST` → JSON | 5 | 분석 결과 조회, 판정 저장, 학사정보시스템 연동(`/api/v1/...`), 웹 푸시 구독·해제 |
-| 합계 | | 77 | GET 39, POST 38 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
+| 합계 | | 78 | GET 39, POST 39 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
 
 ### 1.2 공통 규칙
 
@@ -69,7 +69,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | # | 메서드 | 경로 | 역할 | 입력 | 응답 | 화면 | FR |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S1 | GET | `/student` | 학생 | – | HTML | P02 | FR-15·21 |
-| S2 | POST | `/student/requests` | 학생 | `source_institution_id`, `major`, `csrf_token` | 303→`/student/requests/{id}` | P02 | FR-15 |
+| S2 | POST | `/student/requests` | 학생 | `csrf_token` (출신 대학·편입 전공은 계정 값, 폼으로 받지 않음) | 303→`/student/requests/{id}` (서류 없는 초안이 있으면 그 요청 + 플래시) / 400(계정에 출신 대학·편입 전공 없음) | P02 | FR-15 |
+| S2-1 | POST | `/student/requests/{id}/delete` | 학생(본인) | `csrf_token` | 303→`/student` / 303→S3 + 빨강 플래시(서류가 있거나 제출한 요청) | P02·P03 | FR-15 |
 | S3 | GET | `/student/requests/{id}` | 학생(본인) | `show`(all·approved·supplement·review), `tuition`, `degree` | HTML | P03 | FR-01·02·15·21 |
 | S4 | POST | `/student/requests/{id}/syllabi` | 학생(본인) | `files[]`(최대 30), `csrf_token` | 303→S3 | P03 | FR-01 |
 | S5 | POST | `/student/requests/{id}/transcript` | 학생(본인) | `file`, `csrf_token` | 303→S3 | P03 | FR-02·13 |

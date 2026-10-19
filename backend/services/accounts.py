@@ -1,7 +1,8 @@
 """기관 계정 목록·수정 (기관 관리자, 권한 매트릭스 "사용자·학과·대리자 설정").
 
 - 목록: 이메일로 찾고 역할·상태로 거른다. 교수·관리자 화면에는 학생 이름을 보여 주지 않으므로 학생 행은 이메일만.
-- 수정: 교직원 이름, 교수·심사관의 학과, 교수의 대리 심사자. 역할은 바꾸지 않는다(판정·요청 기록이 역할에 묶여 있어
+- 수정: 교직원 이름, 교수·심사관의 학과, 교수의 대리 심사자, 학생의 편입 전공·출신 대학(이름은 보지도 고치지도
+  않는다). 역할은 바꾸지 않는다(판정·요청 기록이 역할에 묶여 있어
   새 계정을 만든다). 학과는 과목에 있는 학과명만 고를 수 있다(철자가 다르면 자동 배정이 안 된다).
 - 진행 중인 배정은 그대로 둔다. 감사 로그에는 바뀐 항목 이름만 남기고 값(이름)은 남기지 않는다.
 """
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.errors import CreditBridgeError, NotFoundError
 from backend.i18n import gettext as tr
-from backend.models import Department, User
+from backend.models import Department, Institution, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import users as user_repo
@@ -21,7 +22,7 @@ from backend.services.auth import RESET_AFTER
 from backend.services.institution_data import ensure_admin
 
 PAGE_SIZE = 50
-STATUSES = ("active", "inactive", "all")
+STATUSES = ("active", "attention", "inactive", "all")
 STAFF = (Role.EVALUATOR, Role.PROFESSOR, Role.ADMIN)
 MAX_NAME = 100
 
@@ -37,11 +38,16 @@ class AccountRow:
 
     @property
     def state(self) -> str:
-        """inactive(비활성) / locked(로그인 실패로 초기화) / pending(첫 비밀번호 변경 대기) / active."""
+        """inactive(비활성) / locked(로그인 실패로 초기화) / incomplete(출신 대학·편입 전공이 빈 학생)
+        / pending(첫 비밀번호 변경 대기) / active."""
         if not self.user.is_active:
             return "inactive"
         if self.user.failed_logins >= RESET_AFTER:
             return "locked"
+        if self.user.role == Role.STUDENT and (
+            self.user.source_institution_id is None or self.user.department_id is None
+        ):
+            return "incomplete"
         if self.user.must_change_password:
             return "pending"
         return "active"
@@ -74,9 +80,16 @@ def list_accounts(session: Session, admin: User, query: str, role: str, status: 
     role = role if role in {r.value for r in Role} else ""
     status = status if status in STATUSES else "active"
     query = query.strip()
-    active = None if status == "all" else status == "active"
+    active = None if status in ("all", "attention") else status == "active"
     users, total = user_repo.search(
-        session, institution_id, query, role or None, active, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE
+        session,
+        institution_id,
+        query,
+        role or None,
+        active,
+        limit=PAGE_SIZE,
+        offset=(page - 1) * PAGE_SIZE,
+        attention_threshold=RESET_AFTER if status == "attention" else None,
     )
     delegates = user_repo.by_ids(session, [u.delegate_user_id for u in users if u.delegate_user_id])
     rows = [AccountRow(u, delegates.get(u.delegate_user_id) if u.delegate_user_id else None) for u in users]
@@ -88,6 +101,7 @@ class AccountForm:
     row: AccountRow
     departments: list[Department]  # 과목이 있는 학과 (+ 지금 학과가 목록에 없으면 그 학과)
     delegate_options: list[User]  # 같은 기관의 다른 활성 교수 (학과별로 정렬)
+    sources: list[Institution]  # 학생 출신 대학으로 고를 수 있는 등록된 출신 대학
 
     @property
     def user(self) -> User:
@@ -102,6 +116,11 @@ def _load(session: Session, admin: User, user_id: int) -> tuple[int, User]:
     return institution_id, user
 
 
+def attention_count(session: Session, admin: User) -> int:
+    """관리자 메뉴 '계정 목록' 배지: 비밀번호를 다시 발급해야 하는 계정 + 출신 대학·편입 전공이 빈 학생."""
+    return user_repo.attention_count(session, ensure_admin(admin), RESET_AFTER)
+
+
 def account_form(session: Session, admin: User, user_id: int) -> AccountForm:
     institution_id, user = _load(session, admin, user_id)
     departments = catalog_repo.course_departments(session, institution_id)
@@ -109,13 +128,21 @@ def account_form(session: Session, admin: User, user_id: int) -> AccountForm:
         departments = [user.dept, *departments]
     delegate = user_repo.get_by_id(session, user.delegate_user_id) if user.delegate_user_id else None
     options = [p for p in user_repo.professors_of(session, institution_id) if p.id != user.id]
-    return AccountForm(AccountRow(user, delegate), departments, options)
+    sources = catalog_repo.source_institutions(session) if user.role == Role.STUDENT else []
+    return AccountForm(AccountRow(user, delegate), departments, options, sources)
 
 
 def update_account(
-    session: Session, admin: User, user_id: int, name: str, department_id: int | None, delegate_id: int | None
+    session: Session,
+    admin: User,
+    user_id: int,
+    name: str,
+    department_id: int | None,
+    delegate_id: int | None,
+    source_institution_id: int | None = None,
 ) -> list[str]:
-    """교직원 이름·학과·대리 심사자를 고친다. 바뀐 항목 이름을 돌려준다 (없으면 빈 목록)."""
+    """교직원 이름·학과·대리 심사자, 학생 편입 전공·출신 대학을 고친다. 바뀐 항목 이름을 돌려준다 (없으면 빈 목록).
+    학생 정보를 바꿔도 이미 만든 편입 요청은 그때의 값을 그대로 둔다."""
     institution_id, user = _load(session, admin, user_id)
     changed: list[str] = []
 
@@ -142,6 +169,26 @@ def update_account(
         if department_id != user.department_id:
             user.department_id = department_id
             changed.append("department")
+
+    if user.role == Role.STUDENT:
+        department_id = department_id or None
+        if (
+            department_id is not None
+            and department_id != user.department_id
+            and department_id not in {d.id for d in catalog_repo.course_departments(session, institution_id)}
+        ):
+            raise CreditBridgeError(tr("과목에 있는 학과 이름을 편입 전공으로 골라 주세요."))
+        if department_id != user.department_id:
+            user.department_id = department_id
+            changed.append("major")
+        source_institution_id = source_institution_id or None
+        if source_institution_id is not None and source_institution_id != user.source_institution_id:
+            source = catalog_repo.get_institution(session, source_institution_id)
+            if source is None or source.is_target:
+                raise CreditBridgeError(tr("등록된 출신 대학을 골라 주세요."))
+        if source_institution_id != user.source_institution_id:
+            user.source_institution_id = source_institution_id
+            changed.append("source_institution")
 
     if user.role == Role.PROFESSOR:
         if delegate_id:

@@ -23,6 +23,12 @@ def add(session: Session, request: TransferRequest) -> TransferRequest:
     return request
 
 
+def delete(session: Session, request: TransferRequest) -> None:
+    """서류가 하나도 없는 초안만 지운다 (호출하는 서비스가 확인). 딸린 행이 없어 이 행만 지우면 된다."""
+    session.delete(request)
+    session.flush()
+
+
 def transcript_entries(session: Session, request_id: int) -> list[TranscriptEntry]:
     stmt = select(TranscriptEntry).where(TranscriptEntry.transfer_request_id == request_id).order_by(TranscriptEntry.id)
     return list(session.scalars(stmt))

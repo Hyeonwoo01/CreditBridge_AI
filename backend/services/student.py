@@ -52,16 +52,32 @@ def get_own_request(session: Session, student: User, request_id: int) -> Transfe
     return request
 
 
-def create_request(session: Session, student: User, source_institution_id: int, major: str) -> TransferRequest:
-    """MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다. 대상 대학은 학생의 소속 대학으로 정해진다."""
+def is_empty_draft(session: Session, request: TransferRequest) -> bool:
+    """아직 아무 서류(성적표·강의계획서)도 올리지 않은 초안. 잘못 눌러 만든 요청은 이 상태로 남는다."""
+    return (
+        request.status == RequestStatus.DRAFT
+        and not request.transcript_file_key
+        and not syllabus_repo.of_request(session, request.id)
+    )
+
+
+def create_request(session: Session, student: User) -> tuple[TransferRequest, bool]:
+    """MVP의 학생은 입학이 확정되어 대상 대학에 소속된 학생이다. 편입 대학(소속 대학)·출신 대학·편입 전공은
+    학교가 계정을 만들 때 정한 값을 쓰고 학생이 고르지 않는다. 요청에는 그때의 값을 남긴다
+    (나중에 계정이 바뀌어도 보존). 빈 초안이 있으면 그 요청을 돌려준다: (요청, 새로 만들었는지)."""
     target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
     if target is None or not target.is_target:
         raise CreditBridgeError(tr("입학이 확정된 대학에 소속된 학생 계정만 편입 요청을 만들 수 있어요."))
-    source = catalog_repo.get_institution(session, source_institution_id)
-    if source is None or source.is_target:
-        raise CreditBridgeError(tr("다니던 대학을 다시 선택해 주세요."))
-    if major not in catalog_repo.departments_of(session, target.id):
-        raise CreditBridgeError(tr("편입 전공을 다시 선택해 주세요."))
+    source = student.source_institution
+    major = student.department_name
+    if source is None or source.is_target or not major:
+        raise CreditBridgeError(
+            tr("계정에 출신 대학·편입 전공이 아직 없어요. 학사처(기관 관리자)에 등록을 요청해 주세요.")
+        )
+    # 빈 초안이 이미 있으면 새로 만들지 않고 그 요청을 쓴다 (버튼을 잘못 눌러 빈 요청이 쌓이지 않게)
+    for existing in request_repo.of_student(session, student.id):
+        if is_empty_draft(session, existing):
+            return existing, False
     request = request_repo.add(
         session,
         TransferRequest(
@@ -70,7 +86,18 @@ def create_request(session: Session, student: User, source_institution_id: int, 
     )
     audit.record(session, student, "request.create", "transfer_request", str(request.id), target=target.id, major=major)
     session.commit()
-    return request
+    return request, True
+
+
+def delete_empty_request(session: Session, student: User, request_id: int) -> None:
+    """학생이 서류를 하나도 올리지 않은 초안을 지운다. 서류가 있거나 심사를 요청한 요청은 지우지 않는다
+    (문서 삭제는 개인정보 삭제 요청 절차로)."""
+    request = get_own_request(session, student, request_id)
+    if not is_empty_draft(session, request):
+        raise CreditBridgeError(tr("서류를 올렸거나 심사를 요청한 요청은 지울 수 없어요."))
+    request_repo.delete(session, request)
+    audit.record(session, student, "request.delete", "transfer_request", str(request_id))
+    session.commit()
 
 
 @dataclass(frozen=True)
