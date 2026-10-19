@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from backend.config import get_settings
 from backend.db.base import utcnow
 from backend.documents.storage import ObjectStorage
-from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.errors import CreditBridgeError, DuplicateRowError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import PrivacyRequest, TransferRequest, User
@@ -46,15 +46,18 @@ def request_deletion(session: Session, student: User, request: TransferRequest) 
     if latest is not None and latest.status != PrivacyStatus.COMPLETED:
         raise CreditBridgeError(tr("이미 처리 중인 삭제 요청이 있어요."))
     now = utcnow()
-    privacy = privacy_repo.add(
-        session,
-        PrivacyRequest(
-            transfer_request_id=request.id,
-            student_id=student.id,
-            created_at=now,
-            due_at=now + timedelta(days=get_settings().privacy_deletion_days),
-        ),
-    )
+    try:
+        privacy = privacy_repo.add(
+            session,
+            PrivacyRequest(
+                transfer_request_id=request.id,
+                student_id=student.id,
+                created_at=now,
+                due_at=now + timedelta(days=get_settings().privacy_deletion_days),
+            ),
+        )
+    except DuplicateRowError:
+        raise CreditBridgeError(tr("이미 처리 중인 삭제 요청이 있어요.")) from None
     notifications.notify(
         session,
         notifications.staff(session, request.target_institution_id, Role.EVALUATOR),

@@ -2,7 +2,7 @@
 
 [API 명세서](API_Spec.md)가 읽고 쓰는 데이터를 [기획 통합본](spec.md) 4장 기능 명세(FR-01~FR-27)에 맞춰 엔티티·속성·관계로 정리했다. 마지막 절에 구조 검토 결과가 있다.
 
-- 기준: 2026-10-19 main, Alembic 0001~0008. 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
+- 기준: 2026-10-19 main, Alembic 0001~0010. 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
 - DB: MariaDB 11.8, MySQL 8.0 호환 문법, utf8mb4. 시간은 모두 UTC `DATETIME(6)`. 기본키는 `id BIGINT UNSIGNED AUTO_INCREMENT`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
@@ -352,7 +352,8 @@ erDiagram
 | input_hash | VARCHAR(64) | IX, null | 프롬프트 버전·규칙 버전·모델·입력의 해시 (같으면 결과 재사용) |
 | prompt_version · model | VARCHAR(20) · VARCHAR(100) | null | evaluation-v2 등 |
 | error_message | VARCHAR(500) | null | 실패 사유 |
-| is_latest | BOOLEAN | NN, IX | 그 강의계획서의 최신 분석 |
+| is_latest | BOOLEAN | NN, IX | 그 강의계획서의 최신 분석 (`syllabus_id, is_latest` 복합 IX) |
+| latest_syllabus_id | BIGINT 생성 컬럼(STORED) | UQ | `IF(is_latest, syllabus_id, NULL)` — 강의계획서당 최신 분석 하나 (0010) |
 
 판정 확률(%) 컬럼은 두지 않는다 (MVP 규칙).
 
@@ -369,7 +370,8 @@ erDiagram
 | assigned_by | BIGINT | FK→users, null | 배정한 심사관 (자동 이어 붙이기는 null) |
 | assigned_at | DATETIME(6) | NN | 배정 시각 (판정 기한 계산 기준) |
 | reassigned_from | BIGINT | FK→users, null | 대리 재배정이면 원래 교수 (FR-19) |
-| is_active | BOOLEAN | NN | 현재 배정 |
+| is_active | BOOLEAN | NN | 현재 배정 (`course_evaluation_id, is_active`·`reviewer_id, is_active` 복합 IX) |
+| active_evaluation_id | BIGINT 생성 컬럼(STORED) | UQ | `IF(is_active, course_evaluation_id, NULL)` — 심사 건당 활성 배정 하나 (0010) |
 
 **decisions** — 추가 전용(INSERT만). 이의 신청 재판정도 새 행. 현재 판정은 그 심사 건의 가장 늦은 `decided_at`.
 
@@ -401,20 +403,21 @@ erDiagram
 | reason | TEXT | NN | 사유 20~3000자 |
 | status | VARCHAR(20) | NN, IX | submitted · accepted · dismissed · redecided |
 | handled_by · handled_at · handler_note | BIGINT FK · DATETIME · TEXT | null·null·NN | 처리한 심사관·시각·메모 (기각 시 필수) |
+| open_evaluation_id | BIGINT 생성 컬럼(STORED) | UQ | 접수·수용 상태일 때만 `course_evaluation_id` — 심사 건당 처리 중 이의 신청 하나 (0010) |
 
 **appeal_files** — `appeal_id` FK(IX), `file_key` VARCHAR(255) null, `original_filename` VARCHAR(255), `content_type` VARCHAR(100), `size` INT.
 
 **evaluation_notes** — `syllabus_id` FK(IX, 재분석해도 이어지게 강의계획서 단위), `course_evaluation_id` FK(쓴 분석 회차), `author_id` FK→users, `body` TEXT(1000자). 고치지 않고 새로 남기며 삭제 승인 때만 지운다.
 
-**equivalencies** — `target_institution_id` FK(IX), `source_institution_id` FK, `source_course_key` VARCHAR(100)(IX, 비교용 정규화 키), `source_course_label` VARCHAR(255), `target_course_id` FK→courses null, `result` VARCHAR(10), `decided_on` DATE null, `note` TEXT(기관 내부 메모, 학생에게 안 보임), `imported_by` FK→users.
+**equivalencies** — `target_institution_id` FK(`target_institution_id, source_institution_id, source_course_key` 복합 IX), `source_institution_id` FK, `source_course_key` VARCHAR(100)(IX, 비교용 정규화 키), `source_course_label` VARCHAR(255), `target_course_id` FK→courses null, `result` VARCHAR(10), `decided_on` DATE null, `note` TEXT(기관 내부 메모, 학생에게 안 보임), `imported_by` FK→users.
 
 ### 3.5 개인정보·운영
 
-**privacy_requests** — `transfer_request_id` FK(IX), `student_id` FK→users, `status` VARCHAR(20)(requested·reviewed·completed, IX), `due_at` DATETIME(처리 기한), `reviewed_by`·`reviewed_at`(심사관 처리), `approved_by`·`completed_at`(관리자 승인·삭제 완료).
+**privacy_requests** — `transfer_request_id` FK(IX), `student_id` FK→users, `status` VARCHAR(20)(requested·reviewed·completed, IX), `due_at` DATETIME(처리 기한), `reviewed_by`·`reviewed_at`(심사관 처리), `approved_by`·`completed_at`(관리자 승인·삭제 완료), `open_request_id`(생성 컬럼, 완료 전이면 `transfer_request_id`, UQ — 요청당 처리 중 삭제 요청 하나, 0010).
 
-**notifications** — `user_id` FK(IX), `kind` VARCHAR(30)(assignment.created 등), `message` VARCHAR(500)(한국어 원문, 화면·메일에서 받는 사람 언어로), `link` VARCHAR(255), `read_at` null, `emailed_at` null.
+**notifications** — `user_id` FK(`user_id, read_at` 복합 IX), `kind` VARCHAR(30)(assignment.created 등), `message` VARCHAR(500)(한국어 원문, 화면·메일에서 받는 사람 언어로), `link` VARCHAR(255), `read_at` null, `emailed_at` null.
 
-**audit_logs** — 추가 전용(INSERT만). `actor_id` FK→users null(IX, 시스템 행위는 null), `action` VARCHAR(50)(IX), `target_type` VARCHAR(50)·`target_id` VARCHAR(36)(대상, 외래키 없음), `payload_json` JSON(id·판정값만, 이름·학번·성적 없음).
+**audit_logs** — 추가 전용(INSERT만). `actor_id` FK→users null(시스템 행위는 null, `actor_id, action` 복합 IX), `action` VARCHAR(50)(IX), `target_type` VARCHAR(50)·`target_id` VARCHAR(36)(대상, 외래키 없음, `target_type, target_id` 복합 IX), `payload_json` JSON(id·판정값만, 이름·학번·성적 없음).
 
 ## 4. 관계
 
@@ -476,7 +479,8 @@ erDiagram
 | 추가 전용 | `decisions`, `audit_logs`는 INSERT만. 앱 DB 계정에 UPDATE·DELETE 권한을 주지 않는다 (`docs/db-grants.sql`). 판정을 바꾸면 새 행 |
 | 이력 보존 | `course_evaluations`(재분석), `assignments`(재배정), `evaluation_notes`는 고치지 않고 새 행 |
 | 지우지 않는 삭제 | 개인정보 삭제는 파일 키를 null로, 글을 비우고 상태를 deleted로. 판정·감사 기록이 가리키는 행은 남긴다. 계정은 비활성화 |
-| JSON 사용 | 구조 검증은 Pydantic, 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 (`course_code`, `recommendation`, `coverage` 등) |
+| DB 검사 (0009) | 상태·코드 컬럼은 허용 목록 CHECK(`ck_<테이블>_<컬럼>_valid`), 0~1 점수·근거 위치·학점·파일 크기는 범위 CHECK. 허용 목록은 `backend/models/enums.py`와 같고, 값을 늘리면 모델과 새 마이그레이션을 함께 고친다 |
+| JSON 사용 | MariaDB는 JSON 컬럼마다 `JSON_VALID` CHECK를 자동으로 붙이고 MySQL 8.0은 JSON 형식이 검사한다. 구조 검증은 Pydantic, 검색 조건에 쓰는 값은 JSON 밖 일반 컬럼으로 (`course_code`, `recommendation`, `coverage` 등) |
 | 결과 재사용 | `syllabi.content_hash`(같은 문서), `course_evaluations.input_hash`(같은 비교 입력)로 LLM 재호출을 막는다 |
 | 개인정보 | 이름은 `users.name`, 성적은 `transcript_entries`에만. 알림·감사 로그·AI 입력에는 넣지 않는다 (성적표는 가린 뒤 AI에) |
 | 다국어 | 저장하는 안내 글은 한국어 원문, 화면에서 번역. AI 설명은 `coverage_json`에 한국어·영어(`*_en`) 두 벌 |
@@ -497,9 +501,9 @@ erDiagram
 | # | 항목 | 내용 | 권장 |
 | --- | --- | --- | --- |
 | E1 | 학과가 글자 | `users.department`와 `courses.department`가 자유 글자다. 철자가 다르면 자동 배정이 안 된다 (화면이 "교수 없는 학과"로 경고만 함). 기능 명세 권한표의 "학과 설정"을 담을 곳도 없다 | `departments`(institution_id, name, UQ) 엔티티를 만들고 두 컬럼을 `department_id` FK로 |
-| E2 | JSON 유효성 검사 | `syllabi.extracted_json`에만 `JSON_VALID` CHECK가 있다. MariaDB의 JSON은 LONGTEXT라 나머지 JSON 컬럼(`courses.concepts`, `decisions.reason_codes`·`ai_recommendation_snapshot`, `course_evaluations.coverage_json`, `material_requests.items`, `audit_logs.payload_json`, `syllabi.page_offsets`·`injection_flags`)에는 잘못된 값이 들어갈 수 있다 (DB 규칙 위반) | 모든 JSON 컬럼에 `CHECK (col IS NULL OR JSON_VALID(col))` 추가 |
-| E3 | 상태·코드 값 검사 | `role`, `status`, `recommendation`, `result`, `action`, `side` 등이 VARCHAR이고 허용 값 검사가 앱에만 있다 | `CHECK (status IN (...))` 추가 (MySQL 8.0.16+, MariaDB 지원) |
-| E4 | 값 범위 검사 | `coverage`·`quality_score`·`link_score`(0~1), `evidence_spans.char_start < char_end`가 DB에서 검사되지 않는다 | CHECK 추가 |
+| E2 | JSON 유효성 검사 ✅ 문제 아님 (확인) | `syllabi.extracted_json`에만 `JSON_VALID` CHECK가 있다. MariaDB의 JSON은 LONGTEXT라 나머지 JSON 컬럼(`courses.concepts`, `decisions.reason_codes`·`ai_recommendation_snapshot`, `course_evaluations.coverage_json`, `material_requests.items`, `audit_logs.payload_json`, `syllabi.page_offsets`·`injection_flags`)에는 잘못된 값이 들어갈 수 있다 (DB 규칙 위반) | 다시 확인해 보니 MariaDB가 `JSON`으로 만든 컬럼마다 `CHECK (json_valid(col))`를 자동으로 붙인다(`SHOW CREATE TABLE`로 확인). MySQL 8.0은 JSON 형식 자체가 검사한다. 추가할 것 없음 |
+| E3 | 상태·코드 값 검사 ✅ 반영 (0009) | `role`, `status`, `recommendation`, `result`, `action`, `side` 등이 VARCHAR이고 허용 값 검사가 앱에만 있다 | `CHECK (status IN (...))` 추가 (MySQL 8.0.16+, MariaDB 지원) |
+| E4 | 값 범위 검사 ✅ 반영 (0009) | `coverage`·`quality_score`·`link_score`(0~1), `evidence_spans.char_start < char_end`가 DB에서 검사되지 않는다 | CHECK 추가 |
 | E5 | 사유 코드가 JSON 배열 | `decisions.reason_codes`라 "사유별 반려 건수" 같은 통계를 SQL로 못 내고 앱에서 센다 | 지금 규모에서는 그대로. 사유 통계가 필요해지면 `decision_reasons(decision_id, code)` |
 | E6 | `syllabi.institution_id`의 뜻이 둘 | 학생 강의계획서는 대상 대학, 기준 강의계획서는 과목의 대학이다. 출신 대학이 아니라서 헷갈린다 | 컬럼 설명을 문서에 고정하거나, 학생 것은 `transfer_request`에서 얻고 이 컬럼은 기준 강의계획서 전용으로 |
 
@@ -515,9 +519,9 @@ erDiagram
 
 | # | 항목 | 내용 | 권장 |
 | --- | --- | --- | --- |
-| R1 | "하나만" 규칙이 DB에 없다 | 심사 건당 활성 배정 1개, 처리 중 이의 신청 1개, 요청당 처리 중 삭제 요청 1개, 강의계획서당 `is_latest` 1개를 앱이 지킨다. 동시에 두 요청이 들어오면 둘 다 들어갈 수 있다 | MariaDB는 부분 유니크 인덱스가 없으므로 생성 컬럼으로 막는다. 예: `active_key = IF(is_active, course_evaluation_id, NULL)`에 UNIQUE |
+| R1 | "하나만" 규칙이 DB에 없다 ✅ 반영 (0010) | 심사 건당 활성 배정 1개, 처리 중 이의 신청 1개, 요청당 처리 중 삭제 요청 1개, 강의계획서당 `is_latest` 1개를 앱이 지킨다. 동시에 두 요청이 들어오면 둘 다 들어갈 수 있다 | MariaDB는 부분 유니크 인덱스가 없으므로 생성 컬럼으로 막는다. 예: `active_key = IF(is_active, course_evaluation_id, NULL)`에 UNIQUE |
 | R2 | 같은 값을 두 곳에 둔다 | `course_evaluations.transfer_request_id`(강의계획서에서 얻을 수 있음), `appeals.student_id`·`privacy_requests.student_id`(요청에서), `material_requests.syllabus_id`·`evaluation_notes.syllabus_id`(분석에서), `evidence_spans`(= `coverage_json`의 근거 위치) | 권한 검사·재분석 묶기·감사에 쓰려고 일부러 둔 것이다. 값이 어긋나지 않도록 만드는 곳을 서비스 한 곳으로 두고, 정합성 점검 쿼리를 테스트에 넣는다 |
-| R3 | 자주 쓰는 조회에 맞는 복합 인덱스가 없다 | `audit_logs(target_type, target_id)` — 심사 건 처리 기록·리포트가 매번 전체를 훑는다 · `notifications(user_id, read_at)` — 60초마다 안 읽은 수 · `assignments(course_evaluation_id, is_active)`, `assignments(reviewer_id, is_active)` · `course_evaluations(syllabus_id, is_latest)` · `equivalencies(target_institution_id, source_institution_id, source_course_key)` | Alembic 마이그레이션으로 추가. 특히 `audit_logs`는 계속 쌓이는 테이블이라 먼저 |
+| R3 | 자주 쓰는 조회에 맞는 복합 인덱스가 없다 ✅ 반영 (0009, 앞 컬럼이 같은 단일 인덱스는 지움) | `audit_logs(target_type, target_id)` — 심사 건 처리 기록·리포트가 매번 전체를 훑는다 · `notifications(user_id, read_at)` — 60초마다 안 읽은 수 · `assignments(course_evaluation_id, is_active)`, `assignments(reviewer_id, is_active)` · `course_evaluations(syllabus_id, is_latest)` · `equivalencies(target_institution_id, source_institution_id, source_course_key)` | Alembic 마이그레이션으로 추가. 특히 `audit_logs`는 계속 쌓이는 테이블이라 먼저 |
 | R4 | 감사 로그 대상에 외래키가 없다 | `audit_logs.target_type`·`target_id`는 여러 테이블을 가리키는 다형 참조라 FK가 없다 | 대상 행이 지워져도 기록이 남아야 하므로 의도한 설계. 그대로 둔다 |
 | R5 | 지울 때 동작 | `syllabus_chunks`만 CASCADE, 나머지는 기본(RESTRICT). 앱은 행을 지우지 않고 키를 비우는 방식이라 맞다 | 그대로. 운영자가 SQL로 직접 지우지 않도록 `db-grants.sql`을 유지 |
 
@@ -528,4 +532,4 @@ erDiagram
 3. **R1 "하나만" 유니크** — 동시 요청 대비.
 4. **E1 학과 엔티티** — 관리자 계정 수정 API(API_Spec 6.3)와 함께.
 
-위 항목은 아직 반영하지 않았다. 바꾸려면 모델과 Alembic 마이그레이션을 함께 고친다.
+1~3은 반영했다 (2026-10-19, Alembic 0009·0010, 테스트 `tests/integration/test_db_rules.py`). 동시에 들어온 두 번째 이의 신청·삭제 요청은 DB 유니크에 걸리면 "이미 처리 중" 안내로 바꿔 보여 준다(`DuplicateRowError`). E1 학과 엔티티는 아직이다.

@@ -1,12 +1,20 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.errors import DuplicateRowError, is_duplicate
 from backend.models import Appeal, AppealFile, CourseEvaluation, Syllabus, TransferRequest
 
 
 def add(session: Session, appeal: Appeal) -> Appeal:
-    session.add(appeal)
-    session.flush()
+    """처리 중인 건이 이미 있으면 DuplicateRowError (앱 검사 뒤 동시 요청은 DB 유니크가 막는다)."""
+    try:
+        with session.begin_nested():
+            session.add(appeal)
+    except IntegrityError as exc:
+        if is_duplicate(exc):
+            raise DuplicateRowError from exc
+        raise
     return appeal
 
 

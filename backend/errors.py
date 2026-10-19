@@ -21,6 +21,16 @@ class DecisionValidationError(CreditBridgeError):
     pass
 
 
+class DuplicateRowError(Exception):
+    """DB 유니크 규칙에 걸려 행을 넣지 못함 (동시에 같은 요청이 들어온 경우). 서비스가 업무 오류로 바꿔 보여 준다."""
+
+
+def is_duplicate(exc: Exception) -> bool:
+    """IntegrityError가 유니크 키 중복(MySQL·MariaDB 1062)인지."""
+    orig = getattr(exc, "orig", None)
+    return bool(orig is not None and orig.args and orig.args[0] == 1062)
+
+
 class LLMError(Exception):
     """LLM 호출 실패 또는 출력 검증 실패."""
 

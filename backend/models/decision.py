@@ -1,16 +1,21 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.db.base import Base, IdMixin, IdType, utcnow
+from backend.db.base import Base, IdMixin, IdType, one_of, utcnow
+from backend.models.enums import DecisionAction, DecisionResult
 
 
 class Decision(IdMixin, Base):
     """사람의 최종 판정. 추가 전용(INSERT만) — 수정·삭제 코드를 작성하지 않는다."""
 
     __tablename__ = "decisions"
+    __table_args__ = (
+        CheckConstraint(one_of("action", DecisionAction), name="action_valid"),
+        CheckConstraint(one_of("result", DecisionResult), name="result_valid"),
+    )
 
     course_evaluation_id: Mapped[int] = mapped_column(IdType, ForeignKey("course_evaluations.id"), index=True)
     decided_by: Mapped[int] = mapped_column(IdType, ForeignKey("users.id"))

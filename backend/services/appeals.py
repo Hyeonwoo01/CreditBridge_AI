@@ -11,7 +11,7 @@ from backend.config import get_settings
 from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
-from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
+from backend.errors import CreditBridgeError, DuplicateRowError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import Appeal, AppealFile, Assignment, CourseEvaluation, Decision, Syllabus, TransferRequest, User
@@ -89,10 +89,13 @@ def file_appeal(
     checked = [(f, doc_text.validate_upload(f.filename, f.data, max_mb)) for f in files]
     if checked and storage is None:
         raise CreditBridgeError(tr("파일 저장소를 쓸 수 없어요."))
-    appeal = appeal_repo.add(
-        session,
-        Appeal(course_evaluation_id=evaluation.id, decision_id=decision.id, student_id=student.id, reason=reason),
-    )
+    try:
+        appeal = appeal_repo.add(
+            session,
+            Appeal(course_evaluation_id=evaluation.id, decision_id=decision.id, student_id=student.id, reason=reason),
+        )
+    except DuplicateRowError:
+        raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요.")) from None
     for f, ext in checked:
         assert storage is not None
         key = storage.new_key("appeals", f.filename)

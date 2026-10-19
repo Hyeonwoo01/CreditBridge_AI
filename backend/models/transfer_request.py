@@ -1,14 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import CheckConstraint, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
+from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of
+from backend.models.enums import RequestStatus
 from backend.models.institution import Institution
 
 
 class TransferRequest(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "transfer_requests"
+    __table_args__ = (CheckConstraint(one_of("status", RequestStatus), name="status_valid"),)
 
     student_id: Mapped[int] = mapped_column(IdType, ForeignKey("users.id"), index=True)
     source_institution_id: Mapped[int] = mapped_column(IdType, ForeignKey("institutions.id"))

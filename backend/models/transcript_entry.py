@@ -1,13 +1,17 @@
-from sqlalchemy import ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
+from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, ratio
 
 
 class TranscriptEntry(IdMixin, CreatedAtMixin, Base):
     """성적표에서 추출한 과목 한 줄과 연결된 강의계획서 (FR-02)."""
 
     __tablename__ = "transcript_entries"
+    __table_args__ = (
+        CheckConstraint(ratio("link_score"), name="link_score_range"),
+        CheckConstraint("credits IS NULL OR credits >= 0", name="credits_range"),
+    )
 
     transfer_request_id: Mapped[int] = mapped_column(IdType, ForeignKey("transfer_requests.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))

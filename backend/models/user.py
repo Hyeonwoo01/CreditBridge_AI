@@ -1,14 +1,20 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, false, text, true
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, false, text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
+from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of
+from backend.models.enums import Role
 from backend.models.institution import Institution
 
 
 class User(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(one_of("role", Role), name="role_valid"),
+        CheckConstraint(one_of("locale", ("ko", "en"), nullable=True), name="locale_valid"),
+        CheckConstraint("failed_logins >= 0", name="failed_logins_range"),
+    )
 
     email: Mapped[str] = mapped_column(String(255), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))

@@ -3,8 +3,9 @@ from typing import Any
 from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
+from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of, ratio
 from backend.db.types import LongText
+from backend.models.enums import SyllabusStatus
 
 
 class Syllabus(IdMixin, CreatedAtMixin, Base):
@@ -13,6 +14,9 @@ class Syllabus(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "syllabi"
     __table_args__ = (
         CheckConstraint("extracted_json IS NULL OR JSON_VALID(extracted_json)", name="extracted_json_valid"),
+        CheckConstraint(one_of("status", SyllabusStatus), name="status_valid"),
+        CheckConstraint(ratio("quality_score"), name="quality_score_range"),
+        CheckConstraint("credits IS NULL OR credits >= 0", name="credits_range"),
         # 같은 요청에 같은 문서를 두 번 올릴 수 없다. 요청이 다르면 같은 문서의 분석 결과를 재사용한다.
         UniqueConstraint("transfer_request_id", "content_hash", name="uq_syllabi_request_content"),
     )

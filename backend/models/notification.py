@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
@@ -10,8 +10,10 @@ class Notification(IdMixin, CreatedAtMixin, Base):
     """화면 알림 (FR-19, FR-20). 메일 설정이 있으면 같은 내용을 메일로도 보낸다. 메시지에 개인정보를 넣지 않는다."""
 
     __tablename__ = "notifications"
+    # 안 읽은 알림 수 (상단 종, 60초마다)
+    __table_args__ = (Index("ix_notifications_user_unread", "user_id", "read_at"),)
 
-    user_id: Mapped[int] = mapped_column(IdType, ForeignKey("users.id"), index=True)
+    user_id: Mapped[int] = mapped_column(IdType, ForeignKey("users.id"))
     kind: Mapped[str] = mapped_column(String(30))
     message: Mapped[str] = mapped_column(String(500))
     link: Mapped[str] = mapped_column(String(255), default="")

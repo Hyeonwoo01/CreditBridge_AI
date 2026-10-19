@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
@@ -8,7 +8,10 @@ class Course(IdMixin, CreatedAtMixin, Base):
     """대상 대학 카탈로그 과목."""
 
     __tablename__ = "courses"
-    __table_args__ = (UniqueConstraint("institution_id", "code"),)
+    __table_args__ = (
+        UniqueConstraint("institution_id", "code"),
+        CheckConstraint("credits >= 0", name="credits_range"),
+    )
 
     institution_id: Mapped[int] = mapped_column(IdType, ForeignKey("institutions.id"), index=True)
     code: Mapped[str] = mapped_column(String(30))
