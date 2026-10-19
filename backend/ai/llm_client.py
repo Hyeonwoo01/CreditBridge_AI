@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ValidationError
 
 from backend.config import Settings, get_settings
-from backend.errors import ConfigurationError, LLMError, LLMRefusalError
+from backend.errors import LLMError, LLMNotConfiguredError, LLMRefusalError
 
 if TYPE_CHECKING:
     import anthropic
@@ -79,8 +79,16 @@ class LLMClient:
     def __init__(self, settings: Settings, client: "anthropic.Anthropic | None" = None) -> None:
         import anthropic  # SDK는 실제로 Claude를 쓸 때만 불러온다 (데모 모드는 메모리를 아낀다)
 
-        if not settings.claude_model:
-            raise ConfigurationError("CLAUDE_MODEL is not set")
+        # 설정이 빠졌으면 여기서 멈추지 않고 부를 때 LLMNotConfiguredError를 낸다:
+        # 작업이 예외로 끝나 화면이 "분석 중"에 멈추는 대신 분석 실패와 설정 안내를 보여 준다
+        self._missing = [
+            name
+            for name, value in (
+                ("CLAUDE_MODEL", settings.claude_model),
+                ("ANTHROPIC_API_KEY", settings.anthropic_api_key or client),
+            )
+            if not value
+        ]
         self._model = settings.claude_model
         # 서버 측 대체 모델은 Claude API에서만 쓸 수 있다. 다른 플랫폼이나 프록시를 거치면 끈다
         self._fallback = settings.claude_server_fallback
@@ -101,6 +109,9 @@ class LLMClient:
     ) -> LLMResult[T]:
         """프롬프트를 보내고 결과를 Pydantic으로 검증한다. 검증 실패 시 1회 재시도한다."""
         import anthropic
+
+        if self._missing:
+            raise LLMNotConfiguredError(f"not configured: {', '.join(self._missing)}")
 
         content: list[dict[str, Any]] = [
             {

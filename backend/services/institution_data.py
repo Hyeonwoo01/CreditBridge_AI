@@ -19,7 +19,7 @@ from backend.config import get_settings
 from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
-from backend.errors import CreditBridgeError, LLMError, NotFoundError, PermissionDeniedError
+from backend.errors import CreditBridgeError, LLMError, LLMNotConfiguredError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import Assignment, Course, Department, Institution, Syllabus, User
@@ -472,6 +472,11 @@ def process_reference(
     except (CreditBridgeError, LLMError) as exc:
         logger.warning("reference syllabus failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
         doc = analysis.DocumentText("", 0.0, [])
+        if isinstance(exc, LLMNotConfiguredError):  # 스캔본은 Claude로 전사하는데 설정이 없다
+            syllabus.status = SyllabusStatus.FAILED
+            syllabus.error_message = analysis.NOT_CONFIGURED
+            session.commit()
+            return
     text, quality = doc.text, doc.quality
     if not text.strip():
         syllabus.status = SyllabusStatus.FAILED

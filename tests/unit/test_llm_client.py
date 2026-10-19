@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from backend.ai.llm_client import FALLBACK_BETA, LLMClient, strict_schema
 from backend.config import Settings
-from backend.errors import ConfigurationError, LLMError, LLMRefusalError
+from backend.errors import LLMError, LLMNotConfiguredError, LLMRefusalError
 from backend.schemas.transcript import TranscriptExtraction
 
 
@@ -42,9 +42,13 @@ def test_model_comes_from_settings_and_request_shape() -> None:
     assert call["output_config"]["format"]["schema"]["additionalProperties"] is False
 
 
-def test_missing_model_is_a_configuration_error() -> None:
-    with pytest.raises(ConfigurationError):
-        LLMClient(Settings(claude_model=""))
+def test_missing_settings_fail_on_call_not_on_startup() -> None:
+    # 작업이 시작부터 예외로 끝나 "분석 중"에 멈추지 않도록, 만들 때는 통과하고 부를 때 LLMError 계열로 알린다
+    llm = LLMClient(Settings(claude_model="", anthropic_api_key=""))
+    with pytest.raises(LLMNotConfiguredError, match="CLAUDE_MODEL, ANTHROPIC_API_KEY"):
+        llm.parse("hi", Out)
+    with pytest.raises(LLMNotConfiguredError, match="ANTHROPIC_API_KEY"):
+        LLMClient(Settings(claude_model="m", anthropic_api_key="")).parse("hi", Out)
 
 
 def test_retries_once_on_invalid_output_then_fails() -> None:

@@ -66,7 +66,7 @@
 git clone https://github.com/Hyeonwoo01/CreditBridge_AI.git
 cd CreditBridge_AI
 cp .env.example .env                      # Windows PowerShell: copy .env.example .env
-# .env를 열어 ANTHROPIC_API_KEY에 Claude API 키를 넣는다 (없으면 화면은 열리지만 AI 분석이 실패함)
+# .env를 열어 ANTHROPIC_API_KEY와 CLAUDE_MODEL을 넣는다 (없으면 화면·업로드는 되지만 AI 분석은 "설정이 없어 분석하지 못했어요"로 실패 표시)
 docker compose --profile app up -d --build
 ```
 

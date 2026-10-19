@@ -18,7 +18,7 @@ from backend.ai.llm_client import LLMClient
 from backend.ai.prompts_loader import load_prompt
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
-from backend.errors import LLMError
+from backend.errors import LLMError, LLMNotConfiguredError
 from backend.i18n import N_
 from backend.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry
 from backend.models.enums import EvaluationStatus, Recommendation, SyllabusStatus
@@ -176,6 +176,17 @@ def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: Obje
     )
 
 
+# Claude 키·모델이 설정되지 않은 서버에서 분석을 요청했을 때 (학생·교직원 화면에 그대로 보인다)
+NOT_CONFIGURED = N_("AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요. 기관 관리자에게 알려 주세요.")
+
+
+def _not_configured(exc: LLMError) -> bool:
+    if isinstance(exc, LLMNotConfiguredError):
+        logger.error("claude is not configured", extra={"error": str(exc)})  # 빠진 설정 이름만, 개인정보 없음
+        return True
+    return False
+
+
 def process_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient, storage: ObjectStorage) -> None:
     syllabus = syllabus_repo.get(session, syllabus_id)
     if syllabus is None or syllabus.status == SyllabusStatus.DELETED:
@@ -191,8 +202,10 @@ def process_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient, stor
     except LLMError as exc:
         session.rollback()
         syllabus.status = SyllabusStatus.FAILED
-        syllabus.error_message = N_(
-            "문서를 분석하지 못했어요. 글자를 읽을 수 있는 PDF나 이미지인지 확인한 뒤 다시 올려 주세요."
+        syllabus.error_message = (
+            NOT_CONFIGURED
+            if _not_configured(exc)
+            else N_("문서를 분석하지 못했어요. 글자를 읽을 수 있는 PDF나 이미지인지 확인한 뒤 다시 올려 주세요.")
         )
         session.commit()
         logger.warning("syllabus processing failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
@@ -211,7 +224,16 @@ def add_supplement(
     if syllabus is None:
         return
     filename = file_key.rsplit("/", 1)[-1]
-    text = document_to_text(llm, storage.get(file_key), filename).text
+    try:
+        text = document_to_text(llm, storage.get(file_key), filename).text
+    except LLMError as exc:  # 스캔본 보완 자료는 Claude로 전사한다
+        syllabus.status = SyllabusStatus.FAILED
+        syllabus.error_message = (
+            NOT_CONFIGURED if _not_configured(exc) else N_("보완 자료에서 글자를 읽지 못했어요. 다시 올려 주세요.")
+        )
+        session.commit()
+        logger.warning("supplement failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
+        return
     # 페이지 위치표는 원본 파일 것 그대로라 덧붙인 보완 자료 구절에는 페이지 링크가 없다
     syllabus.raw_text = f"{syllabus.raw_text}\n\n[보완 자료: {filename}]\n{text}"
     session.commit()
@@ -294,7 +316,9 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         result = matching.compare(llm, prompt)
     except LLMError as exc:
         evaluation.status = EvaluationStatus.FAILED
-        evaluation.error_message = N_("AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요.")
+        evaluation.error_message = (
+            NOT_CONFIGURED if _not_configured(exc) else N_("AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요.")
+        )
         session.commit()
         logger.warning("evaluation failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
         return evaluation
