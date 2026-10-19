@@ -28,7 +28,7 @@
 | P13 | 판정 근거 리포트 | `/evaluations/{id}/report`, `…/report.pdf` | 학생·심사관·교수 | FR-10·23 감사용 리포트, 역할별 돌아가기, PDF 내려받기 | [13-report.md](pages/13-report.md) |
 | P14 | 알림 | `/notifications` | 전체 | FR-19·20 알림함, 매일 기한 알림 | [14-notifications.md](pages/14-notifications.md) |
 | P15 | 학사정보 연동 | `/admin/sis` | 관리자 | FR-24 토큰 발급·폐기 | [15-admin-sis.md](pages/15-admin-sis.md) |
-| P16 | 감사 로그 | `/admin/audit` | 관리자 | FR-10 추가 전용 기록(소속 기관만, 근거 자료 열람 포함) | [16-admin-audit.md](pages/16-admin-audit.md) |
+| P16 | 감사 로그 | `/admin/audit` | 관리자 | FR-10 추가 전용 기록(소속 기관만, 근거 자료 열람 포함), 행위·대상·기간 필터와 50건 페이지 | [16-admin-audit.md](pages/16-admin-audit.md) |
 | P17 | 오류 | 모든 화면 | 전체 | 403·404·400 안내 | [17-error.md](pages/17-error.md) |
 | P18 | 계정·과목 관리 | `/admin/data` | 관리자 | 단계 순서(①~④) 배치, 과목·계정 CSV, 기준 강의계획서, 출신 대학, 비밀번호 초기화(메일 링크 자동/메일 없으면 임시 비밀번호), 계정 비활성화·다시 활성화 | [18-admin-data.md](pages/18-admin-data.md) |
 | P19 | 비밀번호 변경 | `/account/password` | 전체 | 첫 로그인 강제 변경 포함 | [19-account-password.md](pages/19-account-password.md) |
@@ -36,6 +36,7 @@
 | P21 | 이의 신청(학생) | `/student/appeals` | 학생 | FR-23 이의 신청할 수 있는 과목, 본인 이의 신청 처리 상황·재판정 결과·기각 사유·근거 자료 | [21-student-appeals.md](pages/21-student-appeals.md) |
 | P22 | 이의 신청 작성(학생) | `/student/evaluations/{id}/appeal` | 학생 | FR-23 원 판정 요약·근거가 약한 개념, 사유(20~3000자), 근거 자료 PDF·JPG·PNG 최대 3개 | [22-student-appeal-form.md](pages/22-student-appeal-form.md) |
 | P23 | 선배 인정 사례(학생) | `/student/precedents` | 학생 | FR-26 기관 동등 과목표 검색(다른 학생의 판정은 보이지 않음) | [23-student-precedents.md](pages/23-student-precedents.md) |
+| P24 | 계정 목록·계정 수정 | `/admin/accounts`, `/admin/accounts/{id}` | 관리자 | 이메일·역할·상태로 계정 찾기(학생 이름 비공개), 교직원 이름·학과·대리 심사자 수정, 비밀번호 초기화·비활성화 | [24-admin-accounts.md](pages/24-admin-accounts.md) |
 
 ## 역할별 흐름
 
@@ -45,7 +46,7 @@
 심사관  P01 → P05 ──(원문 대조 확인 / 충돌 내역 확인 / 보완 요청 발송)──→ P06,  P05에서 일괄 배정
         P07 이의 신청 · P08 삭제 요청 · P09 동등 과목표 · P10 운영 통계
 교수    P01 → P11 → P12 ──(판정 확정 → 반려·변경·경보면 사유 선택 창)──→ 학생 P03·P04에 반영
-관리자  P01 → P10 관리자 콘솔 → P18 계정·과목 · P08 삭제 승인 · P15 연동 토큰 · P16 전체 감사 로그
+관리자  P01 → P10 관리자 콘솔 → P18 계정·과목 · P24 계정 목록(→ 계정 수정) · P08 삭제 승인 · P15 연동 토큰 · P16 전체 감사 로그
 새 계정  메일 O: 설정 링크 메일 → P20 → P01 / 메일 X: P01(임시 비밀번호) → P19 → 역할 홈
 잊었을 때 P01 → P20 메일 링크 → 새 비밀번호 → P01   (메일 미설정: 관리자가 P18에서 재발급 → P19)
 실패 잠금 P01 5번 틀림 → 1분 잠금 → 다시 5번 틀림(누적 10번) → 비밀번호 초기화 + 재설정 메일 자동 → P20 → P01
@@ -66,6 +67,7 @@
 
 | 날짜 | 내용 |
 | --- | --- |
+| 2026-10-19 | P24 계정 목록·계정 수정 추가(관리자 메뉴 "계정 목록", 모든 관리자 화면 메뉴 스케치 갱신), P16 감사 로그 행위·대상·기간 필터·행위자 역할·대상 링크·50건 페이지, P18 비밀번호 초기화 카드에 "계정 목록에서 찾기" 링크 |
 | 2026-10-16 | P00 화면 언어: AI 근거 설명도 영어 화면에서 영어로(분석 때 두 벌 생성) |
 | 2026-10-16 | P00 상단 언어 전환(한국어·English)과 화면 언어 규칙, P01 브라우저 언어가 영어일 때. 모든 화면 문구는 영어 번역을 함께 둠(`backend/locales/en.json`) |
 | 2026-10-16 | P04·P06·P12 "이전 분석과 달라진 점"(#compare) 강의계획서 버전 비교 카드 |

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block nav %}{% include "admin/_nav.html" %}{% endblock %}
+{% block crumb %}{{ _("관리자 콘솔 · 계정 목록 · 계정 수정") }}{% endblock %}
+{% block content %}
+{% set role_names = {"student": _("학생"), "evaluator": _("심사관"), "professor": _("교수"), "admin": _("관리자")} %}
+{% set states = {"active": (_("활성"), "badge-approve"), "pending": (_("첫 비밀번호 변경 대기"), "badge"), "locked": (_("로그인 실패로 초기화"), "badge-reject"), "inactive": (_("비활성"), "badge")} %}
+{% set u = form.user %}{% set st = states[form.row.state] %}
+<a href="/admin/accounts" class="btn-text text-sm">‹ {{ _("계정 목록") }}</a>
+<header class="mt-2 grid gap-2">
+  <h1 class="page-title break-all">{{ u.email }}</h1>
+  <p class="flex flex-wrap items-center gap-2 text-sm text-muted"><span>{{ role_names.get(u.role, u.role) }}</span><span class="{{ st[1] }}">{{ st[0] }}</span>{% if u.deactivated_at %}<span>{{ _("비활성화한 날 {date}", date=(u.deactivated_at.strftime('%Y-%m-%d'))) }}</span>{% endif %}</p>
+</header>
+
+<div class="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+  {% if form.row.show_name %}
+  <form method="post" action="/admin/accounts/{{ u.id }}" class="card grid content-start gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h2 class="font-semibold">{{ _("계정 정보") }}</h2>
+    <label class="field"><span>{{ _("이름") }}</span><input class="input" name="name" value="{{ u.name }}" required maxlength="100"></label>
+    {% if u.role in ['professor', 'evaluator'] %}
+    <label class="field"><span>{{ _("학과") }}</span>
+      <select name="department" class="input h-11" {% if u.role == 'professor' %}required{% endif %}>
+        {% if u.role != 'professor' or not u.department %}<option value="">{{ _("없음") if u.role != 'professor' else _("학과를 골라 주세요") }}</option>{% endif %}
+        {% for d in form.departments %}<option value="{{ d }}" {% if d == u.department %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+    </label>
+    {% if u.role == 'professor' %}<p class="text-xs text-muted">{{ _("과목에 있는 학과 이름만 고를 수 있어요. 이 학과 과목이 이 교수에게 자동 배정돼요. 진행 중인 배정은 그대로 남아요.") }}</p>{% endif %}
+    {% endif %}
+    {% if u.role == 'professor' %}
+    <label class="field"><span>{{ _("대리 심사자 (부재 시)") }}</span>
+      <select name="delegate_user_id" class="input h-11">
+        <option value="">{{ _("없음") }}</option>
+        {% for p in form.delegate_options %}<option value="{{ p.id }}" {% if p.id == u.delegate_user_id %}selected{% endif %}>{{ p.name }} · {{ p.department or '–' }}</option>{% endfor %}
+      </select>
+    </label>
+    <p class="text-xs text-muted">{{ _("교수가 부재 기간을 설정하면 진행 중인 심사가 대리 심사자에게 넘어가요. 교수 본인도 배정된 심사 화면에서 바꿀 수 있어요.") }}</p>
+    {% endif %}
+    <button class="btn-primary w-fit">{{ _("저장") }}</button>
+  </form>
+  {% else %}
+  <section class="card grid content-start gap-2">
+    <h2 class="font-semibold">{{ _("계정 정보") }}</h2>
+    <p class="text-sm text-muted">{{ _("학생 계정은 이름·학과를 여기서 보거나 고치지 않아요. 비밀번호 초기화와 비활성화만 할 수 있어요.") }}</p>
+  </section>
+  {% endif %}
+
+  <div class="grid content-start gap-4">
+    {% if u.id != user.id %}
+    <form method="post" action="/admin/data/password-reset" class="card grid content-start gap-3" data-confirm="{{ _('이 계정의 지금 비밀번호를 무효로 할까요?') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="email" value="{{ u.email }}">
+      <h2 class="font-semibold">{{ _("비밀번호 초기화") }}</h2>
+      <p class="text-sm text-muted">{{ _("메일로 설정 링크(72시간 유효)를 보내요.") if email_enabled else _("임시 비밀번호를 다시 발급해 계정·과목 화면에 한 번만 보여드려요.") }}</p>
+      <button class="btn-secondary w-fit">{{ _('설정 링크 메일 보내기') if email_enabled else _('임시 비밀번호 발급') }}</button>
+    </form>
+    <form method="post" action="/admin/data/accounts/active" class="card grid content-start gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="email" value="{{ u.email }}">
+      <input type="hidden" name="next" value="/admin/accounts/{{ u.id }}">
+      {% if u.is_active %}
+      <h2 class="font-semibold">{{ _("계정 비활성화") }}</h2>
+      <p class="text-sm text-muted">{{ _("로그인이 막히고 다른 기기의 로그인도 끊겨요. 계정은 지우지 않아 판정·감사 기록은 남아요. 교수라면 진행 중인 심사를 같은 학과 다른 교수에게 넘겨요.") }}</p>
+      <button class="btn-secondary w-fit" name="action" value="deactivate" data-confirm="{{ _('이 계정을 비활성화할까요? 로그인이 바로 막혀요.') }}">{{ _("비활성화") }}</button>
+      {% else %}
+      <h2 class="font-semibold">{{ _("다시 활성화") }}</h2>
+      <p class="text-sm text-muted">{{ _("이전 비밀번호로 다시 로그인할 수 있어요.") }}</p>
+      <button class="btn-secondary w-fit" name="action" value="reactivate">{{ _("다시 활성화") }}</button>
+      {% endif %}
+    </form>
+    {% else %}
+    <p class="card text-sm text-muted">{{ _("본인 계정은 비밀번호 변경 화면에서 관리해요.") }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

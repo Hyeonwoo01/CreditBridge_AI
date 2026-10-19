@@ -169,6 +169,7 @@
     {% endif %}
     <label class="field"><span>{{ _("사용자 이메일") }}</span><input class="input" type="email" name="email" required></label>
     <button class="btn-secondary w-fit">{{ _('설정 링크 메일 보내기') if email_enabled else _('임시 비밀번호 발급') }}</button>
+    <a href="/admin/accounts" class="btn-text w-fit text-sm">{{ _("이메일을 모르면 계정 목록에서 찾기") }}</a>
   </form>
 
   <form id="account-active" method="post" action="/admin/data/accounts/active" class="card grid scroll-mt-20 content-start gap-3">

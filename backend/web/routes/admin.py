@@ -1,8 +1,10 @@
 import base64
 import csv
 import io
+import re
+from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,7 @@ from backend.models import User
 from backend.models.enums import Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
+from backend.services import accounts as account_service
 from backend.services import auth as auth_service
 from backend.services import institution_data, notifications, views
 from backend.services import privacy as privacy_service
@@ -29,9 +32,86 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(nav_badges)])
 Admin = Depends(require(Role.ADMIN))
 
 
+def _day(value: str) -> date | None:
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
 @router.get("/audit")
-def audit_log(request: Request, user: User = Admin, session: Session = Depends(get_db)) -> Response:
-    return render(request, "admin/audit.html", user=user, logs=views.recent_audit(session, user))
+def audit_log(
+    request: Request,
+    action: str = Query("", max_length=50),
+    target_type: str = Query("", max_length=50),
+    target_id: str = Query("", max_length=36),
+    since: str = Query("", max_length=10),
+    until: str = Query("", max_length=10),
+    page: int = Query(1, ge=1),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """감사 로그 (FR-10): 행위·대상·기간(UTC 날짜) 필터, 50건씩."""
+    filters = stats_service.AuditFilter(
+        action.strip(), target_type.strip(), target_id.strip(), _day(since), _day(until)
+    )
+    return render(request, "admin/audit.html", user=user, view=stats_service.audit_page(session, user, filters, page))
+
+
+# ---------- 계정 목록·수정 ----------
+
+
+@router.get("/accounts")
+def accounts(
+    request: Request,
+    q: str = Query("", max_length=100),
+    role: str = Query(""),
+    status: str = Query("active"),
+    page: int = Query(1, ge=1),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """기관 계정 목록: 이메일 검색, 역할·상태 필터, 50건씩."""
+    return render(
+        request,
+        "admin/accounts.html",
+        user=user,
+        view=account_service.list_accounts(session, user, q, role, status, page),
+    )
+
+
+@router.get("/accounts/{user_id}")
+def account_page(request: Request, user_id: int, user: User = Admin, session: Session = Depends(get_db)) -> Response:
+    return render(
+        request,
+        "admin/account_edit.html",
+        user=user,
+        form=account_service.account_form(session, user, user_id),
+        email_enabled=notifications.email_enabled(),
+    )
+
+
+@router.post("/accounts/{user_id}")
+def update_account(
+    request: Request,
+    user_id: int,
+    name: str = Form(""),
+    department: str = Form(""),
+    delegate_user_id: int | None = Form(None),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """교직원 이름, 교수·심사관 학과, 교수 대리 심사자 수정 (역할은 바꾸지 않는다)."""
+    check_csrf(request, csrf_token)
+    try:
+        changed = account_service.update_account(session, user, user_id, name, department, delegate_user_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse(f"/admin/accounts/{user_id}", status_code=303)
+    flash(request, tr("계정 정보를 저장했어요.") if changed else tr("바뀐 내용이 없어요."))
+    return RedirectResponse(f"/admin/accounts/{user_id}", status_code=303)
 
 
 @router.get("/stats")
@@ -238,12 +318,14 @@ def account_active(
     request: Request,
     email: str = Form(...),
     action: str = Form(...),
+    next_url: str = Form("", alias="next"),
     csrf_token: str = Form(""),
     user: User = Admin,
     session: Session = Depends(get_db),
 ) -> Response:
-    """계정 비활성화·다시 활성화. 계정은 지우지 않는다."""
+    """계정 비활성화·다시 활성화. 계정은 지우지 않는다. 계정 수정 화면에서 누르면 그 화면으로 돌아간다."""
     check_csrf(request, csrf_token)
+    back = next_url if re.fullmatch(r"/admin/accounts/\d+", next_url) else "/admin/data#account-active"
     if action not in ("deactivate", "reactivate"):
         raise CreditBridgeError(tr("처리 방법을 골라 주세요."))
     try:
@@ -251,7 +333,7 @@ def account_active(
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
-        return RedirectResponse("/admin/data#account-active", status_code=303)
+        return RedirectResponse(back, status_code=303)
     send_emails()
     target = change.user
     if action == "reactivate":
@@ -267,7 +349,7 @@ def account_active(
                 " 심사 {released}건은 넘길 교수가 없어 심사관이 다시 배정해야 해요.", released=change.released
             )
         flash(request, message)
-    return RedirectResponse("/admin/data#account-active", status_code=303)
+    return RedirectResponse(back, status_code=303)
 
 
 @router.post("/data/password-reset")

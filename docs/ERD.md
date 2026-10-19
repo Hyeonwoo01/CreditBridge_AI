@@ -456,7 +456,7 @@ erDiagram
 | 엔티티 | 만드는 API | 바꾸는 API | 읽는 화면(조회 API) |
 | --- | --- | --- | --- |
 | institutions | M8, 첫 관리자 스크립트 | M12(토큰) | S1·S15·M11 |
-| users | M5, 첫 관리자 스크립트 | A3(실패 수·언어), A5, A7, A11, F2, M6, M7 | 대부분 (권한·이름) |
+| users | M5, 첫 관리자 스크립트 | A3(실패 수·언어), A5, A7, A11, F2, M6, M7, M16(이름·학과·대리 심사자) | 대부분 (권한·이름) |
 | courses | M3 | M3, M4 | R1·S10·R4·F3·M2 |
 | transfer_requests | S2 | S5, S7, S8, 판정 완료 시 | S1·S3·R1 |
 | syllabi | S4, M4 | S11, 작업 큐(추출·분석), M10(삭제) | S3·S10·R4·F3·C3 |
@@ -470,7 +470,7 @@ erDiagram
 | equivalencies | R11 | – | R10·S15·R4·F3(과거 이력) |
 | privacy_requests | S8 | R9, M10 | S3·R8·M9·M1 |
 | notifications | 여러 처리 API, 기한 알림 작업 | A12·S10·S14(읽음) | A12·A13 |
-| audit_logs | 거의 모든 처리 API, C3·C5 열람 | – (추가 전용) | M13·M1·C1·R4 |
+| audit_logs | 거의 모든 처리 API, C3·C5 열람 | – (추가 전용) | M13(조건별·50건씩)·M1·C1·R4 |
 
 ## 5. 설계 규칙
 
@@ -500,7 +500,7 @@ erDiagram
 
 | # | 항목 | 내용 | 권장 |
 | --- | --- | --- | --- |
-| E1 | 학과가 글자 | `users.department`와 `courses.department`가 자유 글자다. 철자가 다르면 자동 배정이 안 된다 (화면이 "교수 없는 학과"로 경고만 함). 기능 명세 권한표의 "학과 설정"을 담을 곳도 없다 | `departments`(institution_id, name, UQ) 엔티티를 만들고 두 컬럼을 `department_id` FK로 |
+| E1 | 학과가 글자 | `users.department`와 `courses.department`가 자유 글자다. 철자가 다르면 자동 배정이 안 된다 (화면이 "교수 없는 학과"로 경고만 함). 기능 명세 권한표의 "학과 설정"을 담을 곳도 없다 | `departments`(institution_id, name, UQ) 엔티티를 만들고 두 컬럼을 `department_id` FK로. (2026-10-19: 관리자 계정 수정 화면 P24가 과목에 있는 학과명만 고르게 해 철자 문제는 줄였다. 테이블 분리는 아직) |
 | E2 | JSON 유효성 검사 ✅ 문제 아님 (확인) | `syllabi.extracted_json`에만 `JSON_VALID` CHECK가 있다. MariaDB의 JSON은 LONGTEXT라 나머지 JSON 컬럼(`courses.concepts`, `decisions.reason_codes`·`ai_recommendation_snapshot`, `course_evaluations.coverage_json`, `material_requests.items`, `audit_logs.payload_json`, `syllabi.page_offsets`·`injection_flags`)에는 잘못된 값이 들어갈 수 있다 (DB 규칙 위반) | 다시 확인해 보니 MariaDB가 `JSON`으로 만든 컬럼마다 `CHECK (json_valid(col))`를 자동으로 붙인다(`SHOW CREATE TABLE`로 확인). MySQL 8.0은 JSON 형식 자체가 검사한다. 추가할 것 없음 |
 | E3 | 상태·코드 값 검사 ✅ 반영 (0009) | `role`, `status`, `recommendation`, `result`, `action`, `side` 등이 VARCHAR이고 허용 값 검사가 앱에만 있다 | `CHECK (status IN (...))` 추가 (MySQL 8.0.16+, MariaDB 지원) |
 | E4 | 값 범위 검사 ✅ 반영 (0009) | `coverage`·`quality_score`·`link_score`(0~1), `evidence_spans.char_start < char_end`가 DB에서 검사되지 않는다 | CHECK 추가 |

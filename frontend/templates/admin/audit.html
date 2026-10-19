@@ -2,12 +2,60 @@
 {% from "partials/macros.html" import time %}
 {% block nav %}{% include "admin/_nav.html" %}{% endblock %}
 {% block content %}
+{% set role_names = {"student": _("학생"), "evaluator": _("심사관"), "professor": _("교수"), "admin": _("관리자")} %}
+{% set f = view.filters %}
+{% macro qlink(p=1, target_type=f.target_type, target_id=f.target_id) -%}
+?action={{ f.action | urlencode }}&target_type={{ target_type | urlencode }}&target_id={{ target_id | urlencode }}&since={{ (f.since or '') }}&until={{ (f.until or '') }}&page={{ p }}
+{%- endmacro %}
 <h1 class="page-title">{{ _("감사 로그") }}</h1>
 <p class="mt-2 text-muted">{{ _("추가 전용 기록이에요. 수정하거나 삭제할 수 없어요.") }}</p>
-<div class="mt-6 overflow-x-auto">
-  <table class="w-full min-w-[640px] text-sm">
-    <thead class="text-left text-muted"><tr><th class="py-2 pr-3 font-normal">{{ _("시각") }}</th><th class="py-2 pr-3 font-normal">{{ _("행위") }}</th><th class="py-2 pr-3 font-normal">{{ _("대상") }}</th><th class="py-2 font-normal">{{ _("내용") }}</th></tr></thead>
-    <tbody>{% for a in logs %}<tr class="border-t border-divider"><td class="py-2 pr-3 whitespace-nowrap">{{ time(a.created_at) }}</td><td class="py-2 pr-3">{{ a.action }}</td><td class="py-2 pr-3">{{ a.target_type }}</td><td class="py-2 text-muted">{{ a.payload_json }}</td></tr>{% endfor %}</tbody>
+
+<form method="get" action="/admin/audit" class="mt-6 grid gap-3 rounded-lg border border-hairline bg-white p-4 md:grid-cols-[repeat(5,minmax(0,1fr))_auto] md:items-end" aria-label="{{ _('감사 로그 찾기') }}">
+  <label class="field"><span>{{ _("행위") }}</span>
+    <select name="action" class="input h-11">
+      <option value="">{{ _("전체") }}</option>
+      {% for code, label in view.actions %}<option value="{{ code }}" {% if code == f.action %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="field"><span>{{ _("대상 종류") }}</span>
+    <select name="target_type" class="input h-11">
+      <option value="">{{ _("전체") }}</option>
+      {% for t in view.target_types %}<option value="{{ t }}" {% if t == f.target_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="field"><span>{{ _("대상 번호") }}</span><input class="input h-11" name="target_id" value="{{ f.target_id }}" maxlength="36" inputmode="numeric" placeholder="{{ _('예: 12') }}"></label>
+  <label class="field"><span>{{ _("시작일 (UTC)") }}</span><input class="input h-11" type="date" name="since" value="{{ f.since or '' }}"></label>
+  <label class="field"><span>{{ _("종료일 (UTC)") }}</span><input class="input h-11" type="date" name="until" value="{{ f.until or '' }}"></label>
+  <div class="flex items-center gap-3">
+    <button class="btn-primary h-11">{{ _("찾기") }}</button>
+    {% if f.active %}<a href="/admin/audit" class="btn-text text-sm">{{ _("초기화") }}</a>{% endif %}
+  </div>
+</form>
+
+<p class="mt-4 text-sm text-muted">{{ _("기록 {total}건 중 {first}–{last}", total=(view.total), first=(view.first), last=(view.last)) }}</p>
+<div class="mt-2 overflow-x-auto">
+  <table class="w-full min-w-[760px] text-sm">
+    <thead class="text-left text-muted"><tr><th class="py-2 pr-3 font-normal">{{ _("시각") }}</th><th class="py-2 pr-3 font-normal">{{ _("행위") }}</th><th class="py-2 pr-3 font-normal">{{ _("행위자") }}</th><th class="py-2 pr-3 font-normal">{{ _("대상") }}</th><th class="py-2 font-normal">{{ _("내용") }}</th></tr></thead>
+    <tbody>
+    {% for e in view.entries %}{% set a = e.log %}
+      <tr class="border-t border-divider align-top">
+        <td class="py-2 pr-3 whitespace-nowrap">{{ time(a.created_at) }}</td>
+        <td class="py-2 pr-3">{{ e.label }}<div class="font-mono text-xs text-muted">{{ a.action }}</div></td>
+        <td class="py-2 pr-3 whitespace-nowrap">{{ role_names.get(e.actor_role, e.actor_role) if e.actor_role else _("시스템") }}</td>
+        <td class="py-2 pr-3 whitespace-nowrap"><a class="text-primary hover:underline" href="{{ qlink(target_type=a.target_type, target_id=a.target_id) }}" title="{{ _('이 대상의 기록만 보기') }}">{{ a.target_type }} #{{ a.target_id }}</a></td>
+        <td class="py-2 break-all text-muted">{{ a.payload_json }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="py-10 text-center text-muted">{{ _("조건에 맞는 기록이 없어요.") }}</td></tr>
+    {% endfor %}
+    </tbody>
   </table>
 </div>
+{% if view.pages > 1 %}
+<nav class="mt-4 flex flex-wrap items-center gap-1 text-sm" aria-label="{{ _('페이지') }}">
+  {% if view.page > 1 %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="{{ qlink(p=view.page - 1) }}" aria-label="{{ _('이전 페이지') }}">‹</a>{% endif %}
+  <span class="px-2 tabular-nums">{{ _("{page} / {pages} 페이지", page=(view.page), pages=(view.pages)) }}</span>
+  {% if view.page < view.pages %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="{{ qlink(p=view.page + 1) }}" aria-label="{{ _('다음 페이지') }}">›</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

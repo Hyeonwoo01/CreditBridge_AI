@@ -79,3 +79,40 @@ def locked_out_count(session: Session, institution_id: int, threshold: int) -> i
 def inactive_count(session: Session, institution_id: int) -> int:
     stmt = select(func.count()).where(User.institution_id == institution_id, User.is_active.is_(False))
     return session.scalar(stmt) or 0
+
+
+def search(
+    session: Session,
+    institution_id: int,
+    query: str = "",
+    role: str | None = None,
+    active: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[User], int]:
+    """기관 계정 목록 (관리자). 이메일 일부로 찾고, 역할·활성 여부로 거른다. (행, 전체 건수)."""
+    conditions = [User.institution_id == institution_id]
+    if query:
+        conditions.append(User.email.contains(query.lower(), autoescape=True))
+    if role:
+        conditions.append(User.role == role)
+    if active is not None:
+        conditions.append(User.is_active.is_(active))
+    total = session.scalar(select(func.count()).select_from(User).where(*conditions)) or 0
+    stmt = select(User).where(*conditions).order_by(User.role, User.email).limit(limit).offset(offset)
+    return list(session.scalars(stmt)), total
+
+
+def by_ids(session: Session, ids: list[int]) -> dict[int, User]:
+    if not ids:
+        return {}
+    return {u.id: u for u in session.scalars(select(User).where(User.id.in_(ids)))}
+
+
+def professors_of(session: Session, institution_id: int) -> list[User]:
+    stmt = (
+        select(User)
+        .where(User.institution_id == institution_id, User.role == "professor", User.is_active.is_(True))
+        .order_by(User.department, User.name)
+    )
+    return list(session.scalars(stmt))

@@ -5,7 +5,7 @@
 
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -218,6 +218,7 @@ ACTION_LABELS = {
     "account.import": (N_("계정 가져오기"), "neutral"),
     "account.deactivate": (N_("계정 비활성화"), "reject"),
     "account.reactivate": (N_("계정 다시 활성화"), "neutral"),
+    "account.update": (N_("계정 정보 수정"), "neutral"),
     "appeal_file.download": (N_("이의 신청 근거 자료 열람"), "neutral"),
     "syllabus.original_view": (N_("강의계획서 원본 열람"), "neutral"),
     "note.create": (N_("내부 메모 작성"), "neutral"),
@@ -268,6 +269,79 @@ def recent_audit(session: Session, user: User, limit: int = 8) -> list[AuditRow]
         if len(out) >= limit:
             break
     return out
+
+
+AUDIT_PAGE_SIZE = 50
+
+
+@dataclass(frozen=True)
+class AuditFilter:
+    action: str = ""
+    target_type: str = ""
+    target_id: str = ""
+    since: date | None = None  # 그날 0시(UTC)부터
+    until: date | None = None  # 그날 끝(UTC)까지
+
+    @property
+    def active(self) -> bool:
+        return bool(self.action or self.target_type or self.target_id or self.since or self.until)
+
+
+@dataclass(frozen=True)
+class AuditEntry:
+    log: AuditLog
+    label: str
+    actor_role: str | None  # 행위자 역할 (이름은 보여 주지 않는다), 시스템 기록은 None
+
+
+@dataclass(frozen=True)
+class AuditPage:
+    entries: list[AuditEntry]
+    total: int
+    page: int
+    filters: AuditFilter
+    actions: list[tuple[str, str]]  # (행위 코드, 화면 이름) — 그 기관 기록에 나온 것만
+    target_types: list[str]
+
+    @property
+    def pages(self) -> int:
+        return max((self.total + AUDIT_PAGE_SIZE - 1) // AUDIT_PAGE_SIZE, 1)
+
+    @property
+    def first(self) -> int:
+        return (self.page - 1) * AUDIT_PAGE_SIZE + 1 if self.total else 0
+
+    @property
+    def last(self) -> int:
+        return min(self.page * AUDIT_PAGE_SIZE, self.total)
+
+
+def audit_page(session: Session, user: User, filters: AuditFilter, page: int) -> AuditPage:
+    """감사 로그 화면 (FR-10): 소속 기관 사용자의 기록을 행위·대상·기간으로 거르고 50건씩 나눠 보여 준다."""
+    if user.role != Role.ADMIN or user.institution_id is None:
+        raise PermissionDeniedError(tr("기관 관리자만 볼 수 있어요."))
+    since = datetime.combine(filters.since, datetime.min.time()) if filters.since else None
+    until = datetime.combine(filters.until + timedelta(days=1), datetime.min.time()) if filters.until else None
+    logs, total = audit_repo.search(
+        session,
+        user.institution_id,
+        filters.action,
+        filters.target_type,
+        filters.target_id,
+        since,
+        until,
+        limit=AUDIT_PAGE_SIZE,
+        offset=(page - 1) * AUDIT_PAGE_SIZE,
+    )
+    actors = user_repo.by_ids(session, sorted({log.actor_id for log in logs if log.actor_id is not None}))
+    entries = []
+    for log in logs:
+        actor = actors.get(log.actor_id) if log.actor_id is not None else None
+        label = ACTION_LABELS.get(log.action, (log.action, "neutral"))[0]
+        entries.append(AuditEntry(log, tr(label), actor.role if actor else None))
+    actions, target_types = audit_repo.facets(session, user.institution_id)
+    named = [(a, tr(ACTION_LABELS[a][0]) if a in ACTION_LABELS else a) for a in actions]
+    return AuditPage(entries, total, page, filters, sorted(named, key=lambda x: x[1]), target_types)
 
 
 @dataclass(frozen=True)

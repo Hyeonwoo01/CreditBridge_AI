@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block nav %}{% include "admin/_nav.html" %}{% endblock %}
+{% block crumb %}{{ _("관리자 콘솔 · 계정 목록") }}{% endblock %}
+{% block content %}
+{% set role_names = {"student": _("학생"), "evaluator": _("심사관"), "professor": _("교수"), "admin": _("관리자")} %}
+{% set states = {"active": (_("활성"), "badge-approve"), "pending": (_("첫 비밀번호 변경 대기"), "badge"), "locked": (_("로그인 실패로 초기화"), "badge-reject"), "inactive": (_("비활성"), "badge")} %}
+{% macro qlink(p=1, status=view.status) -%}?q={{ view.query | urlencode }}&role={{ view.role }}&status={{ status }}&page={{ p }}{%- endmacro %}
+<header class="grid gap-1">
+  <h1 class="page-title">{{ _("계정 목록") }}</h1>
+  <p class="text-sm text-muted">{{ _("이메일로 계정을 찾아 교직원 이름·학과·대리 심사자를 고치고, 비밀번호 초기화·비활성화를 할 수 있어요. 학생 이름은 보여 주지 않아요.") }}</p>
+</header>
+
+<form method="get" action="/admin/accounts" class="mt-6 flex flex-col gap-3 rounded-lg border border-hairline bg-white p-4 md:flex-row md:items-end" aria-label="{{ _('계정 찾기') }}">
+  <label class="field flex-1"><span>{{ _("이메일") }}</span><input class="input h-11" type="search" name="q" value="{{ view.query }}" maxlength="100" placeholder="{{ _('이메일 일부 (예: physics, @msu)') }}"></label>
+  <label class="field md:w-44"><span>{{ _("역할") }}</span>
+    <select name="role" class="input h-11">
+      <option value="">{{ _("전체") }}</option>
+      {% for key in ['student', 'evaluator', 'professor', 'admin'] %}<option value="{{ key }}" {% if key == view.role %}selected{% endif %}>{{ role_names[key] }}</option>{% endfor %}
+    </select>
+  </label>
+  <input type="hidden" name="status" value="{{ view.status }}">
+  <button class="btn-primary h-11">{{ _("찾기") }}</button>
+</form>
+
+<nav class="mt-4 flex flex-wrap gap-2" aria-label="{{ _('계정 상태') }}">
+  {% for key, label in [('active', _('활성')), ('inactive', _('비활성')), ('all', _('전체'))] %}
+  <a href="{{ qlink(status=key) }}" class="inline-flex min-h-9 items-center rounded-full border px-3.5 text-sm {{ 'border-ink bg-ink text-white' if view.status == key else 'border-hairline bg-white text-ink-80' }}" {% if view.status == key %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+
+<p class="mt-4 text-sm text-muted">{{ _("계정 {total}개 중 {first}–{last}", total=(view.total), first=(view.first), last=(view.last)) }}</p>
+<div class="card mt-2 overflow-x-auto p-0">
+  <table class="w-full min-w-[820px] text-sm">
+    <thead class="bg-pearl text-left text-xs text-muted">
+      <tr><th class="px-5 py-3 font-normal">{{ _("이메일") }}</th><th class="px-3 py-3 font-normal">{{ _("이름") }}</th><th class="px-3 py-3 font-normal">{{ _("역할") }}</th><th class="px-3 py-3 font-normal">{{ _("학과") }}</th><th class="px-3 py-3 font-normal">{{ _("대리 심사자") }}</th><th class="px-3 py-3 font-normal">{{ _("상태") }}</th><th class="px-5 py-3 font-normal"><span class="sr-only">{{ _("수정") }}</span></th></tr>
+    </thead>
+    <tbody>
+    {% for r in view.rows %}{% set u = r.user %}{% set st = states[r.state] %}
+      <tr class="border-t border-divider align-middle">
+        <td class="px-5 py-3">{{ u.email }}</td>
+        <td class="px-3 py-3">{% if r.show_name %}{{ u.name }}{% else %}<span class="text-muted" title="{{ _('학생 이름은 보여 주지 않아요') }}">–</span>{% endif %}</td>
+        <td class="px-3 py-3">{{ role_names.get(u.role, u.role) }}</td>
+        <td class="px-3 py-3">{{ u.department or '–' }}</td>
+        <td class="px-3 py-3">{{ r.delegate.name if r.delegate else '–' }}</td>
+        <td class="px-3 py-3"><span class="{{ st[1] }}">{{ st[0] }}</span></td>
+        <td class="px-5 py-3 text-right"><a href="/admin/accounts/{{ u.id }}" class="btn-secondary btn-sm">{{ _("수정") }}</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="px-5 py-10 text-center text-muted">{{ _("조건에 맞는 계정이 없어요.") }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if view.pages > 1 %}
+<nav class="mt-4 flex flex-wrap items-center gap-1 text-sm" aria-label="{{ _('페이지') }}">
+  {% if view.page > 1 %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="{{ qlink(p=view.page - 1) }}" aria-label="{{ _('이전 페이지') }}">‹</a>{% endif %}
+  <span class="px-2 tabular-nums">{{ _("{page} / {pages} 페이지", page=(view.page), pages=(view.pages)) }}</span>
+  {% if view.page < view.pages %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="{{ qlink(p=view.page + 1) }}" aria-label="{{ _('다음 페이지') }}">›</a>{% endif %}
+</nav>
+{% endif %}
+<p class="mt-6 text-sm text-muted">{{ _("새 계정은") }} <a href="/admin/data#accounts" class="text-primary hover:underline">{{ _("계정·과목의 계정 CSV") }}</a>{{ _("로 만들어요. 역할은 바꿀 수 없어서, 역할이 바뀐 사람은 새 계정을 만들고 이전 계정을 비활성화해요.") }}</p>
+{% endblock %}
