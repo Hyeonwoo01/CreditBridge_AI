@@ -60,7 +60,10 @@ def test_push_card_and_service_worker(client: TestClient, seeded: Session, vapid
     assert sw.status_code == 200 and "showNotification" in sw.text and "javascript" in sw.headers["content-type"]
 
 
-def test_push_card_hidden_without_keys(client: TestClient, seeded: Session) -> None:
+def test_push_card_hidden_without_keys(client: TestClient, seeded: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"):
+        monkeypatch.setenv(name, "")  # 개발자 .env에 키가 있어도 키 없는 서버로 본다
+    get_settings.cache_clear()
     login(client, "mbrown@msu.example")
     assert 'id="push-card"' not in client.get("/notifications").text
     token = login(client, "mbrown@msu.example")
@@ -128,5 +131,8 @@ def test_deliver_sends_translated_payload_and_drops_gone_devices(seeded: Session
     assert push.deliver_pending(seeded) == 0  # 이미 보낸 알림은 다시 보내지 않는다
 
 
-def test_deliver_does_nothing_without_keys(seeded: Session) -> None:
+def test_deliver_does_nothing_without_keys(seeded: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", "")
+    get_settings.cache_clear()
     assert push.deliver_pending(seeded) == 0
+    get_settings.cache_clear()

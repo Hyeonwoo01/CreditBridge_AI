@@ -9,6 +9,7 @@ from tests.conftest import login
 
 HEADER = "source_institution,source_course,target_course,result,decided_on,note\n"
 HANKUK = "Hankuk University (한국대학교)"
+UNREAD = 'class="dot mr-1.5 inline-block bg-primary'  # 안 읽은 알림 점 (푸시 카드의 초록 점과 구분)
 
 
 def test_notifications_are_paged_and_keep_unread_marks(client: TestClient, seeded: Session) -> None:
@@ -20,12 +21,12 @@ def test_notifications_are_paged_and_keep_unread_marks(client: TestClient, seede
     first = client.get("/notifications").text
     assert "알림 번호 54" in first and "알림 번호 05" in first and "알림 번호 04" not in first
     assert "1 / 2 페이지" in first and "/notifications?page=2" in first
-    assert first.count('class="dot ') >= 50  # 읽기 전 상태로 보여 주고
+    assert first.count(UNREAD) >= 50  # 읽기 전 상태로 보여 주고
     assert client.get("/notifications/count").text == ""  # 열면 모두 읽음
 
     second = client.get("/notifications?page=2").text
     assert "알림 번호 04" in second and "알림 번호 00" in second and "알림 번호 05" not in second
-    assert "2 / 2 페이지" in second and 'class="dot ' not in second
+    assert "2 / 2 페이지" in second and UNREAD not in second
     assert "알림 번호 00" in client.get("/notifications?page=9").text  # 범위를 넘으면 마지막 페이지
 
 
