@@ -287,7 +287,7 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
                 appeal=appeals.get(ev.id) if ev else None,
                 open_materials=open_materials.get(s.id, []),
                 candidate_title=course.title if course else None,
-                candidate_department=course.department if course else None,
+                candidate_department=course.department_name if course else None,
                 reviewer=user_repo.get_by_id(session, reviewer_id) if reviewer_id else None,
             )
         )

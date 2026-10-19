@@ -22,7 +22,7 @@ from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, LLMError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Assignment, Course, Institution, Syllabus, User
+from backend.models import Assignment, Course, Department, Institution, Syllabus, User
 from backend.models.enums import Role, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
@@ -110,6 +110,12 @@ class Overview:
         return sum(1 for r in self.courses if r.course.reference_syllabus_id is None)
 
 
+def department_named(session: Session, institution_id: int, name: str) -> Department:
+    """그 이름의 학과 행. 없으면 만든다 (과목 CSV·계정 CSV)."""
+    found = catalog_repo.department_by_name(session, institution_id, name)
+    return found or catalog_repo.add_department(session, Department(institution_id=institution_id, name=name))
+
+
 def ensure_admin(user: User) -> int:
     if user.role != Role.ADMIN or user.institution_id is None:
         raise PermissionDeniedError(tr("기관 관리자만 사용할 수 있어요."))
@@ -124,7 +130,7 @@ def overview(session: Session, admin: User) -> Overview:
     courses = catalog_repo.courses_of(session, institution_id)
     uploads = syllabus_repo.latest_reference_uploads(session, institution_id)
     staffed = user_repo.professor_departments(session, institution_id)
-    departments = sorted({c.department for c in courses})
+    departments = catalog_repo.course_departments(session, institution_id)
     return Overview(
         institution=institution,
         role_counts=user_repo.role_counts(session, institution_id),
@@ -132,7 +138,7 @@ def overview(session: Session, admin: User) -> Overview:
         locked_out=user_repo.locked_out_count(session, institution_id, RESET_AFTER),
         inactive=user_repo.inactive_count(session, institution_id),
         courses=[CourseRow(c, uploads.get(c.code)) for c in courses],
-        departments_without_professor=[d for d in departments if d not in staffed],
+        departments_without_professor=[d.name for d in departments if d.id not in staffed],
         source_institutions=catalog_repo.source_institutions(session),
     )
 
@@ -185,7 +191,7 @@ def _hand_over_reviews(session: Session, admin: User, professor: User) -> tuple[
     receivers: dict[int, tuple[User, int]] = {}
     for a in evaluation_repo.active_assignments_for(session, professor.id):
         try:
-            reviewer, _ = review.pick_reviewer(session, admin.institution_id or 0, professor.department or "", today)
+            reviewer, _ = review.pick_reviewer(session, admin.institution_id or 0, professor.dept, today)
         except CreditBridgeError:
             evaluation_repo.release_assignment(session, a)
             released += 1
@@ -225,7 +231,7 @@ def _hand_over_reviews(session: Session, admin: User, professor: User) -> tuple[
             session,
             notifications.staff(session, admin.institution_id or 0, Role.EVALUATOR),
             "assignment.delegated",
-            template.format(dept=professor.department or "", moved=moved, released=released),
+            template.format(dept=professor.department_name or "", moved=moved, released=released),
             "/review",
         )
     return moved, released
@@ -293,7 +299,7 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
                 name=name,
                 role=role,
                 institution_id=institution_id,
-                department=department,
+                department_id=department_named(session, institution_id, department).id if department else None,
                 password_hash=unusable_password() if by_email else hash_password(password),
                 must_change_password=True,
             ),
@@ -375,14 +381,15 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
                     code=code,
                     title=title,
                     credits=credits,
-                    department=department,
+                    department_id=department_named(session, institution_id, department).id,
                     level=level,
                     concepts=concepts,
                 ),
             )
             result.created += 1
         else:
-            course.title, course.credits, course.department, course.concepts = title, credits, department, concepts
+            course.title, course.credits, course.concepts = title, credits, concepts
+            course.department_id = department_named(session, institution_id, department).id
             if level:
                 course.level = level
             result.updated += 1

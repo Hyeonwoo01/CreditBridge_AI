@@ -43,8 +43,10 @@ _KOREAN = {
 
 
 class CourseLike(Protocol):
-    department: str
     code: str
+
+    @property
+    def department_name(self) -> str: ...
 
 
 def _korean(word: str) -> str:
@@ -73,6 +75,6 @@ def select[C: CourseLike](courses: list[C], disciplines: list[str], limit: int =
     picked: list[C] = []
     for discipline in disciplines:
         for course in courses:
-            if course not in picked and matches(discipline, course.department):
+            if course not in picked and matches(discipline, course.department_name):
                 picked.append(course)
     return picked[:limit]

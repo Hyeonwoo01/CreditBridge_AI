@@ -4,8 +4,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import AuditLog, User
+from backend.models import AuditLog, Department, User
 from tests.conftest import login
+
+
+def dept(db: Session, name: str) -> int:
+    return db.scalars(select(Department.id).where(Department.name == name)).one()
 
 
 def user_of(db: Session, email: str) -> User:
@@ -33,25 +37,26 @@ def test_admin_edits_professor_department_and_delegate(client: TestClient, seede
     token = login(client, "admin@msu.example")
     kim, wong = user_of(seeded, "dkim@msu.example"), user_of(seeded, "ewong@msu.example")
     page = client.get(f"/admin/accounts/{kim.id}").text
-    assert 'value="Mathematics" selected' in page and "Emily Wong" in page
+    assert f'value="{dept(seeded, "Mathematics")}" selected' in page and "Emily Wong" in page
 
     def save(**data: object) -> str:
         return client.post(f"/admin/accounts/{kim.id}", data={"csrf_token": token, **data}).text
 
-    assert "과목에 있는 학과 이름을 골라 주세요" in save(name="Daniel Kim", department="Maths")
-    assert "학과를 골라야" in save(name="Daniel Kim", department="")
-    assert "다른 교수를 대리 심사자로" in save(name="Daniel Kim", department="Mathematics", delegate_user_id=kim.id)
-    assert user_of(seeded, kim.email).department == "Mathematics"  # 실패하면 아무것도 바뀌지 않는다
+    math, physics, retired = dept(seeded, "Mathematics"), dept(seeded, "Physics"), dept(seeded, "Retired")
+    assert "과목에 있는 학과 이름을 골라 주세요" in save(name="Daniel Kim", department_id=retired)  # 과목 없는 학과
+    assert "학과를 골라야" in save(name="Daniel Kim", department_id="")
+    assert "다른 교수를 대리 심사자로" in save(name="Daniel Kim", department_id=math, delegate_user_id=kim.id)
+    assert user_of(seeded, kim.email).department_name == "Mathematics"  # 실패하면 아무것도 바뀌지 않는다
 
-    page = save(name="Daniel J. Kim", department="Physics", delegate_user_id=wong.id)
+    page = save(name="Daniel J. Kim", department_id=physics, delegate_user_id=wong.id)
     assert "계정 정보를 저장했어요" in page
     kim = user_of(seeded, kim.email)
-    assert (kim.name, kim.department, kim.delegate_user_id) == ("Daniel J. Kim", "Physics", wong.id)
+    assert (kim.name, kim.department_name, kim.delegate_user_id) == ("Daniel J. Kim", "Physics", wong.id)
     log = seeded.scalars(select(AuditLog).where(AuditLog.action == "account.update")).one()
     assert log.target_id == str(kim.id) and log.payload_json == {"fields": ["name", "department", "delegate"]}
     assert "Daniel" not in str(log.payload_json)  # 감사 로그에는 바뀐 항목 이름만
 
-    assert "바뀐 내용이 없어요" in save(name="Daniel J. Kim", department="Physics", delegate_user_id=wong.id)
+    assert "바뀐 내용이 없어요" in save(name="Daniel J. Kim", department_id=physics, delegate_user_id=wong.id)
     assert client.post(f"/admin/accounts/{kim.id}", data={"name": "x"}).status_code in (400, 403)  # CSRF
     assert client.get("/admin/accounts/999999").status_code == 404
 
@@ -82,7 +87,10 @@ def test_student_account_page_hides_name_and_returns_after_deactivation(client: 
 def test_audit_log_filters_by_action_target_and_date(client: TestClient, seeded: Session) -> None:
     token = login(client, "admin@msu.example")
     kim = user_of(seeded, "dkim@msu.example")
-    client.post(f"/admin/accounts/{kim.id}", data={"name": "Daniel Kim", "department": "Physics", "csrf_token": token})
+    client.post(
+        f"/admin/accounts/{kim.id}",
+        data={"name": "Daniel Kim", "department_id": dept(seeded, "Physics"), "csrf_token": token},
+    )
 
     page = client.get("/admin/audit").text
     assert "계정 정보 수정" in page and "로그인" in page

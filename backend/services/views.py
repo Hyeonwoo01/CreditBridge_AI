@@ -391,7 +391,7 @@ def professor_items(session: Session, professor: User) -> list[ProfessorItem]:
 def colleagues(session: Session, professor: User) -> list[User]:
     return [
         p
-        for p in user_repo.professors_in(session, professor.institution_id or 0, professor.department or "")
+        for p in user_repo.professors_in(session, professor.institution_id or 0, professor.department_id)
         if p.id != professor.id
     ]
 

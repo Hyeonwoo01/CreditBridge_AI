@@ -40,7 +40,7 @@
         <td class="px-5 py-3">{{ u.email }}</td>
         <td class="px-3 py-3">{% if r.show_name %}{{ u.name }}{% else %}<span class="text-muted" title="{{ _('학생 이름은 보여 주지 않아요') }}">–</span>{% endif %}</td>
         <td class="px-3 py-3">{{ role_names.get(u.role, u.role) }}</td>
-        <td class="px-3 py-3">{{ u.department or '–' }}</td>
+        <td class="px-3 py-3">{{ u.department_name or '–' }}</td>
         <td class="px-3 py-3">{{ r.delegate.name if r.delegate else '–' }}</td>
         <td class="px-3 py-3"><span class="{{ st[1] }}">{{ st[0] }}</span></td>
         <td class="px-5 py-3 text-right"><a href="/admin/accounts/{{ u.id }}" class="btn-secondary btn-sm">{{ _("수정") }}</a></td>

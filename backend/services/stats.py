@@ -157,11 +157,11 @@ def institution_stats(session: Session, user: User) -> Stats:
     dept_days: dict[str, list[float]] = {}
     for e, _, _ in waiting:
         course = courses.get(e.candidate_course_id) if e.candidate_course_id else None
-        received[course.department if course else tr("미분류")] += 1
+        received[course.department_name if course else tr("미분류")] += 1
     for evaluation_id, d in current.items():
         target = d.target_course_id or candidate_of.get(evaluation_id)
         course = courses.get(target) if target else None
-        name = course.department if course else tr("미분류")
+        name = course.department_name if course else tr("미분류")
         received[name] += 1
         decided[name] += 1
         start = submitted_at.get(request_of[evaluation_id] or 0)

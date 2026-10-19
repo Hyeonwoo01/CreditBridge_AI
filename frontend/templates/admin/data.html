@@ -116,7 +116,7 @@
         {% set st = r.reference_status %}
         <tr class="border-t border-divider align-middle">
           <td class="px-5 py-3"><span class="font-mono text-[13px] font-semibold">{{ c.code }}</span><div class="text-xs text-ink-80">{{ c.title }}</div></td>
-          <td class="px-3 py-3">{{ c.department }}</td>
+          <td class="px-3 py-3">{{ c.department_name }}</td>
           <td class="px-3 py-3 tabular-nums">{{ c.credits }}</td>
           <td class="px-3 py-3">{% if r.concepts %}<span title="{{ r.concepts | join(', ') }}">{{ _("{concepts}개", concepts=(r.concepts | length)) }}</span>{% else %}<span class="text-muted">{{ _("기준 강의계획서 기준") }}</span>{% endif %}</td>
           <td class="px-3 py-3">

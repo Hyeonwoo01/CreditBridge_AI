@@ -149,11 +149,11 @@ def _department_professors(session: Session, evaluation: CourseEvaluation, insti
     decision = decision_repo.for_evaluation(session, evaluation.id)
     course_id = (decision.target_course_id if decision else None) or evaluation.candidate_course_id
     course = catalog_repo.get_course(session, course_id) if course_id else None
-    department = course.department if course else None
-    if department is None and decision is not None:
+    department_id = course.department_id if course else None
+    if department_id is None and decision is not None:
         decider = user_repo.get_by_id(session, decision.decided_by)
-        department = decider.department if decider else None
-    return user_repo.professors_in(session, institution_id, department) if department else []
+        department_id = decider.department_id if decider else None
+    return user_repo.professors_in(session, institution_id, department_id)
 
 
 def accept(session: Session, evaluator: User, appeal_id: int, reviewer_id: int | None, note: str) -> Appeal:

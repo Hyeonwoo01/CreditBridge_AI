@@ -9,7 +9,7 @@ from backend.db.base import utcnow
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Assignment, Course, CourseEvaluation, Syllabus, TransferRequest, User
+from backend.models import Assignment, Course, CourseEvaluation, Department, Syllabus, TransferRequest, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
@@ -125,7 +125,7 @@ def queue(
                 syllabus=syllabus,
                 request=request,
                 course=course,
-                department=course.department if course else tr("미분류"),
+                department=course.department_name if course else tr("미분류"),
                 assignment=assignment,
                 reviewer=reviewer,
                 delegated=bool(assignment and assignment.reassigned_from),
@@ -164,11 +164,14 @@ def queue(
     )
 
 
-def pick_reviewer(session: Session, institution_id: int, department: str, today: date) -> tuple[User, User | None]:
+def pick_reviewer(
+    session: Session, institution_id: int, department: Department | None, today: date
+) -> tuple[User, User | None]:
     """담당 교수 중 배정이 가장 적은 사람. 부재 중이면 대리 심사자 (반환: 실제 배정자, 원래 배정자)."""
-    professors = user_repo.professors_in(session, institution_id, department)
+    professors = user_repo.professors_in(session, institution_id, department.id if department else None)
     if not professors:
-        raise CreditBridgeError(tr("{department} 학과에 등록된 심사 교수가 없어요.", department=department))
+        name = department.name if department else tr("미분류")
+        raise CreditBridgeError(tr("{department} 학과에 등록된 심사 교수가 없어요.", department=name))
     available = [p for p in professors if not p.is_away(today)] or professors
     chosen = min(available, key=lambda p: len(evaluation_repo.active_assignments_for(session, p.id)))
     if chosen.is_away(today) and chosen.delegate_user_id:
@@ -193,7 +196,7 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
             problems.append(tr("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요."))
             continue
         try:
-            reviewer, original = pick_reviewer(session, institution_id, course.department, today)
+            reviewer, original = pick_reviewer(session, institution_id, course.dept, today)
         except CreditBridgeError as exc:
             problems.append(str(exc))
             continue
@@ -245,7 +248,7 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
         delegate = next(
             (
                 p
-                for p in user_repo.professors_in(session, professor.institution_id or 0, professor.department or "")
+                for p in user_repo.professors_in(session, professor.institution_id or 0, professor.department_id)
                 if p.id == delegate_id and p.id != professor.id
             ),
             None,
@@ -284,7 +287,7 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
                 notifications.staff(session, professor.institution_id or 0, Role.EVALUATOR),
                 "assignment.delegated",
                 N_("{dept} 교수 부재로 진행 중인 심사 {n}건이 대리 재배정됐어요.").format(
-                    dept=professor.department or "", n=moved
+                    dept=professor.department_name or "", n=moved
                 ),
                 "/review",
             )

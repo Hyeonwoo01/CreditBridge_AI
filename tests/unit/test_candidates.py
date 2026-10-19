@@ -6,7 +6,7 @@ from backend.ai.candidates import MAX_CANDIDATES, matches, select
 @dataclass(frozen=True)
 class C:
     code: str
-    department: str
+    department_name: str
 
 
 CATALOG = [

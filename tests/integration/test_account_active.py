@@ -59,7 +59,7 @@ def test_deactivated_account_cannot_sign_in_and_can_be_restored(client: TestClie
 def test_deactivating_professor_hands_over_reviews(client: TestClient, seeded: Session) -> None:
     ev, prof, _ = professor_for(client, seeded, "calculus.txt")
     colleague = seeded.scalars(
-        select(User).where(User.department == prof.department, User.role == "professor", User.id != prof.id)
+        select(User).where(User.department_id == prof.department_id, User.role == "professor", User.id != prof.id)
     ).one()
 
     page = deactivate(client, prof.email)

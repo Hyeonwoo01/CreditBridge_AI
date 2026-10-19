@@ -96,7 +96,7 @@ def update_account(
     request: Request,
     user_id: int,
     name: str = Form(""),
-    department: str = Form(""),
+    department_id: int | None = Form(None),
     delegate_user_id: int | None = Form(None),
     csrf_token: str = Form(""),
     user: User = Admin,
@@ -105,7 +105,7 @@ def update_account(
     """교직원 이름, 교수·심사관 학과, 교수 대리 심사자 수정 (역할은 바꾸지 않는다)."""
     check_csrf(request, csrf_token)
     try:
-        changed = account_service.update_account(session, user, user_id, name, department, delegate_user_id)
+        changed = account_service.update_account(session, user, user_id, name, department_id, delegate_user_id)
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")

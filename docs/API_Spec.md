@@ -137,7 +137,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M13 | GET | `/admin/audit` | 관리자 | `action`, `target_type`, `target_id`, `since`·`until`(UTC 날짜 YYYY-MM-DD), `page` | HTML (소속 기관 기록, 50건씩) | P16 | FR-10 |
 | M14 | GET | `/admin/accounts` | 관리자 | `q`(이메일 일부), `role`, `status`(active·inactive·all), `page` | HTML (50건씩, 학생 이름 없음) | P24 | FR-12 |
 | M15 | GET | `/admin/accounts/{id}` | 관리자 | – | HTML / 404(다른 기관) | P24 | FR-12·19 |
-| M16 | POST | `/admin/accounts/{id}` | 관리자 | `name`(교직원), `department`(교수 필수·심사관 선택, 과목 학과명만), `delegate_user_id`(교수), `csrf_token` | 303→M15 + 플래시 | P24 | FR-12·19 |
+| M16 | POST | `/admin/accounts/{id}` | 관리자 | `name`(교직원), `department_id`(교수 필수·심사관 선택, 과목이 있는 학과만), `delegate_user_id`(교수), `csrf_token` | 303→M15 + 플래시 | P24 | FR-12·19 |
 
 ### 2.7 JSON API
 

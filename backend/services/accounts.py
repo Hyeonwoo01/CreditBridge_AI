@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend.errors import CreditBridgeError, NotFoundError
 from backend.i18n import gettext as tr
-from backend.models import User
+from backend.models import Department, User
 from backend.models.enums import Role
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import users as user_repo
@@ -86,7 +86,7 @@ def list_accounts(session: Session, admin: User, query: str, role: str, status: 
 @dataclass(frozen=True)
 class AccountForm:
     row: AccountRow
-    departments: list[str]  # 과목에 있는 학과명 (+ 지금 값이 목록에 없으면 그 값)
+    departments: list[Department]  # 과목이 있는 학과 (+ 지금 학과가 목록에 없으면 그 학과)
     delegate_options: list[User]  # 같은 기관의 다른 활성 교수 (학과별로 정렬)
 
     @property
@@ -104,16 +104,16 @@ def _load(session: Session, admin: User, user_id: int) -> tuple[int, User]:
 
 def account_form(session: Session, admin: User, user_id: int) -> AccountForm:
     institution_id, user = _load(session, admin, user_id)
-    departments = catalog_repo.departments_of(session, institution_id)
-    if user.department and user.department not in departments:
-        departments = [user.department, *departments]
+    departments = catalog_repo.course_departments(session, institution_id)
+    if user.dept is not None and user.dept not in departments:
+        departments = [user.dept, *departments]
     delegate = user_repo.get_by_id(session, user.delegate_user_id) if user.delegate_user_id else None
     options = [p for p in user_repo.professors_of(session, institution_id) if p.id != user.id]
     return AccountForm(AccountRow(user, delegate), departments, options)
 
 
 def update_account(
-    session: Session, admin: User, user_id: int, name: str, department: str, delegate_id: int | None
+    session: Session, admin: User, user_id: int, name: str, department_id: int | None, delegate_id: int | None
 ) -> list[str]:
     """교직원 이름·학과·대리 심사자를 고친다. 바뀐 항목 이름을 돌려준다 (없으면 빈 목록)."""
     institution_id, user = _load(session, admin, user_id)
@@ -130,17 +130,17 @@ def update_account(
             changed.append("name")
 
     if user.role in (Role.PROFESSOR, Role.EVALUATOR):
-        department = department.strip()
+        department_id = department_id or None
         if (
-            department
-            and department != user.department
-            and department not in catalog_repo.departments_of(session, institution_id)
+            department_id is not None
+            and department_id != user.department_id
+            and department_id not in {d.id for d in catalog_repo.course_departments(session, institution_id)}
         ):
             raise CreditBridgeError(tr("과목에 있는 학과 이름을 골라 주세요."))
-        if user.role == Role.PROFESSOR and not department:
+        if user.role == Role.PROFESSOR and department_id is None:
             raise CreditBridgeError(tr("교수는 학과를 골라야 심사를 배정받을 수 있어요."))
-        if (department or None) != user.department:
-            user.department = department or None
+        if department_id != user.department_id:
+            user.department_id = department_id
             changed.append("department")
 
     if user.role == Role.PROFESSOR:

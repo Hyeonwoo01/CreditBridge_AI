@@ -16,6 +16,7 @@ from backend.models import (
     AuditLog,
     CourseEvaluation,
     Decision,
+    Department,
     MaterialRequest,
     Notification,
     PrivacyRequest,
@@ -273,7 +274,11 @@ def test_notifications_for_assignment_and_delegation(client: TestClient, seeded:
     prof = reviewer_of(seeded, calc)
     assert any("새 심사가 배정" in m for m in notes_for(seeded, prof.email))
 
-    colleague = seeded.scalars(select(User).where(User.department == "Mathematics", User.id != prof.id)).one()
+    colleague = seeded.scalars(
+        select(User)
+        .join(Department, Department.id == User.department_id)
+        .where(Department.name == "Mathematics", User.id != prof.id)
+    ).one()
     token = login(client, prof.email)
     assert client.get("/notifications/count").text.count("notify-count") == 1
     client.post("/professor/away", data={"days": 7, "delegate_id": colleague.id, "csrf_token": token})

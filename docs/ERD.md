@@ -2,15 +2,16 @@
 
 [API 명세서](API_Spec.md)가 읽고 쓰는 데이터를 [기획 통합본](spec.md) 4장 기능 명세(FR-01~FR-27)에 맞춰 엔티티·속성·관계로 정리했다. 마지막 절에 구조 검토 결과가 있다.
 
-- 기준: 2026-10-19 main, Alembic 0001~0010. 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
+- 기준: 2026-10-19 main, Alembic 0001~0011. 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
 - DB: MariaDB 11.8, MySQL 8.0 호환 문법, utf8mb4. 시간은 모두 UTC `DATETIME(6)`. 기본키는 `id BIGINT UNSIGNED AUTO_INCREMENT`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (21개)
+## 1. 엔티티 한눈에 보기 (22개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
 | 기관·사용자 | `institutions` | 출신 대학과 대상(편입) 대학 | FR-12·15·24 |
+| | `departments` | 대상 대학의 학과 (과목·교수 배정 기준) | FR-05·18 |
 | | `users` | 학생·심사관·교수·관리자 계정 | FR-12·19 |
 | | `courses` | 대상 대학 카탈로그 과목과 필수 개념 | FR-05 |
 | 편입 요청·문서 | `transfer_requests` | 학생의 편입 학점 심사 요청 묶음 | FR-15·21 |
@@ -38,6 +39,9 @@
 ```mermaid
 erDiagram
     institutions ||--o{ users : "소속"
+    institutions ||--o{ departments : "학과"
+    departments ||--o{ courses : "개설 학과"
+    departments |o--o{ users : "소속 교수"
     institutions ||--o{ courses : "카탈로그"
     institutions ||--o{ transfer_requests : "출신 대학"
     institutions ||--o{ transfer_requests : "대상 대학"
@@ -81,12 +85,17 @@ erDiagram
         int degree_credits
         varchar sis_token_hash
     }
+    departments {
+        bigint id PK
+        bigint institution_id FK
+        varchar name "기관 안에서 UNIQUE"
+    }
     users {
         bigint id PK
         varchar email UK
         varchar role
         bigint institution_id FK
-        varchar department
+        bigint department_id FK
         bigint delegate_user_id FK
         date away_until
         boolean is_active
@@ -97,7 +106,7 @@ erDiagram
         bigint institution_id FK
         varchar code "기관 안에서 UNIQUE"
         decimal credits
-        varchar department
+        bigint department_id FK
         json concepts
         bigint reference_syllabus_id FK
     }
@@ -261,6 +270,13 @@ erDiagram
 | degree_credits | INT | null | 졸업 학점 (FR-15) |
 | sis_token_hash | VARCHAR(64) | null | 학사정보시스템 연동 토큰의 해시 (원문은 저장하지 않음, FR-24) |
 
+**departments** — 대상 대학의 학과. `(institution_id, name)` UNIQUE. 과목 CSV를 가져올 때 새 학과명이면 만들고, 계정 CSV·관리자 계정 수정은 과목이 있는 학과만 고른다. 학과명을 고치면 과목·교수가 함께 따라간다(Alembic 0011).
+
+| 속성 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| institution_id | BIGINT | FK→institutions, NN | 기관 |
+| name | VARCHAR(50) | NN, UQ(기관 안) | 학과명 (예: Mathematics) |
+
 **users** — 역할 하나와 소속 기관 하나를 가진다. 지우지 않고 비활성화한다(판정·감사 기록이 가리키므로).
 
 | 속성 | 타입 | 제약 | 설명 |
@@ -270,7 +286,7 @@ erDiagram
 | name | VARCHAR(100) | NN | 이름 |
 | role | VARCHAR(20) | NN, IX | student · evaluator · professor · admin (FR-12) |
 | institution_id | BIGINT | FK→institutions, null | 소속 기관 |
-| department | VARCHAR(50) | IX, null | 교수의 학과 (과목 `department`와 같은 이름이어야 자동 배정, FR-18) |
+| department_id | BIGINT | FK→departments, IX, null | 교수의 학과 (과목과 같은 학과 행이어야 자동 배정, FR-18). 심사관은 선택, 학생·관리자는 비움 |
 | delegate_user_id | BIGINT | FK→users, null | 부재 시 대리 심사자 (FR-19) |
 | away_until | DATE | null | 부재 종료일 (FR-19) |
 | must_change_password | BOOLEAN | NN | 임시 비밀번호 → 첫 로그인 때 변경 |
@@ -288,7 +304,7 @@ erDiagram
 | code | VARCHAR(30) | NN, UQ(institution_id, code) | 과목 코드 (MATH 1151) |
 | title | VARCHAR(200) | NN | 과목명 |
 | credits | DECIMAL(4,1) | NN | 학점 |
-| department | VARCHAR(50) | NN, IX | 학과 (후보 선정 필터·교수 배정 기준, FR-05·18) |
+| department_id | BIGINT | FK→departments, NN, IX | 학과 (후보 선정 필터·교수 배정 기준, FR-05·18) |
 | level | TEXT | NN | 과목 수준 설명 (FR-16) |
 | concepts | JSON | null | 학과가 정한 필수 개념 목록 (FR-05) |
 | reference_syllabus_id | BIGINT | FK→syllabi, null | 기준 강의계획서 |
@@ -426,6 +442,9 @@ erDiagram
 | 1 | 기관 – 사용자 | 1 : N (사용자 쪽 0..1) | users.institution_id | FR-12 소속 기관 건만 접근 |
 | 2 | 사용자 – 대리 심사자 (자기 참조) | 0..1 : N | users.delegate_user_id | FR-19 |
 | 3 | 대상 대학 – 과목 | 1 : N | courses.institution_id | FR-05 카탈로그 |
+| 3a | 대상 대학 – 학과 | 1 : N | departments.institution_id | FR-18 |
+| 3b | 학과 – 과목 | 1 : N | courses.department_id | FR-05 후보 필터 |
+| 3c | 학과 – 교수 | 0..1 : N | users.department_id | FR-18 자동 배정, FR-19 같은 학과 대리 |
 | 4 | 과목 – 기준 강의계획서 | 0..1 : 0..1 | courses.reference_syllabus_id | FR-05 개념 비교 기준 |
 | 5 | 학생 – 편입 요청 | 1 : N | transfer_requests.student_id | FR-15 |
 | 6 | 출신·대상 대학 – 편입 요청 | 1 : N (두 번) | source_institution_id, target_institution_id | FR-15 |
@@ -456,7 +475,8 @@ erDiagram
 | 엔티티 | 만드는 API | 바꾸는 API | 읽는 화면(조회 API) |
 | --- | --- | --- | --- |
 | institutions | M8, 첫 관리자 스크립트 | M12(토큰) | S1·S15·M11 |
-| users | M5, 첫 관리자 스크립트 | A3(실패 수·언어), A5, A7, A11, F2, M6, M7, M16(이름·학과·대리 심사자) | 대부분 (권한·이름) |
+| users | M5, 첫 관리자 스크립트 | A3(실패 수·언어), A5, A7, A11, F2, M6, M7, M16(이름·department_id·대리 심사자) | 대부분 (권한·이름) |
+| departments | M3(새 학과명), M5 | – | M2·M14·M15·R1·M1(학과별 지표) |
 | courses | M3 | M3, M4 | R1·S10·R4·F3·M2 |
 | transfer_requests | S2 | S5, S7, S8, 판정 완료 시 | S1·S3·R1 |
 | syllabi | S4, M4 | S11, 작업 큐(추출·분석), M10(삭제) | S3·S10·R4·F3·C3 |
@@ -500,7 +520,7 @@ erDiagram
 
 | # | 항목 | 내용 | 권장 |
 | --- | --- | --- | --- |
-| E1 | 학과가 글자 | `users.department`와 `courses.department`가 자유 글자다. 철자가 다르면 자동 배정이 안 된다 (화면이 "교수 없는 학과"로 경고만 함). 기능 명세 권한표의 "학과 설정"을 담을 곳도 없다 | `departments`(institution_id, name, UQ) 엔티티를 만들고 두 컬럼을 `department_id` FK로. (2026-10-19: 관리자 계정 수정 화면 P24가 과목에 있는 학과명만 고르게 해 철자 문제는 줄였다. 테이블 분리는 아직) |
+| E1 | 학과가 글자 ✅ 반영 (0011) | `users.department`와 `courses.department`가 자유 글자다. 철자가 다르면 자동 배정이 안 된다 (화면이 "교수 없는 학과"로 경고만 함). 기능 명세 권한표의 "학과 설정"을 담을 곳도 없다 | `departments`(institution_id, name, UQ) 엔티티를 만들고 두 컬럼을 `department_id` FK로. (2026-10-19 반영: Alembic 0011이 기존 글자 값으로 학과 행을 만들고 id로 옮긴 뒤 글자 컬럼을 지웠다. 학생의 편입 전공 `transfer_requests.major`는 요청 당시 이름을 남기는 기록이라 글자로 둔다) |
 | E2 | JSON 유효성 검사 ✅ 문제 아님 (확인) | `syllabi.extracted_json`에만 `JSON_VALID` CHECK가 있다. MariaDB의 JSON은 LONGTEXT라 나머지 JSON 컬럼(`courses.concepts`, `decisions.reason_codes`·`ai_recommendation_snapshot`, `course_evaluations.coverage_json`, `material_requests.items`, `audit_logs.payload_json`, `syllabi.page_offsets`·`injection_flags`)에는 잘못된 값이 들어갈 수 있다 (DB 규칙 위반) | 다시 확인해 보니 MariaDB가 `JSON`으로 만든 컬럼마다 `CHECK (json_valid(col))`를 자동으로 붙인다(`SHOW CREATE TABLE`로 확인). MySQL 8.0은 JSON 형식 자체가 검사한다. 추가할 것 없음 |
 | E3 | 상태·코드 값 검사 ✅ 반영 (0009) | `role`, `status`, `recommendation`, `result`, `action`, `side` 등이 VARCHAR이고 허용 값 검사가 앱에만 있다 | `CHECK (status IN (...))` 추가 (MySQL 8.0.16+, MariaDB 지원) |
 | E4 | 값 범위 검사 ✅ 반영 (0009) | `coverage`·`quality_score`·`link_score`(0~1), `evidence_spans.char_start < char_end`가 DB에서 검사되지 않는다 | CHECK 추가 |
@@ -532,4 +552,4 @@ erDiagram
 3. **R1 "하나만" 유니크** — 동시 요청 대비.
 4. **E1 학과 엔티티** — 관리자 계정 수정 API(API_Spec 6.3)와 함께.
 
-1~3은 반영했다 (2026-10-19, Alembic 0009·0010, 테스트 `tests/integration/test_db_rules.py`). 동시에 들어온 두 번째 이의 신청·삭제 요청은 DB 유니크에 걸리면 "이미 처리 중" 안내로 바꿔 보여 준다(`DuplicateRowError`). E1 학과 엔티티는 아직이다.
+1~3은 반영했다 (2026-10-19, Alembic 0009·0010, 테스트 `tests/integration/test_db_rules.py`). 동시에 들어온 두 번째 이의 신청·삭제 요청은 DB 유니크에 걸리면 "이미 처리 중" 안내로 바꿔 보여 준다(`DuplicateRowError`). 4(E1 학과 엔티티)도 반영했다 (Alembic 0011).

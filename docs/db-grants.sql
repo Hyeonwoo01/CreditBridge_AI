@@ -5,6 +5,7 @@ CREATE USER IF NOT EXISTS 'creditbridge_app'@'%' IDENTIFIED BY 'change-me';
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON creditbridge.institutions       TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON creditbridge.users              TO 'creditbridge_app'@'%';
+GRANT SELECT, INSERT, UPDATE         ON creditbridge.departments        TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON creditbridge.courses            TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON creditbridge.syllabi            TO 'creditbridge_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON creditbridge.syllabus_chunks    TO 'creditbridge_app'@'%';

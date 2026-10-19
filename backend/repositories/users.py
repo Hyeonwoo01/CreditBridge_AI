@@ -1,7 +1,7 @@
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from backend.models import User
+from backend.models import Department, User
 
 
 def get_by_email(session: Session, email: str) -> User | None:
@@ -12,13 +12,15 @@ def get_by_id(session: Session, user_id: int) -> User | None:
     return session.get(User, user_id)
 
 
-def professors_in(session: Session, institution_id: int, department: str) -> list[User]:
+def professors_in(session: Session, institution_id: int, department_id: int | None) -> list[User]:
+    if department_id is None:
+        return []
     stmt = (
         select(User)
         .where(
             User.institution_id == institution_id,
             User.role == "professor",
-            User.department == department,
+            User.department_id == department_id,
             User.is_active.is_(True),
         )
         .order_by(User.id)
@@ -55,11 +57,12 @@ def pending_password_change(session: Session, institution_id: int) -> int:
     return session.scalar(stmt) or 0
 
 
-def professor_departments(session: Session, institution_id: int) -> set[str]:
-    stmt = select(User.department).where(
+def professor_departments(session: Session, institution_id: int) -> set[int]:
+    """활성 교수가 있는 학과 id."""
+    stmt = select(User.department_id).where(
         User.institution_id == institution_id,
         User.role == "professor",
-        User.department.is_not(None),
+        User.department_id.is_not(None),
         User.is_active.is_(True),
     )
     return {d for d in session.scalars(stmt) if d}
@@ -113,6 +116,7 @@ def professors_of(session: Session, institution_id: int) -> list[User]:
     stmt = (
         select(User)
         .where(User.institution_id == institution_id, User.role == "professor", User.is_active.is_(True))
-        .order_by(User.department, User.name)
+        .outerjoin(Department, Department.id == User.department_id)
+        .order_by(Department.name, User.name)
     )
     return list(session.scalars(stmt))

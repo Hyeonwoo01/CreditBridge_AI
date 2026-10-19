@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from backend.models import Assignment, AuditLog, CourseEvaluation, Decision, TransferRequest, User
+from backend.models import Assignment, AuditLog, CourseEvaluation, Decision, Department, TransferRequest, User
 from backend.services.decisions import SIMILARITY_MIN, similarity
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import demo_text, login
@@ -50,8 +50,8 @@ def test_queue_tabs_and_department_assignment(client: TestClient, seeded: Sessio
 
     calc, ds = latest(seeded, "calculus.txt"), latest(seeded, "data_structures.txt")
     client.post("/review/assign", data={"evaluation_ids": [calc.id, ds.id], "csrf_token": token})
-    assert reviewer_of(seeded, calc).department == "Mathematics"
-    assert reviewer_of(seeded, ds).department == "Computer Science and Engineering"
+    assert reviewer_of(seeded, calc).department_name == "Mathematics"
+    assert reviewer_of(seeded, ds).department_name == "Computer Science and Engineering"
 
 
 def test_away_professor_is_replaced_by_delegate(client: TestClient, seeded: Session) -> None:
@@ -59,7 +59,11 @@ def test_away_professor_is_replaced_by_delegate(client: TestClient, seeded: Sess
     calc = latest(seeded, "calculus.txt")
     assign(client, calc)
     first = reviewer_of(seeded, calc)
-    colleague = seeded.scalars(select(User).where(User.department == "Mathematics", User.id != first.id)).one()
+    colleague = seeded.scalars(
+        select(User)
+        .join(Department, Department.id == User.department_id)
+        .where(Department.name == "Mathematics", User.id != first.id)
+    ).one()
 
     token = login(client, first.email)
     r = client.post(
@@ -243,7 +247,9 @@ def test_no_decision_without_assigned_professor(client: TestClient, seeded: Sess
         assert r.status_code == 403
     # 배정되지 않은 교수도 불가
     assign(client, calc)
-    other = seeded.scalars(select(User).where(User.department == "Physics")).first()
+    other = seeded.scalars(
+        select(User).join(Department, Department.id == User.department_id).where(Department.name == "Physics")
+    ).first()
     assert other is not None
     token = login(client, other.email)
     assert client.post("/api/decisions", json=body, headers={"X-CSRF-Token": token}).status_code == 403

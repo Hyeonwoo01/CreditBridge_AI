@@ -19,9 +19,9 @@
     <label class="field"><span>{{ _("이름") }}</span><input class="input" name="name" value="{{ u.name }}" required maxlength="100"></label>
     {% if u.role in ['professor', 'evaluator'] %}
     <label class="field"><span>{{ _("학과") }}</span>
-      <select name="department" class="input h-11" {% if u.role == 'professor' %}required{% endif %}>
-        {% if u.role != 'professor' or not u.department %}<option value="">{{ _("없음") if u.role != 'professor' else _("학과를 골라 주세요") }}</option>{% endif %}
-        {% for d in form.departments %}<option value="{{ d }}" {% if d == u.department %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      <select name="department_id" class="input h-11" {% if u.role == 'professor' %}required{% endif %}>
+        {% if u.role != 'professor' or not u.department_id %}<option value="">{{ _("없음") if u.role != 'professor' else _("학과를 골라 주세요") }}</option>{% endif %}
+        {% for d in form.departments %}<option value="{{ d.id }}" {% if d.id == u.department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
       </select>
     </label>
     {% if u.role == 'professor' %}<p class="text-xs text-muted">{{ _("과목에 있는 학과 이름만 고를 수 있어요. 이 학과 과목이 이 교수에게 자동 배정돼요. 진행 중인 배정은 그대로 남아요.") }}</p>{% endif %}
@@ -30,7 +30,7 @@
     <label class="field"><span>{{ _("대리 심사자 (부재 시)") }}</span>
       <select name="delegate_user_id" class="input h-11">
         <option value="">{{ _("없음") }}</option>
-        {% for p in form.delegate_options %}<option value="{{ p.id }}" {% if p.id == u.delegate_user_id %}selected{% endif %}>{{ p.name }} · {{ p.department or '–' }}</option>{% endfor %}
+        {% for p in form.delegate_options %}<option value="{{ p.id }}" {% if p.id == u.delegate_user_id %}selected{% endif %}>{{ p.name }} · {{ p.department_name or '–' }}</option>{% endfor %}
       </select>
     </label>
     <p class="text-xs text-muted">{{ _("교수가 부재 기간을 설정하면 진행 중인 심사가 대리 심사자에게 넘어가요. 교수 본인도 배정된 심사 화면에서 바꿀 수 있어요.") }}</p>

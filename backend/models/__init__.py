@@ -7,6 +7,7 @@ from backend.models.audit_log import AuditLog
 from backend.models.course import Course
 from backend.models.course_evaluation import CourseEvaluation
 from backend.models.decision import Decision
+from backend.models.department import Department
 from backend.models.equivalency import Equivalency
 from backend.models.evaluation_note import EvaluationNote
 from backend.models.evidence_span import EvidenceSpan
@@ -29,6 +30,7 @@ __all__ = [
     "Course",
     "CourseEvaluation",
     "Decision",
+    "Department",
     "Equivalency",
     "EvaluationNote",
     "EvidenceSpan",

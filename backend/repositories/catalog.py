@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import Course, Institution
+from backend.models import Course, Department, Institution
 
 
 def target_institutions(session: Session) -> list[Institution]:
@@ -36,10 +36,40 @@ def course_by_code(session: Session, institution_id: int, code: str) -> Course |
 
 
 def departments_of(session: Session, institution_id: int) -> list[str]:
+    """과목이 있는 학과 이름 (학생 편입 전공 선택지 등)."""
     stmt = (
-        select(Course.department).where(Course.institution_id == institution_id).distinct().order_by(Course.department)
+        select(Department.name)
+        .join(Course, Course.department_id == Department.id)
+        .where(Department.institution_id == institution_id)
+        .distinct()
+        .order_by(Department.name)
     )
     return list(session.scalars(stmt))
+
+
+def course_departments(session: Session, institution_id: int) -> list[Department]:
+    """과목이 있는 학과 (교수에게 고를 수 있는 학과)."""
+    stmt = (
+        select(Department)
+        .where(Department.institution_id == institution_id, Department.id.in_(select(Course.department_id)))
+        .order_by(Department.name)
+    )
+    return list(session.scalars(stmt))
+
+
+def department_by_name(session: Session, institution_id: int, name: str) -> Department | None:
+    stmt = select(Department).where(Department.institution_id == institution_id, Department.name == name)
+    return session.scalars(stmt).first()
+
+
+def get_department(session: Session, department_id: int) -> Department | None:
+    return session.get(Department, department_id)
+
+
+def add_department(session: Session, department: Department) -> Department:
+    session.add(department)
+    session.flush()
+    return department
 
 
 def source_institution_by_name(session: Session, name: str) -> Institution | None:

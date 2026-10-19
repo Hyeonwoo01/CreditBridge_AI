@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, fa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of
+from backend.models.department import Department
 from backend.models.enums import Role
 from backend.models.institution import Institution
 
@@ -21,7 +22,8 @@ class User(IdMixin, CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), index=True)
     institution_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("institutions.id"))
-    department: Mapped[str | None] = mapped_column(String(50), index=True)
+    # 교수의 학과 (과목과 같은 학과 행이어야 자동 배정, FR-18). 심사관은 선택, 학생·관리자는 비움
+    department_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("departments.id"), index=True)
     # 부재 시 대리 심사자 (FR-19)
     delegate_user_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("users.id"))
     away_until: Mapped[date | None] = mapped_column(default=None)
@@ -37,6 +39,11 @@ class User(IdMixin, CreatedAtMixin, Base):
     locale: Mapped[str | None] = mapped_column(String(5), default=None)
 
     institution: Mapped[Institution | None] = relationship(lazy="joined")
+    dept: Mapped[Department | None] = relationship(lazy="joined")
+
+    @property
+    def department_name(self) -> str | None:
+        return self.dept.name if self.dept else None
 
     def is_away(self, today: date) -> bool:
         return self.away_until is not None and self.away_until >= today

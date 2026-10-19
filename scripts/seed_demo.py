@@ -25,6 +25,7 @@ from backend.models import (
 )
 from backend.services.analysis import content_hash
 from backend.services.auth import hash_password
+from backend.services.institution_data import department_named
 from scripts.catalog_data import MSU_COURSES, reference_syllabus_text
 
 DEMO_PASSWORD = "demo1234"
@@ -42,7 +43,9 @@ def _user(
             name=name,
             role=role,
             institution_id=institution.id if institution else None,
-            department=department,
+            department_id=department_named(session, institution.id, department).id
+            if institution and department
+            else None,
         )
         session.add(user)
         session.flush()
@@ -92,7 +95,7 @@ def seed(session: Session) -> None:
                 code=c.code,
                 title=c.title,
                 credits=c.credits,
-                department=c.department,
+                department_id=department_named(session, msu.id, c.department).id,
                 level=c.level,
                 reference_syllabus_id=ref.id,
             )
