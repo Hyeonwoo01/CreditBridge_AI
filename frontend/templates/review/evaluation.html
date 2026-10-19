@@ -8,7 +8,7 @@
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
 {% include "partials/notes.html" %}
-{% if not v.decision %}{% include "partials/material_request_form.html" %}{% endif %}
+{% if not v.decision %}{% include "partials/material_request_form.html" %}{% if v.evaluation.is_latest %}{% include "partials/staff_supplement_form.html" %}{% endif %}{% endif %}
 <section class="mt-10 grid gap-2 text-sm">
   <h2 class="section-title">{{ _("처리 기록") }}</h2>
   <p>{{ _("담당 교수: {reviewer}", reviewer=(v.reviewer.name if v.reviewer else _('미배정'))) }}{% if v.assignment %} {{ _("· 배정 {time}", time=(time(v.assignment.assigned_at))) }}{% endif %}</p>

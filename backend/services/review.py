@@ -72,9 +72,16 @@ def ensure_evaluator(user: User) -> int:
     return user.institution_id
 
 
-def unassigned_count(session: Session, evaluator: User) -> int:
-    """심사관 메뉴 배지: 판정 전인데 담당 교수가 아직 없는 과목 수."""
-    institution_id = ensure_evaluator(evaluator)
+def ensure_assigner(user: User) -> int:
+    """교수 배정·재배정: 심사관과 기관 관리자 (권한 매트릭스)."""
+    if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
+        raise PermissionDeniedError(tr("심사관이나 기관 관리자만 교수를 배정할 수 있어요."))
+    return user.institution_id
+
+
+def unassigned_count(session: Session, user: User) -> int:
+    """심사관·관리자 메뉴 배지: 판정 전인데 담당 교수가 아직 없는 과목 수."""
+    institution_id = ensure_assigner(user)
     return sum(
         1
         for evaluation, _, _ in evaluation_repo.review_queue(session, institution_id)
@@ -182,7 +189,8 @@ def pick_reviewer(
 
 
 def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) -> tuple[int, list[str]]:
-    institution_id = ensure_evaluator(evaluator)
+    """학과 담당 교수 중 배정이 가장 적은 사람에게 배정한다 (심사관·관리자)."""
+    institution_id = ensure_assigner(evaluator)
     today = utcnow().date()
     assigned, problems = 0, []
     for evaluation_id in evaluation_ids:
@@ -299,3 +307,125 @@ def set_away(session: Session, professor: User, days: int, delegate_id: int | No
 def _course(session: Session, evaluation: CourseEvaluation) -> str:
     syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
     return (syllabus.course_code or syllabus.course_title).strip() if syllabus else N_("과목")
+
+
+# ---------- 관리자 교수 배정 (권한 매트릭스: 교수 배정·재배정은 심사관·관리자) ----------
+
+
+@dataclass(frozen=True)
+class BoardRow:
+    """관리자 배정 화면의 한 줄. 관리자는 AI 분석 결과를 보지 않으므로 추천·커버리지·후보 과목은 담지 않는다."""
+
+    evaluation: CourseEvaluation
+    syllabus: Syllabus
+    request: TransferRequest
+    department: Department | None  # 배정 기준 학과 (후보 과목의 학과)
+    reviewer: User | None
+    assigned_at: date | None
+    delegated: bool
+    default_reviewer_id: int | None  # 선택 상자 기본값: 지금 담당 교수, 없으면 그 학과 첫 교수
+
+
+@dataclass(frozen=True)
+class AssignmentBoard:
+    rows: list[BoardRow]
+    show: str  # unassigned / all
+    unassigned: int
+    total: int
+    professors: list[User]  # 같은 기관 활성 교수 (학과·이름 순)
+
+
+def assignment_board(session: Session, admin: User, show: str) -> AssignmentBoard:
+    """판정 전 심사 건과 담당 교수. 관리자 전용."""
+    if admin.role != Role.ADMIN or admin.institution_id is None:
+        raise PermissionDeniedError(tr("기관 관리자만 사용할 수 있어요."))
+    institution_id = admin.institution_id
+    queue_rows = evaluation_repo.review_queue(session, institution_id)
+    courses = catalog_repo.courses_by_ids(
+        session, [e.candidate_course_id for e, _, _ in queue_rows if e.candidate_course_id]
+    )
+    professors = user_repo.professors_of(session, institution_id)
+    first_of: dict[int, int] = {}
+    for p in professors:
+        if p.department_id is not None:
+            first_of.setdefault(p.department_id, p.id)
+    rows = []
+    for evaluation, syllabus, request in queue_rows:
+        course = courses.get(evaluation.candidate_course_id) if evaluation.candidate_course_id else None
+        assignment = evaluation_repo.active_assignment(session, evaluation.id)
+        reviewer = user_repo.get_by_id(session, assignment.reviewer_id) if assignment else None
+        rows.append(
+            BoardRow(
+                evaluation=evaluation,
+                syllabus=syllabus,
+                request=request,
+                department=course.dept if course else None,
+                reviewer=reviewer,
+                assigned_at=assignment.assigned_at.date() if assignment else None,
+                delegated=bool(assignment and assignment.reassigned_from),
+                default_reviewer_id=reviewer.id
+                if reviewer
+                else (first_of.get(course.department_id) if course else None),
+            )
+        )
+    unassigned = sum(1 for r in rows if r.reviewer is None)
+    show = show if show in ("unassigned", "all") else "unassigned"
+    picked = [r for r in rows if show == "all" or r.reviewer is None]
+    return AssignmentBoard(picked, show, unassigned, len(rows), professors)
+
+
+def assign_to(session: Session, user: User, evaluation_id: int, reviewer_id: int) -> User:
+    """특정 교수에게 배정하거나 다른 교수로 바꾼다 (심사관·관리자). 이전 배정은 기록으로 남는다."""
+    institution_id = ensure_assigner(user)
+    evaluation = evaluation_repo.get(session, evaluation_id)
+    in_queue = {e.id for e, _, _ in evaluation_repo.review_queue(session, institution_id)}
+    if evaluation is None or evaluation.id not in in_queue:
+        raise NotFoundError(tr("판정 전인 소속 기관 심사 건만 배정할 수 있어요."))
+    reviewer = user_repo.get_by_id(session, reviewer_id)
+    if (
+        reviewer is None
+        or reviewer.institution_id != institution_id
+        or reviewer.role != Role.PROFESSOR
+        or not reviewer.is_active
+    ):
+        raise CreditBridgeError(tr("우리 기관의 활성 교수를 골라 주세요."))
+    current = evaluation_repo.active_assignment(session, evaluation.id)
+    if current is not None and current.reviewer_id == reviewer.id:
+        raise CreditBridgeError(tr("이미 그 교수에게 배정돼 있어요."))
+    evaluation_repo.add_assignment(
+        session,
+        Assignment(
+            course_evaluation_id=evaluation.id,
+            reviewer_id=reviewer.id,
+            assigned_by=user.id,
+            # reassigned_from은 부재 대리 표시에 쓰므로 비운다. 이전 교수는 비활성 배정 행과 감사 로그에 남는다
+        ),
+    )
+    notifications.notify(
+        session,
+        [reviewer],
+        "assignment.created",
+        N_("새 심사가 배정됐어요: {course}").format(course=_course(session, evaluation)),
+        f"/professor/evaluations/{evaluation.id}",
+    )
+    if current is not None:
+        previous = user_repo.get_by_id(session, current.reviewer_id)
+        if previous is not None:
+            notifications.notify(
+                session,
+                [previous],
+                "assignment.moved",
+                N_("{course} 심사가 다른 교수에게 넘어갔어요.").format(course=_course(session, evaluation)),
+                "/professor",
+            )
+    audit.record(
+        session,
+        user,
+        "assignment.create",
+        "course_evaluation",
+        str(evaluation.id),
+        reviewer=reviewer.id,
+        previous=current.reviewer_id if current else None,
+    )
+    session.commit()
+    return reviewer

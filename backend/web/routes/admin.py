@@ -21,6 +21,7 @@ from backend.services import accounts as account_service
 from backend.services import auth as auth_service
 from backend.services import institution_data, notifications, views
 from backend.services import privacy as privacy_service
+from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
 from backend.web.nav import nav_badges
@@ -56,6 +57,66 @@ def audit_log(
         action.strip(), target_type.strip(), target_id.strip(), _day(since), _day(until)
     )
     return render(request, "admin/audit.html", user=user, view=stats_service.audit_page(session, user, filters, page))
+
+
+# ---------- 교수 배정 (권한 매트릭스: 관리자도 배정·재배정) ----------
+
+
+@router.get("/assignments")
+def assignments(
+    request: Request,
+    show: str = Query("unassigned", pattern="^(unassigned|all)$"),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """판정 전 심사 건의 담당 교수. AI 분석 결과(추천·커버리지)는 보여 주지 않는다."""
+    return render(
+        request, "admin/assignments.html", user=user, board=review_service.assignment_board(session, user, show)
+    )
+
+
+@router.post("/assignments/auto")
+def auto_assign(
+    request: Request,
+    evaluation_ids: list[int] = Form([]),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """고른 건을 학과 담당 교수에게 자동 배정 (심사관 일괄 배정과 같은 규칙)."""
+    check_csrf(request, csrf_token)
+    if not evaluation_ids:
+        flash(request, tr("배정할 건을 선택해 주세요."), "error")
+    else:
+        count, problems = review_service.auto_assign(session, user, evaluation_ids)
+        send_emails()
+        flash(request, tr("{count}건을 학과 담당 교수에게 배정했어요.", count=count))
+        for p in problems:
+            flash(request, p, "error")
+    return RedirectResponse("/admin/assignments", status_code=303)
+
+
+@router.post("/assignments/{evaluation_id}")
+def assign_one(
+    request: Request,
+    evaluation_id: int,
+    reviewer_id: int = Form(...),
+    show: str = Form("unassigned"),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """한 건을 고른 교수에게 배정하거나 바꾼다."""
+    check_csrf(request, csrf_token)
+    try:
+        reviewer = review_service.assign_to(session, user, evaluation_id, reviewer_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_emails()
+        flash(request, tr("{name} 교수에게 배정했어요.", name=reviewer.name))
+    return RedirectResponse(f"/admin/assignments?show={'all' if show == 'all' else 'unassigned'}", status_code=303)
 
 
 # ---------- 계정 목록·수정 ----------

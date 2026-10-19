@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import time %}
+{% block nav %}{% include "admin/_nav.html" %}{% endblock %}
+{% block crumb %}{{ _("관리자 콘솔 · 교수 배정") }}{% endblock %}
+{% block content %}
+<header class="grid gap-1">
+  <h1 class="page-title">{{ _("교수 배정") }}</h1>
+  <p class="text-sm text-muted">{{ _("판정 전인 심사 건의 담당 교수를 정하거나 바꿔요. 관리자 화면에는 AI 추천·커버리지·근거를 보여 주지 않아요. 내용 검토는 심사관과 교수가 해요.") }}</p>
+</header>
+
+<nav class="mt-6 flex flex-wrap gap-2" aria-label="{{ _('보기') }}">
+  {% for key, label, n in [('unassigned', _('미배정'), board.unassigned), ('all', _('전체'), board.total)] %}
+  <a href="?show={{ key }}" class="inline-flex min-h-9 items-center gap-1 rounded-full border px-3.5 text-sm {{ 'border-ink bg-ink text-white' if board.show == key else 'border-hairline bg-white text-ink-80' }}" {% if board.show == key %}aria-current="page"{% endif %}>{{ label }} <span class="tabular-nums {{ 'text-white/70' if board.show == key else 'text-muted' }}">({{ n }})</span></a>
+  {% endfor %}
+</nav>
+
+<form id="auto-form" method="post" action="/admin/assignments/auto" class="mt-4 flex flex-wrap items-center gap-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button class="btn-primary btn-sm" {% if not board.rows %}disabled{% endif %}>{{ _("고른 건 학과 교수에게 자동 배정") }}</button>
+  <span class="text-xs text-muted">{{ _("학과 교수 중 배정이 가장 적은 사람에게, 부재 중이면 대리 심사자에게 가요 (심사관 일괄 배정과 같은 규칙).") }}</span>
+</form>
+
+<div class="card mt-3 overflow-x-auto p-0">
+  <table class="w-full min-w-[960px] text-sm">
+    <thead class="bg-pearl text-left text-xs text-muted">
+      <tr>
+        <th class="w-12 px-4 py-3"><span class="sr-only">{{ _("선택") }}</span></th>
+        <th class="px-3 py-3 font-normal">{{ _("접수") }}</th>
+        <th class="px-3 py-3 font-normal">{{ _("학생 과목") }}</th>
+        <th class="px-3 py-3 font-normal">{{ _("출신 대학") }}</th>
+        <th class="px-3 py-3 font-normal">{{ _("배정 학과") }}</th>
+        <th class="px-3 py-3 font-normal">{{ _("담당 교수") }}</th>
+        <th class="px-5 py-3 font-normal">{{ _("배정·바꾸기") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in board.rows %}
+      <tr class="border-t border-divider align-middle">
+        <td class="px-4 py-3"><input type="checkbox" name="evaluation_ids" value="{{ r.evaluation.id }}" form="auto-form" aria-label="{{ _('{course} 선택', course=(r.syllabus.course_code or r.syllabus.course_title)) }}"></td>
+        <td class="px-3 py-3 whitespace-nowrap"><span class="font-mono text-[13px]">#{{ r.request.id }}</span><div class="text-xs text-muted">{{ time(r.request.submitted_at, 'date') }}</div></td>
+        <td class="px-3 py-3"><span class="font-semibold">{{ r.syllabus.course_code }}</span><div class="text-xs text-ink-80">{{ r.syllabus.course_title }}</div></td>
+        <td class="px-3 py-3">{{ r.request.source_institution.name }}</td>
+        <td class="px-3 py-3">{{ r.department.name if r.department else _("미분류") }}</td>
+        <td class="px-3 py-3">{% if r.reviewer %}{{ r.reviewer.name }}<div class="text-xs {{ 'text-reject' if r.delegated else 'text-muted' }}">{{ _('대리 재배정') if r.delegated else _('배정 {date}', date=(r.assigned_at.strftime('%Y-%m-%d'))) }}</div>{% else %}<span class="badge-elective">{{ _("미배정") }}</span>{% endif %}</td>
+        <td class="px-5 py-3">
+          <form method="post" action="/admin/assignments/{{ r.evaluation.id }}" class="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="show" value="{{ board.show }}">
+            <label class="sr-only" for="rev-{{ r.evaluation.id }}">{{ _("담당 교수") }}</label>
+            <select id="rev-{{ r.evaluation.id }}" name="reviewer_id" class="h-9 max-w-[240px] rounded-sm border border-hairline px-2 text-sm" required>
+              {% if not r.default_reviewer_id %}<option value="" selected disabled>{{ _("교수를 골라 주세요") }}</option>{% endif %}
+              {% for p in board.professors %}<option value="{{ p.id }}" {% if p.id == r.default_reviewer_id %}selected{% endif %}>{{ p.name }} · {{ p.department_name or '–' }}</option>{% endfor %}
+            </select>
+            <button class="btn-secondary btn-sm">{{ _('바꾸기') if r.reviewer else _('배정') }}</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="px-5 py-10 text-center text-muted">{{ _("배정할 심사 건이 없어요.") if board.show == 'unassigned' else _("판정 전인 심사 건이 없어요.") }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

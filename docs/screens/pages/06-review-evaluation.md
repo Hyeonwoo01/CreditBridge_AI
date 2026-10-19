@@ -2,11 +2,11 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| URL | `GET /review/evaluations/{id}`, 보완 요청 `POST /review/evaluations/{id}/materials` |
+| URL | `GET /review/evaluations/{id}`, 보완 요청 `POST /review/evaluations/{id}/materials`, 학생 대신 보완 자료 `POST /review/evaluations/{id}/supplement` |
 | 역할 | 심사관 (소속 기관, 제출된 요청만) |
-| 템플릿 | `review/evaluation.html` + 공용 `partials/evaluation.html`, `partials/history.html`, `partials/material_request_form.html` |
+| 템플릿 | `review/evaluation.html` + 공용 `partials/evaluation.html`, `partials/history.html`, `partials/material_request_form.html`, `partials/staff_supplement_form.html` |
 | 최대 폭 | 확장형 `max-w-[1440px]` (좌우 원문 대조 칸을 넓게) |
-| 기능 | 근거 확인(P04와 같은 분석 결과, FR-25 원본 PDF 쪽 링크, 다시 분석했으면 이전 분석과 비교), FR-11 과거 판정 이력, 심사 건 내부 메모, FR-22 보완 자료 요청, 처리 기록 |
+| 기능 | 근거 확인(P04와 같은 분석 결과, FR-25 원본 PDF 쪽 링크, 다시 분석했으면 이전 분석과 비교), FR-11 과거 판정 이력, 심사 건 내부 메모, FR-22 보완 자료 요청, 학생 대신 보완 자료 올리기(권한 매트릭스 "문서 업로드 — 심사관 소속 기관 전체"), 처리 기록 |
 
 ## 위치
 
@@ -22,6 +22,7 @@
 │ [메모 남기기]                                                                        │
 └──────────────────────────────────────────────────────────────────────────────────┘
 학생에게 보완 자료 요청 (`#materials`, 판정 전, 접힘. 정보 부족이면 펼침 — P05 "보완 요청 발송"이 여기로 이동)
+학생 대신 보완 자료 올리기 (`#supplement`, 판정 전·최신 분석에서만, 접힘): 안내 · 파일 · [올리고 다시 분석]
 처리 기록: 담당 교수 · 배정 시각 / 감사 로그 시간순
 [footer]
 ```
@@ -33,13 +34,16 @@
 | 과거 판정 | 이력 카드 | 판정일 · 결과 · 대상 과목 · 강의계획서 유사도 % · 사유. 개편된 강의계획서, 다른 대상 과목, 기존 동등 과목표(유사도 비교 불가)는 회색 보조 표시. 경보 조건을 채우는 이력이 있으면 앰버 카드 | 경보: `{colors.surface-elective-subtle}`, 아니면 `{colors.hairline}` |
 | 내부 메모 | `evaluation-utility-card` (P12와 같은 `partials/notes.html`) | 오래된 순 목록: 작성자 이름(600)·역할(심사관/교수)·시각, 다른 분석 회차에서 남긴 메모는 "이전 분석에서 남김". 본문 줄바꿈 유지. 없으면 파치먼트 "아직 메모가 없어요. 확인 중인 일이나 다른 담당자에게 전할 말을 남겨 두세요." 아래 textarea(1000자) + [메모 남기기] → `POST /evaluations/{id}/notes`. 고치거나 지울 수 없음 | 흰 카드 1px `{colors.hairline}`, `{rounded.lg}`, 패딩 24px, 행 구분 `{colors.divider-soft}`, 버튼 `button-secondary-pill` |
 | 보완 요청 | `<details>` 카드 | 자료 칩(분석이 제안한 자료가 먼저, 기본 체크) + 메모 + [요청 보내기] | 칩 `decision-option-chip`(선택 시 2px `{colors.primary-focus}`), 버튼 `button-secondary-pill` |
+| 학생 대신 올리기 | `<details>` 카드 | 학생이 메일·종이로 낸 자료를 심사관이 올림. 안내(원문 뒤에 덧붙여 다시 분석, 열린 보완 요청은 처리됨, 학생 알림, 담당 교수 배정은 새 분석으로 이어짐) + 파일(PDF·JPG·PNG, 20MB) + [올리고 다시 분석](확인 창) | 흰 카드 1px `{colors.hairline}`, 버튼 `button-secondary-pill` |
 | 처리 기록 | 목록 | 담당 교수, 배정 시각, 감사 로그(시각 · 행위) | `section-title` 21px/600, 본문 14px muted |
 
 ## 상태
 
 | 상태 | 표시 |
 | --- | --- |
-| 판정 완료 | 보완 요청 카드 숨김 (내부 메모는 판정 뒤에도 남길 수 있음) |
+| 판정 완료 | 보완 요청·학생 대신 올리기 카드 숨김 (내부 메모는 판정 뒤에도 남길 수 있음) |
+| 이전 분석 회차 | 학생 대신 올리기 카드 숨김 (최신 분석에서만) |
+| 대신 올림 | 플래시 "보완 자료를 올렸어요. 다시 분석한 결과는 심사 큐와 학생 화면에 반영돼요. 이전 결과는 기록으로 남아요." → P05, 학생에게 알림 "학사처가 {과목} 보완 자료를 대신 올렸어요…", 감사 로그 `syllabus.supplement`(`by_staff`) |
 | 메모 남김 | 플래시 "메모를 남겼어요. 학생에게는 보이지 않아요." → `#notes` |
 | 메모 비움·1000자 초과 | 빨강 플래시 "메모 내용을 적어 주세요." / "메모는 1000자까지 남길 수 있어요." |
 | 보완 요청 보냄 | 플래시 "학생에게 보완 자료를 요청했어요", 분석 결과 영역에 앰버 "제출 대기" 박스 |

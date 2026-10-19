@@ -33,7 +33,8 @@ from backend.repositories import materials as material_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
-from backend.services import analysis, audit, materials
+from backend.security.permissions import ensure_can_view_evaluation
+from backend.services import analysis, audit, materials, notifications
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,60 @@ def store_supplement(
         raise CreditBridgeError(
             tr("심사 중인 과목은 학사처나 교수의 보완 자료 요청이 있을 때만 자료를 올릴 수 있어요.")
         )
+    key = _save_supplement(session, storage, student, syllabus, file, open_requests)
+    audit.record(session, student, "syllabus.supplement", "syllabus", str(syllabus.id))
+    session.commit()
+    return key
+
+
+def store_supplement_by_staff(
+    session: Session, storage: ObjectStorage, evaluator: User, evaluation_id: int, file: UploadedFile
+) -> tuple[Syllabus, str]:
+    """심사관이 학생 대신 보완 자료를 올린다 (권한 매트릭스: 문서 업로드는 심사관 소속 기관 전체).
+
+    학생이 메일·종이로 낸 자료를 심사관이 받은 경우. 심사 중(제출 뒤)·판정 전 과목만. 열린 보완 요청은 처리됨으로
+    바뀌고 학생에게 알림이 간다. 재분석은 작업 큐(syllabus.supplement)가 맡는다."""
+    if evaluator.role != Role.EVALUATOR:
+        raise PermissionDeniedError(tr("심사관 계정만 학생 대신 자료를 올릴 수 있어요."))
+    evaluation = evaluation_repo.get(session, evaluation_id)
+    if evaluation is None:
+        raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
+    ensure_can_view_evaluation(session, evaluator, evaluation)
+    syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
+    request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
+    if syllabus is None or request is None:
+        raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
+    latest = evaluation_repo.latest_for_syllabus(session, syllabus.id)
+    if latest is None or latest.id != evaluation.id:
+        raise CreditBridgeError(tr("최신 분석 화면에서 올려 주세요."))
+    if decision_repo.for_evaluation(session, evaluation.id) is not None:
+        raise CreditBridgeError(tr("판정이 끝난 과목에는 자료를 올릴 수 없어요. 이의 신청으로 다시 심사해요."))
+    if syllabus.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING, SyllabusStatus.DELETED):
+        raise CreditBridgeError(tr("분석이 끝난 강의계획서에만 보완 자료를 올릴 수 있어요."))
+    open_requests = materials.open_for_syllabus(session, syllabus.id)
+    key = _save_supplement(session, storage, evaluator, syllabus, file, open_requests)
+    notifications.notify(
+        session,
+        [u for u in [user_repo.get_by_id(session, request.student_id)] if u is not None],
+        "material.uploaded_by_staff",
+        N_("학사처가 {course} 보완 자료를 대신 올렸어요. 다시 분석한 결과가 나오면 화면에 반영돼요.").format(
+            course=(syllabus.course_code or syllabus.course_title or N_("강의계획서")).strip()
+        ),
+        f"/student/requests/{request.id}",
+    )
+    audit.record(session, evaluator, "syllabus.supplement", "syllabus", str(syllabus.id), by_staff=True)
+    session.commit()
+    return syllabus, key
+
+
+def _save_supplement(
+    session: Session,
+    storage: ObjectStorage,
+    actor: User,
+    syllabus: Syllabus,
+    file: UploadedFile,
+    open_requests: list[MaterialRequest],
+) -> str:
     ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
     key = storage.new_key("supplements", file.filename)
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
@@ -188,9 +243,7 @@ def store_supplement(
     # 원본이 바뀌었으므로 내용 해시도 새로 만든다 (이전 해시 + 보완 파일)
     syllabus.content_hash = analysis.content_hash(syllabus.content_hash.encode(), file.data)
     syllabus.status = SyllabusStatus.UPLOADED
-    materials.mark_fulfilled(session, student, syllabus)
-    audit.record(session, student, "syllabus.supplement", "syllabus", str(syllabus.id))
-    session.commit()
+    materials.mark_fulfilled(session, actor, syllabus)
     return key
 
 

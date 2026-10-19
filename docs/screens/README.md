@@ -18,7 +18,7 @@
 | P03 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | FR-01·02·15·21 다크 히어로 예상치, 과목 필터, 정보 부족 진단, 심사 진행 단계 | [03-student-request.md](pages/03-student-request.md) |
 | P04 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | 학생 | FR-05~08 추천·근거, 버전 비교, FR-25 원본 PDF 쪽 링크, FR-22 보완 제출, FR-23 이의 신청 작성(P22)으로 이동 | [04-student-evaluation.md](pages/04-student-evaluation.md) |
 | P05 | 심사 큐 | `/review` | 심사관 | FR-17 검색·신뢰도·일관성 경보·학과 필터, FR-18 일괄 배정, 커버리지 링, 경보 행 | [05-review-queue.md](pages/05-review-queue.md) |
-| P06 | 심사 건 상세(심사관) | `/review/evaluations/{id}` | 심사관 | 근거 확인(원본 PDF 쪽), 내부 메모, 보완 자료 요청, 처리 기록 | [06-review-evaluation.md](pages/06-review-evaluation.md) |
+| P06 | 심사 건 상세(심사관) | `/review/evaluations/{id}` | 심사관 | 근거 확인(원본 PDF 쪽), 내부 메모, 보완 자료 요청, 학생 대신 보완 자료 올리기, 처리 기록 | [06-review-evaluation.md](pages/06-review-evaluation.md) |
 | P07 | 이의 신청 처리 | `/review/appeals` | 심사관 | FR-23 받아들임·기각, 학생 근거 자료 내려받기 | [07-review-appeals.md](pages/07-review-appeals.md) |
 | P08 | 문서 삭제 요청 | `/review/privacy`, `/admin/privacy` | 심사관·관리자 | FR-13 처리·승인, 기한 관리 | [08-privacy-requests.md](pages/08-privacy-requests.md) |
 | P09 | 기존 동등 과목표 | `/review/equivalencies` | 심사관 | FR-26 CSV 가져오기 | [09-review-equivalencies.md](pages/09-review-equivalencies.md) |
@@ -37,6 +37,7 @@
 | P22 | 이의 신청 작성(학생) | `/student/evaluations/{id}/appeal` | 학생 | FR-23 원 판정 요약·근거가 약한 개념, 사유(20~3000자), 근거 자료 PDF·JPG·PNG 최대 3개 | [22-student-appeal-form.md](pages/22-student-appeal-form.md) |
 | P23 | 선배 인정 사례(학생) | `/student/precedents` | 학생 | FR-26 기관 동등 과목표 검색(다른 학생의 판정은 보이지 않음) | [23-student-precedents.md](pages/23-student-precedents.md) |
 | P24 | 계정 목록·계정 수정 | `/admin/accounts`, `/admin/accounts/{id}` | 관리자 | 이메일·역할·상태로 계정 찾기(학생 이름 비공개), 교직원 이름·학과·대리 심사자 수정, 비밀번호 초기화·비활성화 | [24-admin-accounts.md](pages/24-admin-accounts.md) |
+| P25 | 교수 배정(관리자) | `/admin/assignments` | 관리자 | 판정 전 심사 건 담당 교수 자동 배정·지정·바꾸기(AI 결과 비공개) | [25-admin-assignments.md](pages/25-admin-assignments.md) |
 
 ## 역할별 흐름
 
@@ -46,7 +47,7 @@
 심사관  P01 → P05 ──(원문 대조 확인 / 충돌 내역 확인 / 보완 요청 발송)──→ P06,  P05에서 일괄 배정
         P07 이의 신청 · P08 삭제 요청 · P09 동등 과목표 · P10 운영 통계
 교수    P01 → P11 → P12 ──(판정 확정 → 반려·변경·경보면 사유 선택 창)──→ 학생 P03·P04에 반영
-관리자  P01 → P10 관리자 콘솔 → P18 계정·과목 · P24 계정 목록(→ 계정 수정) · P08 삭제 승인 · P15 연동 토큰 · P16 전체 감사 로그
+관리자  P01 → P10 관리자 콘솔 → P18 계정·과목 · P24 계정 목록(→ 계정 수정) · P25 교수 배정 · P08 삭제 승인 · P15 연동 토큰 · P16 전체 감사 로그
 새 계정  메일 O: 설정 링크 메일 → P20 → P01 / 메일 X: P01(임시 비밀번호) → P19 → 역할 홈
 잊었을 때 P01 → P20 메일 링크 → 새 비밀번호 → P01   (메일 미설정: 관리자가 P18에서 재발급 → P19)
 실패 잠금 P01 5번 틀림 → 1분 잠금 → 다시 5번 틀림(누적 10번) → 비밀번호 초기화 + 재설정 메일 자동 → P20 → P01
@@ -67,6 +68,7 @@
 
 | 날짜 | 내용 |
 | --- | --- |
+| 2026-10-19 | P25 교수 배정(관리자) 추가와 관리자 메뉴 "교수 배정"(숫자 배지), P06 "학생 대신 보완 자료 올리기"(심사관), P00 메뉴가 길면 메뉴 줄 안에서만 가로로 넘김·영어 "Deletions"로 짧게 — 권한 매트릭스와 코드 맞춤 |
 | 2026-10-19 | P24 계정 목록·계정 수정 추가(관리자 메뉴 "계정 목록", 모든 관리자 화면 메뉴 스케치 갱신), P16 감사 로그 행위·대상·기간 필터·행위자 역할·대상 링크·50건 페이지, P18 비밀번호 초기화 카드에 "계정 목록에서 찾기" 링크 |
 | 2026-10-16 | P00 화면 언어: AI 근거 설명도 영어 화면에서 영어로(분석 때 두 벌 생성) |
 | 2026-10-16 | P00 상단 언어 전환(한국어·English)과 화면 언어 규칙, P01 브라우저 언어가 영어일 때. 모든 화면 문구는 영어 번역을 함께 둠(`backend/locales/en.json`) |

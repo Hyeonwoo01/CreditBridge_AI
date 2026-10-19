@@ -458,6 +458,7 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
         overview = institution_service.overview(session, user)
         setup = overview.missing_reference + len(overview.departments_without_professor)
         privacy = privacy_service.pending_count(session, user)
+        unassigned = review_service.unassigned_count(session, user)
         return {
             "/admin/data": [
                 (
@@ -471,6 +472,9 @@ def nav_badges(session: Session, user: User) -> dict[str, list[Badge]]:
                         departments=len(overview.departments_without_professor),
                     ),
                 )
+            ],
+            "/admin/assignments": [
+                (unassigned, "todo", tr("교수 배정이 필요한 과목 {unassigned}개", unassigned=unassigned))
             ],
             "/admin/privacy": [(privacy, "todo", tr("승인할 삭제 요청 {privacy}건", privacy=privacy))],
         }

@@ -28,7 +28,7 @@
 {% set path = request.url.path %}
 {% if badges is none %}{% set badges = (request.state.nav_badges() if request.state.nav_badges is defined else {}).get(href, []) %}{% endif %}
 {% set active = current if current is not none else (path == href or (not exact and path.startswith(href + '/'))) %}
-<a href="{{ href }}" class="flex h-11 items-center gap-1.5 text-xs tracking-[-0.12px] {{ 'text-white' if active else 'text-white/70 hover:text-white' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}
+<a href="{{ href }}" class="flex h-11 items-center gap-1.5 text-xs tracking-[-0.12px] whitespace-nowrap {{ 'text-white' if active else 'text-white/70 hover:text-white' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}
   {%- for n, tone, title in badges if n %}<span class="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[11px] leading-none font-semibold tabular-nums {{ {'todo': 'bg-elective-subtle text-elective', 'new': 'bg-hl-target text-primary'}.get(tone, 'bg-white/20 text-white') }}" title="{{ title }}"><span class="sr-only">{{ title }} </span>{{ n }}</span>{% endfor -%}
 </a>
 {%- endmacro %}

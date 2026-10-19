@@ -27,15 +27,16 @@
   {% set role_label = {"student": _("학생"), "evaluator": _("심사관"), "professor": _("학과 교수"), "admin": _("관리자")} %}
   <header class="sticky top-0 z-30 bg-black text-white">
     <div class="mx-auto flex h-11 {{ self.width() }} items-center justify-between gap-4 px-4 md:px-10">
-      <a href="/" class="flex items-center gap-1.5 font-display text-[15px] font-semibold tracking-[-0.2px]">
+      <a href="/" class="flex shrink-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-[-0.2px]">
         <span class="flex h-8 items-center rounded-sm bg-white px-1"><img src="/static/img/logo-mark.png" alt="" width="36" height="26" class="h-[26px] w-auto"></span>
         CreditBridge AI
       </a>
       {% if user %}
-      <nav class="hidden items-center gap-6 md:flex" aria-label="{{ _('메인') }}">
+      {# 메뉴가 많아 폭이 모자라면(관리자 7개, 영어) 페이지 대신 메뉴 줄 안에서만 가로로 넘긴다 #}
+      <nav class="hidden min-w-0 items-center gap-4 overflow-x-auto [scrollbar-width:none] md:flex xl:gap-5" aria-label="{{ _('메인') }}">
         {% block nav %}{% endblock %}
       </nav>
-      <div class="flex items-center gap-1 md:gap-3">
+      <div class="flex shrink-0 items-center gap-1 md:gap-3">
         {% set lang_form_class = 'hidden md:block' %}{% include "partials/lang_switch.html" %}
         <a href="/notifications" class="relative flex size-11 items-center justify-center text-white/80 hover:text-white" aria-label="{{ _('알림') }}">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>

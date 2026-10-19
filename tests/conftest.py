@@ -82,6 +82,7 @@ def client(
 ) -> Iterator[TestClient]:
     from backend.main import app
     from backend.web.routes import admin as admin_routes
+    from backend.web.routes import review as review_routes
     from backend.web.routes import shared as shared_routes
     from backend.web.routes import student as student_routes
     from backend.workers import tasks
@@ -90,6 +91,7 @@ def client(
     monkeypatch.setattr(tasks, "get_storage", lambda: fake_storage)
     monkeypatch.setattr(student_routes, "get_storage", lambda: fake_storage)
     monkeypatch.setattr(admin_routes, "get_storage", lambda: fake_storage)
+    monkeypatch.setattr(review_routes, "get_storage", lambda: fake_storage)
     monkeypatch.setattr(shared_routes, "get_storage", lambda: fake_storage)
     with TestClient(app) as c:
         yield c

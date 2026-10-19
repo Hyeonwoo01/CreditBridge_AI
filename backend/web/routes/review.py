@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.db.session import get_db
+from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError
 from backend.i18n import gettext as tr
 from backend.models import User
@@ -20,10 +21,12 @@ from backend.services import privacy as privacy_service
 from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
+from backend.services import student as student_service
 from backend.services import views
 from backend.web.nav import nav_badges
 from backend.web.notify import send_emails
 from backend.web.templating import flash, render
+from backend.workers import tasks
 
 router = APIRouter(prefix="/review", dependencies=[Depends(nav_badges)])
 Evaluator = Depends(require(Role.EVALUATOR))
@@ -119,6 +122,35 @@ def request_materials(
         send_emails()
         flash(request, tr("학생에게 보완 자료를 요청했어요. 자료가 오면 알림으로 알려 드려요."))
     return RedirectResponse(f"/review/evaluations/{evaluation_id}", status_code=303)
+
+
+@router.post("/evaluations/{evaluation_id}/supplement")
+def upload_supplement(
+    request: Request,
+    evaluation_id: int,
+    file: UploadFile = File(...),
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    """학생 대신 보완 자료 올리기 (권한 매트릭스: 문서 업로드는 심사관 소속 기관 전체). 올리면 다시 분석한다."""
+    check_csrf(request, csrf_token)
+    try:
+        if not file.filename:
+            raise CreditBridgeError(tr("보완 자료 파일을 선택해 주세요."))
+        uploaded = student_service.UploadedFile(filename=file.filename, data=file.file.read())
+        syllabus, key = student_service.store_supplement_by_staff(session, get_storage(), user, evaluation_id, uploaded)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse(f"/review/evaluations/{evaluation_id}#supplement", status_code=303)
+    tasks.add_supplement.delay(syllabus.id, key)
+    send_emails()
+    flash(
+        request,
+        tr("보완 자료를 올렸어요. 다시 분석한 결과는 심사 큐와 학생 화면에 반영돼요. 이전 결과는 기록으로 남아요."),
+    )
+    return RedirectResponse("/review", status_code=303)
 
 
 @router.get("/appeals")

@@ -87,8 +87,9 @@ def request_materials(
     return material
 
 
-def mark_fulfilled(session: Session, student: User, syllabus: Syllabus) -> list[MaterialRequest]:
-    """학생이 보완 자료를 올렸을 때 열려 있는 요청을 모두 처리됨으로 바꾸고 요청자에게 알린다. 커밋은 호출자가 한다."""
+def mark_fulfilled(session: Session, actor: User, syllabus: Syllabus) -> list[MaterialRequest]:
+    """보완 자료가 올라왔을 때(학생 본인 또는 심사관 대신) 열려 있는 요청을 모두 처리됨으로 바꾸고 요청자에게 알린다.
+    커밋은 호출자가 한다."""
     open_requests = material_repo.open_for_syllabus(session, syllabus.id)
     for m in open_requests:
         m.status = MaterialRequestStatus.FULFILLED
@@ -109,7 +110,7 @@ def mark_fulfilled(session: Session, student: User, syllabus: Syllabus) -> list[
                 ),
                 link,
             )
-        audit.record(session, student, "material.fulfilled", "material_request", str(m.id))
+        audit.record(session, actor, "material.fulfilled", "material_request", str(m.id))
     return open_requests
 
 

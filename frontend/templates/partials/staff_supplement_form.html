@@ -1,0 +1,12 @@
+{# 학생 대신 보완 자료 올리기: 심사관 (권한 매트릭스 "문서 업로드 — 소속 기관 전체") #}
+<details id="supplement" class="mt-4 scroll-mt-16 rounded-lg border border-hairline bg-white p-6">
+  <summary class="cursor-pointer list-none font-semibold">{{ _("학생 대신 보완 자료 올리기") }}</summary>
+  <form method="post" action="/review/evaluations/{{ v.evaluation.id }}/supplement" enctype="multipart/form-data" class="mt-3 grid gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p class="text-sm text-muted">{{ _("학생이 메일·종이로 낸 자료를 대신 올려요. 원문 뒤에 덧붙여 다시 분석하고, 열린 보완 요청은 처리됨으로 바뀌며 학생에게 알림이 가요. 담당 교수 배정은 새 분석으로 이어져요.") }}</p>
+    <label class="field"><span>{{ _("파일 (PDF·JPG·PNG, 20MB까지)") }}</span>
+      <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-parchment file:px-4 file:py-2 file:font-normal file:text-primary">
+    </label>
+    <button class="btn-secondary w-fit" data-confirm="{{ _('이 자료를 올리고 다시 분석할까요?') }}">{{ _("올리고 다시 분석") }}</button>
+  </form>
+</details>

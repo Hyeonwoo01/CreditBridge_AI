@@ -482,10 +482,10 @@ erDiagram
 | syllabi | S4, M4 | S11, 작업 큐(추출·분석), M10(삭제) | S3·S10·R4·F3·C3 |
 | transcript_entries | S5(작업 큐) | S6 | S3 |
 | course_evaluations · evidence_spans | 작업 큐(분석) | 재분석 시 is_latest | S3·S10·R1·R4·F1·F3·C1·J1 |
-| assignments | R2, R7(재판정), F2(대리), M7(비활성화 인계) | 같은 API | R1·F1·F3 |
+| assignments | R2, R7(재판정), F2(대리), M7(비활성화 인계), M18·M19(관리자 배정) | 같은 API | R1·F1·F3·M17 |
 | decisions | F4, J2 | – (추가 전용) | S3·S10·R4·F3·C1·M1·J1·J3·R3 |
 | appeals · appeal_files | S13 | R7 | S14·R6·S10·C5 |
-| material_requests · supplement_files | R5, F5 · S11 | S11 | S3·S10·R4·F3 |
+| material_requests · supplement_files | R5, F5 · S11, R13(심사관 대신 올리기) | S11, R13 | S3·S10·R4·F3 |
 | evaluation_notes | C4 | – | R4·F3 |
 | equivalencies | R11 | – | R10·S15·R4·F3(과거 이력) |
 | privacy_requests | S8 | R9, M10 | S3·R8·M9·M1 |
