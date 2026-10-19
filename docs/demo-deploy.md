@@ -11,8 +11,8 @@ CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입�
 | AI 분석 | 예시 AI(`backend/ai/demo_llm.py`): Claude를 부르지 않고 강의계획서의 "Week N:" 줄과 기준 개념의 낱말 겹침으로 결과를 만든다. 비용 없음 | Claude API (`ANTHROPIC_API_KEY`) |
 | 파일 저장 | 컨테이너 안 폴더(`DEMO_STORAGE_DIR`, `DiskStorage`) | S3 |
 | 작업 큐 | 요청 안에서 바로 실행(`CELERY_TASK_ALWAYS_EAGER=true`), Redis·worker·beat 없음 | Celery + Redis |
-| DB | 컨테이너 안 MariaDB 11.8, 시작할 때마다 새로 만듦 | 별도 MariaDB |
-| 데이터 | 시작할 때 데모 계정·카탈로그(`scripts/seed_demo.py`)와 예시 시나리오(`scripts/demo_scenario.py`)를 넣음. **다시 시작하면 처음 상태로 돌아감** | 보존 |
+| DB | 컨테이너 안 MariaDB 11.8. 이미지를 빌드할 때 미리 만들어 두고(`deploy/demo/build_db.sh`) 시작할 때 그대로 띄움 | 별도 MariaDB |
+| 데이터 | 빌드할 때 데모 계정·카탈로그(`scripts/seed_demo.py`)와 예시 시나리오(`scripts/demo_scenario.py`)를 넣어 둠. **다시 시작하면 그 처음 상태로 돌아감** | 보존 |
 | 화면 | 모든 화면 위에 "예시용 공개 데모" 안내, 로그인 화면에 데모 계정 4개 바로 로그인 버튼 | 없음 |
 | 막는 동작 | 비밀번호 변경·관리자 비밀번호 초기화·계정 비활성화. 로그인 실패는 5번마다 1분 잠금만(비밀번호 무효화 없음) | 정상 동작 |
 | 메일 | 보내지 않음 | SMTP 설정 시 발송 |
@@ -32,7 +32,7 @@ CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입�
 고친 뒤 다시 올리기: 변경을 main에 push한 다음 Render 서비스 화면에서 **Manual Deploy → Deploy latest commit**을 누른다(`autoDeploy: false`라 push만으로는 다시 빌드하지 않는다).
 
 Render 무료 웹 서비스 참고:
-- 15분 동안 접속이 없으면 잠든다. 다시 열면 깨어나는 데 1분 안팎 걸리고, 이때 데이터가 처음 상태로 돌아간다.
+- 15분 동안 접속이 없으면 잠든다. 다시 열면 깨어나는 데 1~2분 걸리고(무료 CPU 0.1개 기준 데모 준비 약 50초 + Render 기동), 이때 데이터가 처음 상태로 돌아간다. 깨어나는 동안 "502 Bad Gateway"가 보이면 1~2분 뒤 새로 고침한다.
 - 메모리 512MB. 데모 컨테이너는 MariaDB를 작게 띄워 250MB 안팎을 쓴다(512MB 제한으로 확인함).
 - 무료 사용 시간은 한 달 단위로 정해져 있다. 데모 하나는 보통 넉넉하다.
 

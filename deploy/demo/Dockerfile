@@ -19,8 +19,11 @@ ENV DEMO_MODE=true \
     CLAUDE_MODEL=demo-ai \
     APP_ENV=demo \
     DATABASE_URL="mysql+pymysql://creditbridge:demo@127.0.0.1:3306/creditbridge?charset=utf8mb4" \
-    DEMO_STORAGE_DIR=/tmp/creditbridge-files \
+    DEMO_DB_DIR=/app/demo-db \
+    DEMO_STORAGE_DIR=/app/demo-files \
     PORT=7860
+# 데모 DB·예시 시나리오·업로드 파일을 빌드할 때 미리 만든다 (시작을 빠르게, 다시 시작하면 이 상태로)
+RUN sh deploy/demo/build_db.sh
 EXPOSE 7860
 ENTRYPOINT []
 CMD ["sh", "deploy/demo/start.sh"]
