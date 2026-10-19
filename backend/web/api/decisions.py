@@ -10,7 +10,7 @@ from backend.models import User
 from backend.security.csrf import check_csrf
 from backend.security.session import current_user
 from backend.services import decisions as decision_service
-from backend.web.notify import send_emails
+from backend.web.notify import send_notifications
 
 router = APIRouter(tags=["decisions"])
 
@@ -47,5 +47,5 @@ def create_decision(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except DecisionValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    send_emails()
+    send_notifications()
     return {"id": decision.id, "result": decision.result, "decided_by": user.id}

@@ -5,7 +5,7 @@
 | URL | `GET /admin/sis`, 발급·폐기 `POST /admin/sis` (`action=issue|revoke`) |
 | 역할 | 대상 대학의 기관 관리자 (심사관은 403) |
 | 템플릿 | `admin/sis.html` |
-| 기능 | FR-24 확정 판정 내보내기용 토큰 관리 (API: `GET /api/sis/decisions`) |
+| 기능 | FR-24 확정 판정 내보내기용 토큰 관리 (API: `GET /api/v1/sis/decisions`, 버전 없는 옛 경로 `/api/sis/decisions`는 폐기 예정으로 같은 응답 + `Deprecation` 헤더) |
 
 ## 위치
 
@@ -29,7 +29,7 @@
 | 영역 | 컴포넌트 | 내용 | 토큰 |
 | --- | --- | --- | --- |
 | 새 토큰 | 강조 박스 | 원문 토큰(한 번만 표시, DB에는 SHA-256만 저장) | 테두리 `{colors.ink}`, 코드 `{typography.mono-code}`, `role="status"` |
-| 요청 예시 | 코드 블록 | `GET /api/sis/decisions?since=...` + `Authorization: Bearer cbsis_...` | `{typography.mono-code}` 13px, 파치먼트, 가로 스크롤 |
+| 요청 예시 | 코드 블록 | `GET /api/v1/sis/decisions?since=...` + `Authorization: Bearer cbsis_...` | `{typography.mono-code}` 13px, 파치먼트, 가로 스크롤 |
 | 발급 | `button-primary` | 다시 발급 시 기존 토큰 즉시 무효 | |
 | 폐기 | `button-secondary-pill` | 토큰 있을 때만 | |
 

@@ -17,7 +17,7 @@ from backend.services import privacy as privacy_service
 from backend.services import student as student_service
 from backend.services import views
 from backend.web.nav import nav_badges
-from backend.web.notify import send_emails
+from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
 from backend.workers import tasks
 
@@ -165,7 +165,7 @@ def request_deletion(
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
         flash(request, tr("문서 삭제 요청을 접수했어요. {due_at}까지 처리돼요.", due_at=f"{privacy.due_at:%Y-%m-%d}"))
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
 
@@ -210,7 +210,7 @@ def supplement(
         flash(request, str(exc), "error")
         return RedirectResponse(request.headers.get("referer") or "/student", status_code=303)
     tasks.add_supplement.delay(syllabus.id, key)
-    send_emails()
+    send_notifications()
     flash(request, tr("보완 자료를 받았어요. 다시 분석한 뒤 결과를 갱신할게요. 이전 결과는 기록으로 남아요."))
     return RedirectResponse(f"/student/requests/{views.request_id_of(session, syllabus)}", status_code=303)
 
@@ -260,7 +260,7 @@ def appeal(
             error=str(exc),
             reason=reason,
         )
-    send_emails()
+    send_notifications()
     flash(request, tr("이의 신청을 접수했어요. 학사처가 검토한 뒤 결과를 알려 드려요."))
     return RedirectResponse("/student/appeals", status_code=303)
 

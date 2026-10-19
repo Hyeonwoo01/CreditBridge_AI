@@ -128,3 +128,62 @@ document.addEventListener("submit", (e) => {
   const message = (button && button.dataset.confirm) || (form.dataset && form.dataset.confirm);
   if (message && !window.confirm(message)) e.preventDefault();
 });
+
+// 웹 푸시 구독 (FR-20, 알림 화면의 "이 기기에서 푸시 알림 받기"). 서버에 VAPID 키가 있을 때만 카드가 있다.
+(() => {
+  const card = document.getElementById("push-card");
+  if (!card) return;
+  const on = card.querySelector('[data-push-action="on"]');
+  const off = card.querySelector('[data-push-action="off"]');
+  const show = (state, subscribed = false) => {
+    card.querySelectorAll("[data-push-state]").forEach((el) => { el.hidden = el.dataset.pushState !== state; });
+    on.hidden = state === "unsupported" || state === "denied" || subscribed;
+    off.hidden = !subscribed;
+  };
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !window.isSecureContext) {
+    show("unsupported");
+    return;
+  }
+  const keyBytes = (b64) => {
+    const raw = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+  const send = (url, body) => fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": card.dataset.csrf },
+    body: JSON.stringify(body),
+  }).then((r) => { if (!r.ok) throw new Error(String(r.status)); });
+  const registration = () => navigator.serviceWorker.register("/sw.js");
+  const refresh = async () => {
+    if (Notification.permission === "denied") return show("denied");
+    const sub = await (await registration()).pushManager.getSubscription();
+    show(sub ? "on" : "off", Boolean(sub));
+  };
+  on.addEventListener("click", async () => {
+    try {
+      if ((await Notification.requestPermission()) !== "granted") return refresh();
+      const reg = await registration();
+      const old = await reg.pushManager.getSubscription();
+      if (old) await old.unsubscribe(); // 서버 키가 바뀌었을 수 있어 새로 받는다
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(card.dataset.pushKey) });
+      await send("/notifications/push/subscribe", sub.toJSON());
+      location.reload();
+    } catch {
+      show("error");
+    }
+  });
+  off.addEventListener("click", async () => {
+    try {
+      const sub = await (await registration()).pushManager.getSubscription();
+      if (sub) {
+        await send("/notifications/push/unsubscribe", { endpoint: sub.endpoint });
+        await sub.unsubscribe();
+      }
+      location.reload();
+    } catch {
+      show("error", true);
+    }
+  });
+  refresh().catch(() => show("error"));
+})();

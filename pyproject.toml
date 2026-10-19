@@ -18,6 +18,7 @@ dependencies = [
     "argon2-cffi>=23.1",
     "boto3>=1.35,<2",
     "psycopg[binary]>=3.2,<4",
+    "pywebpush>=2,<3",
 ]
 
 [dependency-groups]
@@ -55,7 +56,7 @@ disallow_incomplete_defs = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "kombu.*", "boto3.*", "botocore.*", "fitz.*", "pymupdf.*"]
+module = ["celery.*", "kombu.*", "boto3.*", "botocore.*", "fitz.*", "pymupdf.*", "pywebpush.*", "py_vapid.*"]
 ignore_missing_imports = true
 
 # PyMuPDF는 타입 힌트가 부분적이라 문서 추출 모듈에서만 미타입 호출을 허용한다

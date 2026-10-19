@@ -27,6 +27,7 @@ RESULTS = {
     "불인정": "none",
 }
 MAX_ROWS = 5000
+RESULT_VALUES = ("direct", "elective", "none")
 
 
 @dataclass
@@ -96,7 +97,61 @@ def import_csv(session: Session, evaluator: User, filename: str, data: bytes) ->
     return result
 
 
-def recent(session: Session, evaluator: User) -> list[Equivalency]:
+PAGE_SIZE = 50
+
+
+@dataclass
+class EquivalencyRow:
+    source_institution: str
+    source_course: str
+    target_code: str  # 대상 과목이 없으면 "" (불인정 이력 등)
+    target_title: str
+    result: str
+    decided_on: date | None
+    note: str
+
+
+@dataclass
+class EquivalencyPage:
+    rows: list[EquivalencyRow]
+    total: int
+    page: int
+    query: str
+    result: str
+
+    @property
+    def pages(self) -> int:
+        return max((self.total + PAGE_SIZE - 1) // PAGE_SIZE, 1)
+
+    @property
+    def first(self) -> int:
+        return (self.page - 1) * PAGE_SIZE + 1 if self.total else 0
+
+    @property
+    def last(self) -> int:
+        return min(self.page * PAGE_SIZE, self.total)
+
+
+def search(session: Session, evaluator: User, query: str = "", result: str = "", page: int = 1) -> EquivalencyPage:
+    """기관 동등 과목표 전체를 출신 과목·출신 대학·대상 과목으로 찾는다 (50건씩, 최신 가져온 순)."""
     if evaluator.role != Role.EVALUATOR or evaluator.institution_id is None:
         raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
-    return equivalency_repo.of_institution(session, evaluator.institution_id)
+    query = query.strip()[:100]
+    result = result if result in RESULT_VALUES else ""
+    page = max(page, 1)
+    found, total = equivalency_repo.search(
+        session, evaluator.institution_id, query, result or None, PAGE_SIZE, (page - 1) * PAGE_SIZE
+    )
+    rows = [
+        EquivalencyRow(
+            source_institution=name,
+            source_course=e.source_course_label,
+            target_code=course.code if course else "",
+            target_title=course.title if course else "",
+            result=e.result,
+            decided_on=e.decided_on,
+            note=e.note,
+        )
+        for e, name, course in found
+    ]
+    return EquivalencyPage(rows=rows, total=total, page=page, query=query, result=result)

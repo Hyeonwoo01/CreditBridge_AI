@@ -8,6 +8,7 @@ import logging
 import smtplib
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import timedelta
 from email.message import EmailMessage
 
@@ -59,12 +60,32 @@ def mark_seen(session: Session, user: User, link: str | None = None, kinds: list
         session.commit()
 
 
-def inbox(session: Session, user: User) -> list[Notification]:
-    """최근 알림을 돌려주고 모두 읽음으로 표시한다."""
-    items = notification_repo.recent_for(session, user.id)
+INBOX_PAGE_SIZE = 50
+
+
+@dataclass
+class InboxPage:
+    items: list[Notification]
+    total: int
+    page: int
+
+    @property
+    def pages(self) -> int:
+        return max((self.total + INBOX_PAGE_SIZE - 1) // INBOX_PAGE_SIZE, 1)
+
+
+def inbox(session: Session, user: User, page: int = 1) -> InboxPage:
+    """알림 한 페이지(50건, 최신순)를 돌려주고 모두 읽음으로 표시한다. 읽기 전 상태로 돌려줘 새 알림을 강조한다."""
+    page = max(page, 1)
+    items, total = notification_repo.page_for(session, user.id, INBOX_PAGE_SIZE, (page - 1) * INBOX_PAGE_SIZE)
+    if not items and page > 1:  # 지난 링크로 범위를 넘으면 마지막 페이지
+        page = max((total + INBOX_PAGE_SIZE - 1) // INBOX_PAGE_SIZE, 1)
+        items, total = notification_repo.page_for(session, user.id, INBOX_PAGE_SIZE, (page - 1) * INBOX_PAGE_SIZE)
+    for n in items:
+        session.expunge(n)  # 아래 읽음 처리 UPDATE가 화면에 넘길 객체를 바꾸지 않게
     notification_repo.mark_read(session, user.id, utcnow())
     session.commit()
-    return items
+    return InboxPage(items=items, total=total, page=page)
 
 
 def email_enabled(settings: Settings | None = None) -> bool:

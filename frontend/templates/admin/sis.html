@@ -15,7 +15,7 @@
 
 <section class="card mt-6 grid gap-3 p-5 text-sm">
   <p>{{ _("상태:") }} <strong>{{ _('토큰 발급됨') if has_token else _('토큰 없음') }}</strong></p>
-  <pre class="overflow-x-auto rounded-sm bg-parchment p-3 text-xs">GET /api/sis/decisions?since=2026-01-01T00:00:00Z
+  <pre class="overflow-x-auto rounded-sm bg-parchment p-3 text-xs">GET /api/v1/sis/decisions?since=2026-01-01T00:00:00Z
 Authorization: Bearer cbsis_...</pre>
   <p class="text-muted">{{ _("응답 필드: decision_id, replaces_decision_id, student_id, source_institution, source_course, result, target_course, credits, decided_at. 같은 내용은 심사관 화면의 CSV 내보내기로도 받을 수 있어요.") }}</p>
   <div class="flex flex-wrap gap-2">

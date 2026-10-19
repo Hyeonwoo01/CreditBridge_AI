@@ -25,7 +25,7 @@ from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
 from backend.web.nav import nav_badges
-from backend.web.notify import send_emails
+from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
 from backend.workers import tasks
 
@@ -89,7 +89,7 @@ def auto_assign(
         flash(request, tr("배정할 건을 선택해 주세요."), "error")
     else:
         count, problems = review_service.auto_assign(session, user, evaluation_ids)
-        send_emails()
+        send_notifications()
         flash(request, tr("{count}건을 학과 담당 교수에게 배정했어요.", count=count))
         for p in problems:
             flash(request, p, "error")
@@ -114,7 +114,7 @@ def assign_one(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
         flash(request, tr("{name} 교수에게 배정했어요.", name=reviewer.name))
     return RedirectResponse(f"/admin/assignments?show={'all' if show == 'all' else 'unassigned'}", status_code=303)
 
@@ -211,7 +211,7 @@ def approve_privacy(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
         flash(request, tr("삭제를 승인했어요. 원본 파일과 추출 텍스트를 지웠어요."))
     return RedirectResponse("/admin/privacy", status_code=303)
 
@@ -395,7 +395,7 @@ def account_active(
         session.rollback()
         flash(request, str(exc), "error")
         return RedirectResponse(back, status_code=303)
-    send_emails()
+    send_notifications()
     target = change.user
     if action == "reactivate":
         flash(request, tr("{email} 계정을 다시 활성화했어요. 이전 비밀번호로 로그인할 수 있어요.", email=target.email))

@@ -4,6 +4,24 @@
 {% block content %}
 <h1 class="page-title">{{ _("알림") }}</h1>
 <p class="mt-2 text-muted">{{ _("배정, 보완 자료 요청, 이의 신청, 판정 결과 소식을 모아 보여줘요.") }}</p>
+{% if push_key %}
+<section id="push-card" class="card mt-6 grid gap-2" data-push-key="{{ push_key }}" data-csrf="{{ csrf_token }}" aria-labelledby="push-title">
+  <h2 id="push-title" class="font-semibold">{{ _("이 기기에서 푸시 알림 받기") }}</h2>
+  <p class="text-sm text-muted">{{ _("휴대폰·컴퓨터 브라우저에 알림을 띄워요. 화면을 닫아 두어도 배정·판정 소식을 바로 알 수 있어요. 푸시에는 과목 코드와 처리 내용만 담고 이름·성적은 넣지 않아요.") }}</p>
+  <p class="text-sm" data-push-state="checking">{{ _("이 기기의 알림 설정을 확인하고 있어요…") }}</p>
+  <p class="text-sm" data-push-state="on" hidden><span class="dot mr-1.5 inline-block bg-approve align-middle"></span>{{ _("이 기기에서 푸시 알림을 받고 있어요.") }}</p>
+  <p class="text-sm" data-push-state="off" hidden>{{ _("이 기기에서는 아직 푸시 알림을 받지 않아요.") }}</p>
+  <p class="text-sm text-reject" data-push-state="denied" hidden>{{ _("브라우저 설정에서 이 사이트의 알림이 차단돼 있어요. 설정에서 허용한 뒤 다시 열어 주세요.") }}</p>
+  <p class="text-sm text-muted" data-push-state="unsupported" hidden>{{ _("이 브라우저에서는 푸시 알림을 쓸 수 없어요. iPhone·iPad는 Safari에서 홈 화면에 추가한 뒤 그 아이콘으로 열어 주세요. https 주소나 localhost에서만 동작해요.") }}</p>
+  <p class="text-sm text-reject" data-push-state="error" role="alert" hidden>{{ _("푸시 알림을 설정하지 못했어요. 잠시 뒤 다시 시도해 주세요.") }}</p>
+  <p class="text-xs text-muted tabular-nums">{{ _("푸시 알림을 받는 기기 {devices}대", devices=(push_devices)) }}</p>
+  <div class="flex flex-wrap gap-2">
+    <button type="button" class="btn-primary w-fit" data-push-action="on" hidden>{{ _("푸시 알림 받기") }}</button>
+    <button type="button" class="btn-secondary w-fit" data-push-action="off" hidden>{{ _("이 기기에서 끄기") }}</button>
+  </div>
+</section>
+{% endif %}
+{% if view.total %}<p class="mt-4 text-sm text-muted tabular-nums">{{ _("알림 {total}개", total=(view.total)) }}</p>{% endif %}
 <ul class="mt-6 grid gap-2">
   {% for n in items %}
   <li>
@@ -16,4 +34,11 @@
   <li class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("새 알림이 없어요.") }}</li>
   {% endfor %}
 </ul>
+{% if view.pages > 1 %}
+<nav class="mt-4 flex flex-wrap items-center gap-1 text-sm" aria-label="{{ _('페이지') }}">
+  {% if view.page > 1 %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="/notifications?page={{ view.page - 1 }}" aria-label="{{ _('이전 페이지') }}">‹</a>{% endif %}
+  <span class="px-2 tabular-nums">{{ _("{page} / {pages} 페이지", page=(view.page), pages=(view.pages)) }}</span>
+  {% if view.page < view.pages %}<a class="flex size-9 items-center justify-center rounded-full hover:bg-parchment" href="/notifications?page={{ view.page + 1 }}" aria-label="{{ _('다음 페이지') }}">›</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

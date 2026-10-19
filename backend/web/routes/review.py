@@ -24,7 +24,7 @@ from backend.services import stats as stats_service
 from backend.services import student as student_service
 from backend.services import views
 from backend.web.nav import nav_badges
-from backend.web.notify import send_emails
+from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
 from backend.workers import tasks
 
@@ -72,7 +72,7 @@ def assign(
         flash(request, tr("배정할 건을 선택해 주세요."), "error")
     else:
         count, problems = review_service.auto_assign(session, user, evaluation_ids)
-        send_emails()
+        send_notifications()
         flash(request, tr("{count}건을 학과 담당 교수에게 배정했어요. 근거 요약이 함께 전달돼요.", count=count))
         for p in problems:
             flash(request, p, "error")
@@ -119,7 +119,7 @@ def request_materials(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
         flash(request, tr("학생에게 보완 자료를 요청했어요. 자료가 오면 알림으로 알려 드려요."))
     return RedirectResponse(f"/review/evaluations/{evaluation_id}", status_code=303)
 
@@ -145,7 +145,7 @@ def upload_supplement(
         flash(request, str(exc), "error")
         return RedirectResponse(f"/review/evaluations/{evaluation_id}#supplement", status_code=303)
     tasks.add_supplement.delay(syllabus.id, key)
-    send_emails()
+    send_notifications()
     flash(
         request,
         tr("보완 자료를 올렸어요. 다시 분석한 결과는 심사 큐와 학생 화면에 반영돼요. 이전 결과는 기록으로 남아요."),
@@ -183,7 +183,7 @@ def handle_appeal(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
     return RedirectResponse("/review/appeals", status_code=303)
 
 
@@ -207,18 +207,26 @@ def review_privacy(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
         flash(request, tr("처리 완료로 표시했어요. 기관 관리자가 승인하면 삭제돼요."))
     return RedirectResponse("/review/privacy", status_code=303)
 
 
 @router.get("/equivalencies")
-def equivalencies(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
+def equivalencies(
+    request: Request,
+    q: str = "",
+    result: str = "",
+    page: int = 1,
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    """기관 동등 과목표: CSV 가져오기와 전체 이력 검색 (출신 과목·출신 대학·대상 과목, 판정 결과, 50건씩)."""
     return render(
         request,
         "review/equivalencies.html",
         user=user,
-        rows=equivalency_service.recent(session, user),
+        view=equivalency_service.search(session, user, q, result, page),
         columns=equivalency_service.COLUMNS,
     )
 
@@ -245,7 +253,7 @@ def import_equivalencies(
             "review/equivalencies.html",
             status_code=422,
             user=user,
-            rows=equivalency_service.recent(session, user),
+            view=equivalency_service.search(session, user),
             columns=equivalency_service.COLUMNS,
             errors=result.errors,
         )

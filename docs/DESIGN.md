@@ -500,7 +500,7 @@ components:
 | `{typography.fine-print}` | 12px | 400 | 1.0 | -0.12px | 푸터 본문, AI 추천 보조 안내문, 파일 업로드 규격 안내 |
 | `{typography.micro-legal}` | 10px | 400 | 1.3 | -0.08px | Human-in-the-Loop 법적 책임 고지, 개인정보 및 문서 보존/파기 정책 캡션 |
 | `{typography.nav-link}` | 12px | 400 | 1.0 | -0.12px | 최상단 글로벌 내비게이션(`global-nav`) 메뉴 항목 |
-| `{typography.mono-code}` | 13px | 400 | 1.40 | 0 | 학수번호, SIS API 엔드포인트(`GET /api/sis/decisions`), 감사로그 ID(`LOG-000123`), 접수 번호(`#2-6`) |
+| `{typography.mono-code}` | 13px | 400 | 1.40 | 0 | 학수번호, SIS API 엔드포인트(`GET /api/v1/sis/decisions`), 감사로그 ID(`LOG-000123`), 접수 번호(`#2-6`) |
 | `{typography.eyebrow}` | 12px | 600 | 1.0 | 0.08em (대문자) | 페이지 제목 위 맥락 라벨(`GOVERNANCE`, `TRANSFER CREDIT SIMULATION`), `{colors.primary}` 색 |
 | `{typography.kpi-number}` | 40px | 600 | 1.0 | 0 | 관리자 콘솔·심사 큐 KPI 카드의 핵심 수치(AI 추천 수용률 등), 단위는 17px muted로 뒤에 붙임 |
 

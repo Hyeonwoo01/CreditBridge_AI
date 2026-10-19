@@ -471,5 +471,26 @@ ALTER TABLE decisions ADD CONSTRAINT fk_decisions_appeal_id_appeals FOREIGN KEY(
 
 INSERT INTO alembic_version (version_num) VALUES ('0001') RETURNING alembic_version.version_num;
 
+-- Running upgrade 0001 -> 0002
+
+CREATE TABLE push_subscriptions (
+    user_id BIGINT NOT NULL, 
+    endpoint VARCHAR(1000) NOT NULL, 
+    p256dh VARCHAR(200) NOT NULL, 
+    auth VARCHAR(100) NOT NULL, 
+    last_sent_at TIMESTAMP WITHOUT TIME ZONE, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_push_subscriptions PRIMARY KEY (id), 
+    CONSTRAINT fk_push_subscriptions_user_id_users FOREIGN KEY(user_id) REFERENCES users (id), 
+    CONSTRAINT uq_push_subscriptions_endpoint UNIQUE (endpoint)
+);
+
+CREATE INDEX ix_push_subscriptions_user_id ON push_subscriptions (user_id);
+
+ALTER TABLE notifications ADD COLUMN pushed_at TIMESTAMP WITHOUT TIME ZONE;
+
+UPDATE alembic_version SET version_num='0002' WHERE alembic_version.version_num = '0001';
+
 COMMIT;
 

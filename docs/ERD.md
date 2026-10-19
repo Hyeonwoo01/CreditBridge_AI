@@ -2,11 +2,11 @@
 
 [API 명세서](API_Spec.md)가 읽고 쓰는 데이터를 [기획 통합본](spec.md) 4장 기능 명세(FR-01~FR-27)에 맞춰 엔티티·속성·관계로 정리했다. 마지막 절에 구조 검토 결과가 있다.
 
-- 기준: 2026-10-19 main, Alembic 0001(PostgreSQL 기준점 — MariaDB 시절 0001~0011을 하나로 합침). 실행 가능한 스키마는 `db/init.sql`, 초기 데이터는 `db/data.sql`(둘 다 `scripts/export_db_sql.sh`로 생성). 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
+- 기준: 2026-10-19 main, Alembic 0001(PostgreSQL 기준점 — MariaDB 시절 0001~0011을 하나로 합침)~0002(웹 푸시). 실행 가능한 스키마는 `db/init.sql`, 초기 데이터는 `db/data.sql`(둘 다 `scripts/export_db_sql.sh`로 생성). 실제 정의는 `backend/models/`(테이블당 1파일), 변경은 `alembic/versions/`로만.
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (22개)
+## 1. 엔티티 한눈에 보기 (23개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -29,7 +29,8 @@
 | | `evaluation_notes` | 심사 건 내부 메모 (교직원만) | – |
 | | `equivalencies` | 기관이 가져온 기존 동등 과목표 | FR-11·26 |
 | 개인정보·운영 | `privacy_requests` | 문서 삭제 요청과 처리 단계 | FR-13 |
-| | `notifications` | 화면 알림과 알림 메일 | FR-19·20 |
+| | `notifications` | 화면 알림과 알림 메일·웹 푸시 | FR-19·20 |
+| | `push_subscriptions` | 웹 푸시를 받는 기기(브라우저) 구독 | FR-20 |
 | | `audit_logs` | 주요 행위 기록 (추가 전용) | FR-10 |
 
 ## 2. ER 다이어그램
@@ -73,6 +74,7 @@ erDiagram
     users ||--o{ evaluation_notes : "작성자"
     transfer_requests ||--o{ privacy_requests : "삭제 요청"
     users ||--o{ notifications : "받는 사람"
+    users ||--o{ push_subscriptions : "푸시 받는 기기"
     users |o--o{ audit_logs : "행위자"
     courses |o--o{ equivalencies : "인정 대상 과목"
 
@@ -242,6 +244,12 @@ erDiagram
         varchar kind
         varchar message
         timestamp read_at
+        timestamp pushed_at
+    }
+    push_subscriptions {
+        bigint id PK
+        bigint user_id FK
+        varchar endpoint UK
     }
     audit_logs {
         bigint id PK
@@ -431,7 +439,9 @@ erDiagram
 
 **privacy_requests** — `transfer_request_id` FK(IX), `student_id` FK→users, `status` VARCHAR(20)(requested·reviewed·completed, IX), `due_at` TIMESTAMP(처리 기한), `reviewed_by`·`reviewed_at`(심사관 처리), `approved_by`·`completed_at`(관리자 승인·삭제 완료), 부분 유니크 인덱스 `uq_privacy_requests_open_request`(`transfer_request_id` `WHERE status <> 'completed'` — 요청당 처리 중 삭제 요청 하나).
 
-**notifications** — `user_id` FK(`user_id, read_at` 복합 IX), `kind` VARCHAR(30)(assignment.created 등), `message` VARCHAR(500)(한국어 원문, 화면·메일에서 받는 사람 언어로), `link` VARCHAR(255), `read_at` null, `emailed_at` null.
+**notifications** — `user_id` FK(`user_id, read_at` 복합 IX), `kind` VARCHAR(30)(assignment.created 등), `message` VARCHAR(500)(한국어 원문, 화면·메일에서 받는 사람 언어로), `link` VARCHAR(255), `read_at` null, `emailed_at` null, `pushed_at` null(웹 푸시를 보낸 시각, Alembic 0002).
+
+**push_subscriptions** — 웹 푸시 구독(FR-20, Alembic 0002). `user_id` FK(IX), `endpoint` VARCHAR(1000) UQ(브라우저 푸시 서비스 주소, 기기마다 다름), `p256dh` VARCHAR(200)·`auth` VARCHAR(100)(내용 암호화 키, RFC 8291), `last_sent_at` null. 같은 브라우저에서 다른 계정으로 구독하면 그 계정으로 옮기고, 푸시 서비스가 만료(404·410)를 알리거나 사용자가 끄면 행을 지운다. 알림보다 나중에 구독한 기기에는 그 알림을 보내지 않는다.
 
 **audit_logs** — 추가 전용(INSERT만). `actor_id` FK→users null(시스템 행위는 null, `actor_id, action` 복합 IX), `action` VARCHAR(50)(IX), `target_type` VARCHAR(50)·`target_id` VARCHAR(36)(대상, 외래키 없음, `target_type, target_id` 복합 IX), `payload_json` JSONB(id·판정값만, 이름·학번·성적 없음).
 
@@ -467,6 +477,7 @@ erDiagram
 | 23 | 강의계획서 – 내부 메모 | 1 : N | evaluation_notes.syllabus_id | 운영 |
 | 24 | 편입 요청 – 삭제 요청 | 1 : N (처리 중 1개) | privacy_requests.transfer_request_id | FR-13 |
 | 25 | 사용자 – 알림 | 1 : N | notifications.user_id | FR-19·20 |
+| 25-1 | 사용자 – 푸시 구독 | 1 : N (기기마다) | push_subscriptions.user_id | FR-20 |
 | 26 | 사용자 – 감사 로그 | 0..1 : N | audit_logs.actor_id | FR-10 |
 | 27 | 대상·출신 대학, 과목 – 동등 과목표 | 1 : N | equivalencies.* | FR-11·26 |
 
@@ -489,7 +500,8 @@ erDiagram
 | evaluation_notes | C4 | – | R4·F3 |
 | equivalencies | R11 | – | R10·S15·R4·F3(과거 이력) |
 | privacy_requests | S8 | R9, M10 | S3·R8·M9·M1 |
-| notifications | 여러 처리 API, 기한 알림 작업 | A12·S10·S14(읽음) | A12·A13 |
+| notifications | 여러 처리 API, 기한 알림 작업 | A12·S10·S14(읽음), 알림 발송 작업(메일·푸시 시각) | A12·A13 |
+| push_subscriptions | A15 | A15(다른 계정으로 옮김), A16·발송 작업(삭제) | A12(기기 수) |
 | audit_logs | 거의 모든 처리 API, C3·C5 열람 | – (추가 전용) | M13(조건별·50건씩)·M1·C1·R4 |
 
 ## 5. 설계 규칙

@@ -2,8 +2,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -44,6 +44,17 @@ async def choose_locale(request: Request, call_next: Callable[[Request], Awaitab
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND / "static"), name="static")
 
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> Response:
+    """웹 푸시 서비스 워커. 사이트 전체(/)를 범위로 쓰려면 루트 주소에서 내보내야 한다."""
+    return FileResponse(
+        FRONTEND / "static" / "js" / "sw.js",
+        media_type="text/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
 for router in (
     auth.router,
     student.router,
@@ -55,9 +66,20 @@ for router in (
     account.router,
 ):
     app.include_router(router)
-app.include_router(api_evaluations.router, prefix="/api")
-app.include_router(api_decisions.router, prefix="/api")
-app.include_router(api_sis.router, prefix="/api")
+# JSON API는 버전을 붙여 연다. 버전 없는 옛 경로(/api/...)는 이미 연동한 시스템을 위해 남기되
+# 폐기 예정으로 표시하고, 응답 헤더로 새 경로를 알려 준다 (docs/API_Spec.md 2.7)
+API_VERSION = "v1"
+
+
+def legacy_api_notice(request: Request, response: Response) -> None:
+    response.headers["Deprecation"] = "true"
+    successor = f"/api/{API_VERSION}" + request.url.path.removeprefix("/api")
+    response.headers["Link"] = f'<{successor}>; rel="successor-version"'
+
+
+for api in (api_evaluations.router, api_decisions.router, api_sis.router):
+    app.include_router(api, prefix=f"/api/{API_VERSION}")
+    app.include_router(api, prefix="/api", deprecated=True, dependencies=[Depends(legacy_api_notice)])
 
 
 @app.get("/healthz", include_in_schema=False)

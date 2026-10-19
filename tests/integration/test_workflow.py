@@ -239,11 +239,11 @@ def test_no_decision_without_assigned_professor(client: TestClient, seeded: Sess
 
     # 로그인 없이 API 호출 → 거부 (TC-16)
     client.cookies.clear()
-    assert client.post("/api/decisions", json=body).status_code == 401
+    assert client.post("/api/v1/decisions", json=body).status_code == 401
     # 학생·심사관도 확정 불가
     for email in ("jiwon@student.example", "rachel@msu.example"):
         token = login(client, email)
-        r = client.post("/api/decisions", json=body, headers={"X-CSRF-Token": token})
+        r = client.post("/api/v1/decisions", json=body, headers={"X-CSRF-Token": token})
         assert r.status_code == 403
     # 배정되지 않은 교수도 불가
     assign(client, calc)
@@ -252,12 +252,12 @@ def test_no_decision_without_assigned_professor(client: TestClient, seeded: Sess
     ).first()
     assert other is not None
     token = login(client, other.email)
-    assert client.post("/api/decisions", json=body, headers={"X-CSRF-Token": token}).status_code == 403
+    assert client.post("/api/v1/decisions", json=body, headers={"X-CSRF-Token": token}).status_code == 403
     assert seeded.scalars(select(Decision).where(Decision.course_evaluation_id == calc.id)).first() is None
 
     prof = reviewer_of(seeded, calc)
     token = login(client, prof.email)
-    r = client.post("/api/decisions", json=body, headers={"X-CSRF-Token": token})
+    r = client.post("/api/v1/decisions", json=body, headers={"X-CSRF-Token": token})
     assert r.status_code == 201 and r.json()["decided_by"] == prof.id
 
 
@@ -268,7 +268,7 @@ def test_role_based_access(client: TestClient, seeded: Session) -> None:
     # 다른 학생은 볼 수 없다
     login(client, "senior@student.example")
     assert client.get(f"/student/evaluations/{calc.id}").status_code == 403
-    assert client.get(f"/api/evaluations/{calc.id}").status_code == 403
+    assert client.get(f"/api/v1/evaluations/{calc.id}").status_code == 403
     # 배정 전 교수는 볼 수 없다
     login(client, "dkim@msu.example")
     assert client.get(f"/professor/evaluations/{calc.id}").status_code == 403

@@ -40,9 +40,17 @@ def mark_read_where(
     return int(session.execute(stmt.values(read_at=now)).rowcount or 0)  # type: ignore[attr-defined]
 
 
-def recent_for(session: Session, user_id: int, limit: int = 50) -> list[Notification]:
-    stmt = select(Notification).where(Notification.user_id == user_id).order_by(Notification.id.desc()).limit(limit)
-    return list(session.scalars(stmt))
+def page_for(session: Session, user_id: int, limit: int = 50, offset: int = 0) -> tuple[list[Notification], int]:
+    """사용자 알림 최신순 한 페이지와 전체 건수."""
+    total = session.scalar(select(func.count()).select_from(Notification).where(Notification.user_id == user_id)) or 0
+    stmt = (
+        select(Notification)
+        .where(Notification.user_id == user_id)
+        .order_by(Notification.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(session.scalars(stmt)), int(total)
 
 
 def mark_read(session: Session, user_id: int, now: datetime) -> None:

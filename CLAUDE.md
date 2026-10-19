@@ -21,6 +21,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - Anthropic 공식 SDK만 사용, LangChain/LlamaIndex 금지
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
 - PDF: PyMuPDF만 사용
+- 웹 푸시: pywebpush만 사용 (서버 발송은 backend/services/push.py 한 곳, 무거운 의존성이라 보낼 때만 import)
 - 화면: Jinja2 + HTMX + Tailwind, React/Vue 금지
 - 린트/포맷: Ruff, 타입: mypy 일반 모드(backend/workers 제외)
 

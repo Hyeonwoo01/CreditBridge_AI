@@ -414,6 +414,7 @@ CreditBridge AI는 Python 3.12와 PostgreSQL 17을 기반으로, 계층마다 �
 | LLM | Anthropic Claude API, 공식 anthropic Python SDK | SDK 최신 안정판 고정 | 구조화 추출, 후보 과목 비교·판정 추론, 스캔본 전사 | LangChain, LlamaIndex, 모델 ID 하드코딩 |
 | 임베딩 | MVP 미사용 (파일럿에서 sentence-transformers + BAAI/bge-m3 도입) | 파일럿 도입 시 1024차원 고정 | MVP는 학과로 후보 과목 20~30개를 거른 뒤 Claude가 직접 비교 | MVP 단계의 임베딩 모델·벡터 DB 도입 |
 | PDF 처리 | PyMuPDF | 1.x | 텍스트 레이어 추출, 페이지 이미지 변환 | PyPDF2, pdfminer, Tesseract |
+| 웹 푸시 | pywebpush (+ 브라우저 표준 Push API·서비스 워커) | 2.x | FR-20 모바일 알림: VAPID 서명·내용 암호화 후 브라우저 푸시 서비스로 발송 (VAPID 키 설정 시) | Firebase SDK, OneSignal 등 외부 푸시 SaaS, 직접 구현한 암호화 |
 | 화면 | Jinja2 + HTMX + Tailwind CSS(standalone CLI) | Jinja2 3.x, HTMX 2.x, Tailwind 4.x | 서버 렌더링 화면, 부분 갱신, 모바일 대응 | React, Vue, Next.js, jQuery(MVP 단계) |
 | 인증·보안 | Starlette SessionMiddleware + argon2-cffi + itsdangerous | 최신 안정판 | 서명 쿠키 세션, 비밀번호 해시, 비밀번호 재설정 링크 서명(서버에 토큰 저장 안 함) | 자체 JWT 구현, passlib, 평문 저장 |
 | 파일 저장 | S3 호환 객체 스토리지 + boto3 | 개발 MinIO, 운영 AWS S3 | 원본 성적표·강의계획서·보완 자료·이의 신청 근거 자료 암호화 저장 | DB BLOB 저장, 서버 로컬 디스크 |
@@ -587,6 +588,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - Anthropic 공식 SDK만 사용, LangChain/LlamaIndex 금지
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
 - PDF: PyMuPDF만 사용
+- 웹 푸시: pywebpush만 사용 (서버 발송은 backend/services/push.py 한 곳, 무거운 의존성이라 보낼 때만 import)
 - 화면: Jinja2 + HTMX + Tailwind, React/Vue 금지
 - 린트/포맷: Ruff, 타입: mypy 일반 모드(backend/workers 제외)
 

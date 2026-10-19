@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     # 메일 속 링크의 기준 주소
     app_base_url: str = "http://localhost:8000"
+    # 브라우저 웹 푸시 (FR-20, 비우면 끔). 키는 uv run python -m scripts.generate_vapid_keys로 만든다.
+    # 푸시 내용에도 개인정보를 넣지 않는다 (알림 메시지와 같은 글)
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:admin@creditbridge.local"
 
     # 공개 데모(예시용 배포, deploy/demo): Claude 대신 예시 AI, S3 대신 이 폴더에 파일 저장,
     # 비밀번호 변경·초기화와 계정 비활성화를 막는다. 운영에서는 반드시 false

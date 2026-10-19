@@ -19,6 +19,8 @@ GRANT SELECT, INSERT, UPDATE         ON assignments        TO creditbridge_app;
 GRANT SELECT, INSERT                 ON decisions          TO creditbridge_app;
 GRANT SELECT, INSERT                 ON audit_logs         TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON notifications      TO creditbridge_app;
+-- 푸시 구독은 기기가 끄거나 만료되면 지운다
+GRANT SELECT, INSERT, UPDATE, DELETE ON push_subscriptions TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON material_requests  TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON supplement_files   TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON appeals            TO creditbridge_app;

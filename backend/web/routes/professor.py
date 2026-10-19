@@ -14,7 +14,7 @@ from backend.services import materials as material_service
 from backend.services import review as review_service
 from backend.services import views
 from backend.web.nav import nav_badges
-from backend.web.notify import send_emails
+from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
 
 router = APIRouter(prefix="/professor", dependencies=[Depends(nav_badges)])
@@ -86,7 +86,7 @@ def decide(
         return render(
             request, "professor/evaluation.html", status_code=422, user=user, v=view, error=str(exc), form=form
         )
-    send_emails()
+    send_notifications()
     flash(request, tr("판정을 확정했어요. 학생 포털과 내보내기에 바로 반영돼요."))
     return RedirectResponse("/professor", status_code=303)
 
@@ -102,7 +102,7 @@ def away(
 ) -> Response:
     check_csrf(request, csrf_token)
     moved = review_service.set_away(session, user, days, int(delegate_id) if delegate_id.isdigit() else None)
-    send_emails()
+    send_notifications()
     flash(
         request,
         tr("부재 기간을 저장했어요. 진행 중인 {moved}건을 대리 심사자에게 넘겼어요.", moved=moved)
@@ -130,6 +130,6 @@ def request_materials(
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        send_emails()
+        send_notifications()
         flash(request, tr("학생에게 보완 자료를 요청했어요. 자료가 오면 다시 분석한 결과로 이어서 판정할 수 있어요."))
     return RedirectResponse(f"/professor/evaluations/{evaluation_id}", status_code=303)

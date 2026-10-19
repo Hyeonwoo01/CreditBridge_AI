@@ -298,8 +298,8 @@ def test_sis_api_requires_admin_issued_token(client: TestClient, seeded: Session
     ev, _, token = professor_for(client, seeded, "calculus.txt")
     approve(client, ev, token)
     client.cookies.clear()
-    assert client.get("/api/sis/decisions").status_code == 401
-    assert client.get("/api/sis/decisions", headers={"Authorization": "Bearer cbsis_wrong"}).status_code == 401
+    assert client.get("/api/v1/sis/decisions").status_code == 401
+    assert client.get("/api/v1/sis/decisions", headers={"Authorization": "Bearer cbsis_wrong"}).status_code == 401
 
     login(client, "rachel@msu.example")
     assert client.get("/admin/sis").status_code == 403
@@ -309,19 +309,27 @@ def test_sis_api_requires_admin_issued_token(client: TestClient, seeded: Session
     secret = "cbsis_" + issued.strip()
 
     client.cookies.clear()
-    r = client.get("/api/sis/decisions", headers={"Authorization": f"Bearer {secret}"})
+    r = client.get("/api/v1/sis/decisions", headers={"Authorization": f"Bearer {secret}"})
     assert r.status_code == 200
     body = r.json()
     assert body["institution"] == "Midwest State University"
     calc = [d for d in body["decisions"] if d["source_course"] == "MATH 101"]
     assert calc and calc[0]["target_course"] == "MATH 1151" and calc[0]["result"] == "direct"
-    later = client.get("/api/sis/decisions?since=2999-01-01T00:00:00Z", headers={"Authorization": f"Bearer {secret}"})
+    later = client.get(
+        "/api/v1/sis/decisions?since=2999-01-01T00:00:00Z", headers={"Authorization": f"Bearer {secret}"}
+    )
     assert later.json()["count"] == 0
+    assert "Deprecation" not in r.headers
+    # 버전 없는 옛 경로도 같은 결과를 주되, 폐기 예정과 새 경로를 헤더로 알린다
+    legacy = client.get("/api/sis/decisions?since=2000-01-01T00:00:00Z", headers={"Authorization": f"Bearer {secret}"})
+    assert legacy.status_code == 200 and legacy.json()["count"] == body["count"]
+    assert legacy.headers["Deprecation"] == "true"
+    assert legacy.headers["Link"] == '</api/v1/sis/decisions>; rel="successor-version"'
 
     token = login(client, "admin@msu.example")
     client.post("/admin/sis", data={"action": "revoke", "csrf_token": token})
     client.cookies.clear()
-    assert client.get("/api/sis/decisions", headers={"Authorization": f"Bearer {secret}"}).status_code == 401
+    assert client.get("/api/v1/sis/decisions", headers={"Authorization": f"Bearer {secret}"}).status_code == 401
 
 
 # ---------- FR-25 근거 위치 이동 ----------

@@ -6,6 +6,8 @@
   <title>{% block title %}CreditBridge AI{% endblock %}</title>
   <link rel="icon" href="/static/img/favicon-64.png" type="image/png">
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+  {# 홈 화면에 추가해 앱처럼 열기 (iPhone·iPad 웹 푸시는 이렇게 연 화면에서만 동작) #}
+  <link rel="manifest" href="/static/manifest.webmanifest">
   {# 한·영 혼용 본문용 Pretendard (불러오지 못하면 시스템 글꼴로 대체) #}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="/static/css/app.css">

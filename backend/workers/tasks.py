@@ -6,7 +6,7 @@ from backend.ai.llm_client import get_llm
 from backend.db.session import SessionLocal
 from backend.documents.storage import get_storage
 from backend.errors import LLMError
-from backend.services import analysis, auth, institution_data, notifications, reminders
+from backend.services import analysis, auth, institution_data, notifications, push, reminders
 from backend.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ def process_transcript(request_id: int) -> None:
 def deliver_notifications() -> None:
     with SessionLocal() as session:
         notifications.deliver_pending(session)
+        push.deliver_pending(session)
 
 
 @celery_app.task(name="reference.process")
@@ -67,3 +68,4 @@ def send_daily_reminders() -> None:
         sent = reminders.send_daily(session)
         logger.info("daily reminders", extra={"notifications": sent})
         notifications.deliver_pending(session)
+        push.deliver_pending(session)

@@ -8,7 +8,7 @@
 2. **심사 대기열과 교수 배정 (심사관)**: 신뢰도·일관성 경보·학과로 걸러 보고, 학과 교수에게 한 번에 배정합니다. 교수가 부재 중이면 대리 심사자에게 넘어갑니다.
 3. **근거를 보고 최종 판정 (학과 교수)**: 양쪽 강의계획서 구절을 나란히 보고 승인·수정·반려합니다. 추천과 다르게 판정하면 사유를 고르고, 과거 판정과 다르면 확정 전에 경보가 뜹니다.
 4. **보완 자료와 이의 신청**: 정보가 모자라면 학생에게 자료를 요청하고, 학생은 근거 자료를 붙여 이의 신청할 수 있습니다. 재판정도 이전 판정을 지우지 않고 새로 남깁니다.
-5. **기관 운영 (관리자)**: 계정·과목 CSV와 기준 강의계획서 등록, 문서 삭제 승인, 운영 통계, 감사 로그, 학사정보시스템 연동(`GET /api/sis/decisions`)을 합니다.
+5. **기관 운영 (관리자)**: 계정·과목 CSV와 기준 강의계획서 등록, 문서 삭제 승인, 운영 통계, 감사 로그, 학사정보시스템 연동(`GET /api/v1/sis/decisions`)을 합니다.
 6. **기록과 알림**: 판정 근거 리포트 PDF, 화면·메일 알림을 제공합니다. 화면은 한국어·영어로 볼 수 있고, 상단 언어 버튼으로 바꾸면 그 계정의 알림·메일도 같은 언어로 갑니다.
 
 역할별 화면과 메뉴는 아래 [주요 화면](#주요-화면), 화면별 세부는 [화면 명세서](docs/screens/README.md)에 있습니다.
@@ -178,7 +178,7 @@ frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (PostgreSQL 17, 기준점 0001에 이전 MariaDB 마이그레이션을 합침)
 db/              init.sql(스키마, alembic --sql로 생성) · data.sql(데모 초기 데이터, pg_dump로 생성) — scripts/export_db_sql.sh로 다시 만듦
-scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · demo_data/
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · demo_data/
 tests/           unit · integration(PostgreSQL) · eval(골든셋)
 ```
 
@@ -195,9 +195,12 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋)
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.
 - 기한 알림은 `beat` 서비스(개발 환경은 `celery beat`)가 매일 `REMINDER_HOUR_UTC`시(기본 13시 UTC = 미국 동부 오전 9시)에 보내요. 판정 기한이 지났거나 하루 남은 심사(교수·심사관), 교수 배정이 밀린 과목(심사관), 처리 기한이 다가온 삭제 요청(심사관·관리자), 답이 없는 보완 자료 요청(학생)을 알려요. beat는 반드시 하나만 띄우세요(여러 개면 알림이 겹쳐 쌓여요). 오늘 대상 건수는 운영 통계의 "기한 알림" 카드에서 볼 수 있어요.
 - 알림 메일과 비밀번호 재설정 메일을 보내려면 `SMTP_HOST` 등과 `APP_BASE_URL`(메일 속 링크 주소)을 설정하세요. 비워 두면 화면 알림만 쓰고, 비밀번호는 관리자가 초기화합니다.
+- 휴대폰·컴퓨터 브라우저 푸시 알림을 켜려면 `uv run python -m scripts.generate_vapid_keys`로 만든 `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`를 `.env`에 넣고 `VAPID_SUBJECT`를 관리자 메일(`mailto:...`)로 바꾸세요. 각 사용자가 알림 화면에서 "푸시 알림 받기"를 누르면 그 기기로 와요. https 주소(또는 localhost)에서만 동작하고, iPhone·iPad는 홈 화면에 추가한 앱으로 열어야 해요. 개인 키를 바꾸면 모두 다시 구독해야 해요.
+- JSON API는 `/api/v1/...`입니다. 버전 없는 옛 경로(`/api/sis/decisions` 등)도 당분간 같은 응답을 주지만 폐기 예정이니 연동 시스템 주소를 바꿔 주세요.
 - `SESSION_SECRET`은 길고 무작위인 값으로 정하고 바꾸지 마세요. 바꾸면 모든 로그인과 아직 쓰지 않은 재설정 링크가 무효가 됩니다.
 - 웹 서버 접근 로그는 쿼리 문자열을 지우고 경로만 남깁니다(심사 대기열 검색어에 학생 이름이 들어갈 수 있음). 앞에 리버스 프록시를 둘 때도 접근 로그에서 쿼리 문자열을 빼세요.
 - 관리자 콘솔의 "데이터 보존 및 파기 정책" 카드는 [docs/privacy.md](docs/privacy.md)를 요약한 것입니다. 삭제 처리 기한은 `PRIVACY_DELETION_DAYS`(기본 30일)로 바꿉니다.
 - 일관성 경보의 유사도 기준(`SIMILARITY_MIN = 0.80`)은 첫 측정 후 확정하는 임시값입니다.
+- 추천 등급 기준값(직접 인정 0.75·선택 인정 0.40)도 임시값입니다. 교수 판정이 쌓이면 `uv run python -m scripts.calibrate_scoring --institution "대학 이름"`(또는 전문가 라벨 CSV `--csv`)으로 지금 값의 일치율·오인정률과 제안값을 보고, 사람이 승인하면 `backend/services/scoring.py`를 고치고 `RULES_VERSION`을 올리세요(자동으로 바꾸지 않아요).
 - 화면 문구를 추가·수정하면 `backend/locales/en.json`에 영어를 함께 넣고 `uv run python -m scripts.i18n_check`로 빠진 번역이 없는지 확인하세요. AI 근거 설명은 한 번의 분석으로 한국어(학생용)와 영어(교직원용)를 함께 받아 화면 언어에 맞춰 보여 줘요(프롬프트 `evaluation-v2`). 그 전에 분석한 결과는 다시 분석하기 전까지 한국어로만 보여요.
 - 0007 마이그레이션 이전에 올린 강의계획서에는 원본 쪽 번호가 없어요. `uv run python -m scripts.backfill_page_offsets`를 한 번 돌리면 텍스트 PDF는 채워져요(LLM 호출 없음). 스캔본은 다시 올리면 채워져요. 새 테이블 `evaluation_notes`의 앱 계정 권한(SELECT·INSERT·DELETE)도 [docs/db-grants.sql](docs/db-grants.sql)대로 부여하세요.

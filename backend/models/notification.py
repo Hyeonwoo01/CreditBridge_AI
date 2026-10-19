@@ -7,7 +7,7 @@ from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType
 
 
 class Notification(IdMixin, CreatedAtMixin, Base):
-    """화면 알림 (FR-19, FR-20). 메일 설정이 있으면 같은 내용을 메일로도 보낸다. 메시지에 개인정보를 넣지 않는다."""
+    """화면 알림 (FR-19, FR-20). 메일·웹 푸시 설정이 있으면 메일·푸시로도 보낸다. 메시지에 개인정보를 넣지 않는다."""
 
     __tablename__ = "notifications"
     # 안 읽은 알림 수 (상단 종, 60초마다)
@@ -19,3 +19,5 @@ class Notification(IdMixin, CreatedAtMixin, Base):
     link: Mapped[str] = mapped_column(String(255), default="")
     read_at: Mapped[datetime | None] = mapped_column(default=None)
     emailed_at: Mapped[datetime | None] = mapped_column(default=None)
+    # 웹 푸시를 보낸 시각 (푸시 설정이 있고 그 사용자가 구독한 기기가 있을 때)
+    pushed_at: Mapped[datetime | None] = mapped_column(default=None)

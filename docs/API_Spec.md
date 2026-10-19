@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 74개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 77개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -16,10 +16,10 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | 화면 조회 | `GET` → HTML | 28 | 화면 하나에 조회 API 하나. 화면에 보이는 데이터를 서버가 모아 HTML에 넣어 보낸다 (조회 함수는 5절) |
 | 이동 | `GET` → 303 | 2 | `GET /`(역할별 홈으로), `GET /student/syllabi/{id}`(최신 분석으로) |
 | 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 35 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
-| 파일 내려받기 | `GET` → PDF·CSV·원본 파일 | 4 | 리포트 PDF, 원본 강의계획서, 이의 신청 근거 자료, SIS CSV |
+| 파일 내려받기 | `GET` → PDF·CSV·원본 파일·스크립트 | 5 | 리포트 PDF, 원본 강의계획서, 이의 신청 근거 자료, SIS CSV, 웹 푸시 서비스 워커(`/sw.js`) |
 | HTMX 조각 | `GET` → HTML 조각 | 2 | 알림 배지 숫자, 상단 보조 바 집계 칩 |
-| JSON API | `GET`/`POST` → JSON | 3 | 분석 결과 조회, 판정 저장, 학사정보시스템 연동 |
-| 합계 | | 74 | GET 38, POST 36 |
+| JSON API | `GET`/`POST` → JSON | 5 | 분석 결과 조회, 판정 저장, 학사정보시스템 연동(`/api/v1/...`), 웹 푸시 구독·해제 |
+| 합계 | | 77 | GET 39, POST 38 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
 
 ### 1.2 공통 규칙
 
@@ -57,9 +57,12 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | A9 | POST | `/account/forgot` | 공개 | `email`, `csrf_token` | HTML (계정 유무와 상관없이 같은 안내) | P20 | – |
 | A10 | GET | `/account/reset` | 공개 | `token`(메일 링크) | HTML | P20 | – |
 | A11 | POST | `/account/reset` | 공개 | `token`, `new`, `confirm`, `csrf_token` | 303→`/login` / 422 | P20 | – |
-| A12 | GET | `/notifications` | 로그인 | – | HTML (열면 모두 읽음) | P14 | FR-19·20 |
+| A12 | GET | `/notifications` | 로그인 | `page`(50건씩) | HTML (열면 모두 읽음, VAPID 키가 있으면 푸시 카드) | P14 | FR-19·20 |
 | A13 | GET | `/notifications/count` | 로그인 | – | HTML 조각(안 읽은 수) | P00 | FR-20 |
 | A14 | GET | `/notifications/workspace` | 심사관·교수·관리자 | – | HTML 조각(제출·대기·완료 칩) | P00 | FR-17 |
+| A15 | POST | `/notifications/push/subscribe` | 로그인 + `X-CSRF-Token` | JSON: 브라우저 `PushSubscription.toJSON()` (`endpoint` https, `keys.p256dh`·`keys.auth`) | JSON `{"devices": n}` / 422 `{"detail"}`(푸시 미설정·잘못된 구독) | P14 | FR-20 |
+| A16 | POST | `/notifications/push/unsubscribe` | 로그인 + `X-CSRF-Token` | JSON `{"endpoint"}` | JSON `{"devices": n}` | P14 | FR-20 |
+| A17 | GET | `/sw.js` | 공개 | – | 서비스 워커 스크립트 (사이트 전체 범위, `Cache-Control: no-cache`) | P14 | FR-20 |
 
 ### 2.2 학생
 
@@ -95,7 +98,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | R7 | POST | `/review/appeals/{id}` | 심사관 | `action`(accept·dismiss), `reviewer_id`(accept), `note`(dismiss 필수), `csrf_token` | 303→R6 | P07 | FR-23 |
 | R8 | GET | `/review/privacy` | 심사관 | – | HTML | P08 | FR-13 |
 | R9 | POST | `/review/privacy/{id}` | 심사관 | `csrf_token` | 303→R8 | P08 | FR-13 |
-| R10 | GET | `/review/equivalencies` | 심사관 | – | HTML | P09 | FR-26 |
+| R10 | GET | `/review/equivalencies` | 심사관 | `q`(출신 과목·출신 대학·대상 과목 일부), `result`(direct·elective·none), `page`(50건씩) | HTML | P09 | FR-26 |
 | R11 | POST | `/review/equivalencies` | 심사관 | `file`(CSV), `csrf_token` | 303→R10 / 422 | P09 | FR-26 |
 | R12 | GET | `/review/stats` | 심사관 | – | HTML | P10 | FR-27 |
 
@@ -147,13 +150,16 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 | # | 메서드 | 경로 | 인증 | 설명 | FR |
 | --- | --- | --- | --- | --- | --- |
-| J1 | GET | `/api/evaluations/{id}` | 세션 | 분석 결과(추천)와 사람 판정 | FR-05~09 |
-| J2 | POST | `/api/decisions` | 세션 + `X-CSRF-Token` | 최종 판정 저장 (F4와 같은 규칙) | FR-09·10 |
-| J3 | GET | `/api/sis/decisions` | `Authorization: Bearer cbsis_...` | 확정 판정 내보내기 | FR-24 |
+| J1 | GET | `/api/v1/evaluations/{id}` | 세션 | 분석 결과(추천)와 사람 판정 | FR-05~09 |
+| J2 | POST | `/api/v1/decisions` | 세션 + `X-CSRF-Token` | 최종 판정 저장 (F4와 같은 규칙) | FR-09·10 |
+| J3 | GET | `/api/v1/sis/decisions` | `Authorization: Bearer cbsis_...` | 확정 판정 내보내기 | FR-24 |
+
+버전: JSON API는 경로에 버전(`/api/v1`)을 붙인다. 응답 모양이 바뀌면(필드 삭제·의미 변경) `/api/v2`를 새로 열고 v1을 한동안 함께 둔다. 필드 추가는 같은 버전에서 한다.
+버전 없는 옛 경로(`/api/evaluations/{id}`, `/api/decisions`, `/api/sis/decisions`)는 이미 연동한 시스템을 위해 같은 동작으로 남겨 두되 폐기 예정이다: 성공 응답에 `Deprecation: true`와 `Link: </api/v1/...>; rel="successor-version"` 헤더를 붙이고, OpenAPI 문서(`/api/docs`)에도 deprecated로 표시한다.
 
 ## 3. JSON API 상세
 
-### J1 `GET /api/evaluations/{id}`
+### J1 `GET /api/v1/evaluations/{id}`
 
 볼 권한은 화면과 같다 (학생 본인, 소속 기관 심사관, 배정·판정 교수).
 
@@ -172,7 +178,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 판정 확률(%)은 MVP에서 계산·제공하지 않는다. 오류: 401 로그인 필요, 403 권한 없음, 404 없음.
 
-### J2 `POST /api/decisions`
+### J2 `POST /api/v1/decisions`
 
 ```json
 { "evaluation_id": 6, "action": "reject", "result": null, "target_course_id": null,
@@ -184,7 +190,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 - 422: 사유 누락(반려·추천과 다른 판정), '기타'인데 메모 없음, 정보 부족 건을 그대로 승인 등.
 - 403: 배정 교수가 아님.
 
-### J3 `GET /api/sis/decisions?since=2026-10-01T00:00:00Z`
+### J3 `GET /api/v1/sis/decisions?since=2026-10-01T00:00:00Z`
 
 ```json
 { "institution": "Midwest State University", "count": 1,
@@ -267,6 +273,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P08 | 처리 완료 (심사관) | R9 |
 | P08 | 승인·삭제 (관리자, 확인창) | M10 |
 | P09 | 가져오기 (CSV) · 예시 파일 | R11 · 정적 파일 |
+| P09 | 찾기 · 판정 결과 칩 · 이전·다음 페이지 | R10 `q`·`result`·`page` |
 | P10 | 학사정보 연동 · 연동 설정 보기 · 전체 감사 로그 · 전체 보기 · 삭제 승인 화면 (관리자) | M11 · M11 · M13 · M13 · M9 |
 | P10 | SIS CSV 내보내기 (심사관) | R3 |
 
@@ -311,7 +318,9 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P25 | 미배정 · 전체 (보기 칩) | M17 `show` |
 | P25 | 고른 건 학과 교수에게 자동 배정 | M18 |
 | P25 | 배정 · 바꾸기 (행마다) | M19 |
-| P14·P17 | (버튼 없음 · 알림 행의 링크는 해당 화면 조회 API · 오류 화면 "처음으로"는 A1) | – |
+| P14 | 푸시 알림 받기 · 이 기기에서 끄기 (VAPID 키가 있을 때) | A15 · A16 (서비스 워커 A17을 먼저 등록) |
+| P14 | 이전·다음 페이지 | A12 `page` |
+| P14·P17 | (알림 행의 링크는 해당 화면 조회 API · 오류 화면 "처음으로"는 A1) | – |
 
 ## 5. 화면 데이터 ↔ 조회 API
 
@@ -327,11 +336,11 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P05 | R1 | `review.queue`, `stats.institution_stats` | 지표 카드 4개, 탭·학과별 건수, 행(접수 번호·학생·출신 대학·과목·후보·커버리지·추천·신뢰도·담당 교수·상태·경보), 페이지 |
 | P07 | R6 | `appeals.rows` | 접수된 이의 신청(과목·출신 대학·신청 시각·사유·근거 자료·원 판정, 학생 이름은 없음), 재판정 교수 후보 |
 | P08 | R8 · M9 | `privacy.rows` | 삭제 요청(요청 #·학생 이메일·기한·상태·기한 초과) |
-| P09 | R10 | `equivalencies.recent` | 최근 가져온 동등 과목표 |
+| P09 | R10 | `equivalencies.search` | 가져온 동등 과목표 검색 (출신 대학·출신 과목·대상 과목·판정, 50건씩) |
 | P10 | M1 · R12 | `stats.institution_stats`, `stats.recent_audit`(관리자), `views.reminder_preview` | 수용률·불일치율, 개인정보, SIS 상태, 처리 현황, 기한 알림, 학과별 지표, 월별 판정, 판정 구성, 최근 감사 로그 8건(관리자), 보존 정책 |
 | P11 | F1 | `views.professor_items`, `views.colleagues` | 배정된 심사(재판정·대리 표시), 부재 설정·대리 교수 후보 |
 | P13 | C1 · C2 | `views.evaluation_view(with_audit=True)` | 사람 판정·당시 AI 추천, 경과, AI 추천, 개념별 근거, 과거 판정, 감사 로그 |
-| P14 | A12 | `notifications.inbox` | 알림 50건 (저장된 한국어 원문을 화면 언어로) |
+| P14 | A12 | `notifications.inbox`, `push.device_count` | 알림 50건씩 페이지 (저장된 한국어 원문을 화면 언어로), 푸시 받는 기기 수 |
 | P15 | M11 | `sis.has_token` | 토큰 상태 (발급 직후에만 원문) |
 | P16 | M13 | `stats.audit_page` | 소속 기관 감사 로그(조건별, 50건씩)·행위자 역할·필터 선택지(그 기관 기록에 나온 행위·대상 종류) |
 | P18 | M2 | `institution_data.overview` | 과목 수·계정 수(역할별, 비활성 제외)·첫 비밀번호 대기·출신 대학, 교수 없는 학과, 과목별 기준 강의계획서 상태, 출신 대학 목록 |
@@ -346,12 +355,12 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 ### 6.1 버튼 ↔ API 매칭 (요청 1)
 
-점검 방법: 템플릿 43개에서 폼 44개·링크 61개·HTMX 호출 3개(모두 108개)를 뽑아 엔드포인트 74개와 경로·메서드로 맞췄다. 메뉴 링크(`nav_link`)와 할 일 링크처럼 코드가 만드는 주소는 따로 확인했다.
+점검 방법: 템플릿 43개에서 폼 44개·링크 61개·HTMX 호출 3개(모두 108개)를 뽑아 엔드포인트 74개와 경로·메서드로 맞췄다. 메뉴 링크(`nav_link`)와 할 일 링크처럼 코드가 만드는 주소는 따로 확인했다. 그 뒤 추가한 웹 푸시 A15~A17은 P14 푸시 카드의 스크립트(`app.js`)가 부른다.
 
 | 항목 | 결과 |
 | --- | --- |
 | 서버를 부르는 버튼이 엔드포인트와 연결되는가 | ✅ 모두 연결. 연결되지 않는 버튼 0개 (보완 자료 요청 폼은 역할에 따라 R5·F5로 나뉨) |
-| 처리 API(POST 35개)마다 버튼이 있는가 | ✅ 35개 모두 화면 버튼이 있음. JSON J2만 화면 버튼 없음 (아래) |
+| 처리 API(POST 35개)마다 버튼이 있는가 | ✅ 35개 모두 화면 버튼이 있음. JSON J2만 화면 버튼 없음 (아래). JSON A15·A16은 P14 푸시 카드 버튼 |
 | 화면 안에서만 동작하는 버튼 | 인쇄, 사유 창 닫기·취소, 판정 칩, 전체 선택, 단계 바로가기, 근거 구절 이동 — 서버 API가 필요 없음 |
 | 버튼 없이 쓰는 API | A1(로고·첫 진입), A10(메일 링크), A13·A14(자동 갱신), S9(과목 카드 → 최신 분석으로 이동), J1·J2(화면에서 안 씀), J3(외부 시스템) |
 
@@ -365,7 +374,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | F4 `POST /professor/evaluations/{id}/decision` | 판정 확정(본문·하단 바) · 사유 창 확정 | 같은 폼의 제출 버튼 3개. 1:1 문제 아님 |
 | R3 `GET /review/export.csv` | 메뉴·심사 큐·통계 3곳 | 같은 기능의 진입점이 여러 곳. 문제 아님 |
 
-같은 일을 하는 API가 둘인 곳: J2 `POST /api/decisions`는 F4와 같은 판정 저장이다. 화면에서는 F4만 쓴다. J1·J2를 외부(모바일 앱 등)용으로 둘지, 지울지 정해야 한다.
+같은 일을 하는 API가 둘인 곳: J2 `POST /api/v1/decisions`는 F4와 같은 판정 저장이다. 화면에서는 F4만 쓰고, J1·J2는 외부(모바일 앱 등)용으로 버전을 붙여 남긴다 (2026-10-19 결정).
 
 ### 6.2 화면 데이터 조회 API (요청 2)
 
@@ -380,8 +389,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- |
 | P18 계정·과목 ✅ 반영 | 계정 **목록**을 조회하는 API가 없었다. 역할별 개수만 보여서, 비활성화·비밀번호 초기화할 때 이메일을 직접 알아야 했다 | M14 `GET /admin/accounts?q=&role=&status=&page=` 추가 (P24) |
 | P16 감사 로그 ✅ 반영 | 최근 200건만, 기간·행위·대상 필터와 페이지가 없었다 | M13에 `action`·`target_type`·`target_id`·`since`·`until`·`page` 추가 (50건씩) |
-| P14 알림 | 최근 50건만, 페이지 없음 | 페이지 추가 (우선순위 낮음) |
-| P09 동등 과목표 | 최근 가져온 것만 보이고 전체 검색이 없다 | `GET /review/equivalencies?q=&page=` |
+| P14 알림 ✅ 반영 | 최근 50건만, 페이지 없음 | A12에 `page` 추가 (50건씩, 2026-10-19) |
+| P09 동등 과목표 ✅ 반영 | 최근 가져온 것만 보이고 전체 검색이 없다 | R10에 `q`·`result`·`page` 추가 (출신 대학·대상 과목 열도 추가, 2026-10-19) |
 
 ### 6.3 기능 명세·권한 매트릭스 대비 빠진 API
 
@@ -392,7 +401,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | 교수 배정·재배정 — **관리자 가능** ✅ 반영 | 배정 API(R2)가 심사관 전용이었다 | 코드를 매트릭스에 맞춤: 관리자용 P25와 M17~M19 추가(학과 자동 배정·교수 지정·바꾸기). 관리자는 AI 결과를 보지 않는다는 매트릭스 규칙에 따라 추천·커버리지 없이 학과·담당 교수만 보여 준다 |
 | 사용자·학과·대리자 설정 — **관리자 가능** ✅ 반영 | 교수의 학과·대리자를 고치는 API가 없었다 | M16 `POST /admin/accounts/{id}` 추가: 교직원 이름, 교수·심사관 학과(과목 학과명만), 교수 대리 심사자. 역할은 기록이 묶여 있어 바꾸지 않는다(새 계정 + 비활성화) |
 | 문서 업로드 — **심사관 소속 기관 전체** ✅ 반영 | 심사관은 보완 자료 **요청**(R5)만 할 수 있었다 | 코드를 매트릭스에 맞춤: R13 `POST /review/evaluations/{id}/supplement`로 심사관이 학생 대신 보완 자료를 올린다(메일·종이로 받은 자료, 판정 전·최신 분석만, 다시 분석). 새 강의계획서 추가는 학생 업로드로 둔다 |
-| FR-20 모바일 승인의 알림 | 화면·메일 알림만 (웹 푸시 없음) | 추적표에 🟡로 이미 기록 |
+| FR-20 모바일 승인의 알림 ✅ 반영 | 화면·메일 알림만 (웹 푸시 없음) | A15~A17 웹 푸시 추가 (pywebpush, VAPID 키 설정 시, 2026-10-19) |
 
 ### 6.4 설계상 확인할 점
 
@@ -400,11 +409,11 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- |
 | GET이 상태를 바꾼다 | A12(알림 모두 읽음), S10·S14(새 결과 배지 읽음 처리)는 조회하면서 읽음 시각을 남긴다 | 같은 요청을 여러 번 해도 결과가 같아(멱등) 실제 문제는 없다. REST 원칙을 지키려면 `POST /notifications/read`로 분리 |
 | 코드 설명이 옛 동작 | S15 라우트 설명에 "확정 판정 건수"가 남아 있지만 지금은 기관 동등 과목표만 보여 준다 | 수정함 (기관 동등 과목표 기준으로 설명 변경) |
-| 버전 표기 | 경로에 버전(`/api/v1`)이 없다 | 외부 연동(J3)을 공개하기 전에 `/api/v1/sis/decisions`로 정한다 |
+| 버전 표기 ✅ 반영 | 경로에 버전(`/api/v1`)이 없었다 | J1~J3을 `/api/v1/...`로 옮기고 옛 경로는 폐기 예정 별칭으로 둠 (2.7, 2026-10-19) |
 
 ### 6.5 권장 조치 (우선순위)
 
 1. ~~계정 목록·수정 API~~ (6.2·6.3) — 반영 (M14~M16, P24, 2026-10-19).
 2. ~~감사 로그 필터·페이지~~ (6.2) — 반영 (M13, P16, 2026-10-19).
 3. ~~권한 매트릭스 정리~~ (6.3) — 코드를 매트릭스에 맞춤 (관리자 배정 P25·M17~M19, 심사관 대신 업로드 R13, 2026-10-19).
-4. J1·J2를 외부용으로 둘지 결정하고, 둔다면 `/api/v1`과 JSON 조회 API 범위를 정한다.
+4. ~~JSON API 버전~~ — J1~J3을 `/api/v1`로 (2026-10-19). J1·J2는 외부(모바일 앱 등)용으로 남긴다. 화면 데이터 JSON 조회 API는 별도 앱을 만들 때 필요한 화면부터 추가한다.
