@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # 메일 속 링크의 기준 주소
     app_base_url: str = "http://localhost:8000"
 
-    # 공개 데모(예시용 배포, deploy/huggingface): Claude 대신 예시 AI, S3 대신 이 폴더에 파일 저장,
+    # 공개 데모(예시용 배포, deploy/demo): Claude 대신 예시 AI, S3 대신 이 폴더에 파일 저장,
     # 비밀번호 변경·초기화와 계정 비활성화를 막는다. 운영에서는 반드시 false
     demo_mode: bool = False
     demo_storage_dir: str = "/tmp/creditbridge-files"

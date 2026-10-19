@@ -76,9 +76,9 @@ docker compose --profile app up -d --build
 - 끄기: `docker compose --profile app down` (데이터는 남음, 모두 지우려면 `down -v`)
 - 로그 보기: `docker compose --profile app logs -f web worker`
 
-### 예시용 공개 데모로 올리기 (Hugging Face Spaces)
+### 예시용 공개 데모로 올리기 (Render 무료)
 
-컨테이너 하나에 앱과 MariaDB를 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. 무료 Hugging Face Space에 올리면 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
+컨테이너 하나에 앱과 MariaDB를 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
 
 ### 개발용: 인프라만 Docker, 앱은 uv로
 

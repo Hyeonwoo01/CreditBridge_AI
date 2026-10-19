@@ -1,0 +1,10 @@
+# Render Blueprint: 예시용 공개 데모 (docs/demo-deploy.md). 운영 배포용이 아니다.
+services:
+  - type: web
+    name: creditbridge-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/demo/Dockerfile
+    dockerContext: .
+    healthCheckPath: /login
+    autoDeploy: false
