@@ -5,7 +5,8 @@ set -e
 DATA="${DEMO_DB_DIR:-/app/demo-db}"
 SOCK=/tmp/mariadb-build.sock
 mariadb-install-db --datadir="$DATA" --auth-root-authentication-method=normal --skip-test-db >/dev/null
-mariadbd --datadir="$DATA" --socket="$SOCK" --bind-address=127.0.0.1 --port=3306 --skip-log-bin \
+# 리두 로그를 작게 만들어 디스크·파일 캐시 사용을 줄인다 (시작할 때도 같은 크기를 쓴다)
+mariadbd --datadir="$DATA" --socket="$SOCK" --bind-address=127.0.0.1 --port=3306 --skip-log-bin --innodb-log-file-size=8M \
   --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --performance-schema=OFF &
 for i in $(seq 1 60); do
   if mariadb-admin --socket="$SOCK" -uroot ping >/dev/null 2>&1; then break; fi

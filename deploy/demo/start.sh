@@ -9,14 +9,17 @@ if [ ! -d "$DATA/creditbridge" ]; then
   sh deploy/demo/build_db.sh
 fi
 mariadbd --datadir="$DATA" --socket="$SOCK" --bind-address=127.0.0.1 --port=3306 \
-  --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --skip-log-bin \
-  --skip-name-resolve --performance-schema=OFF --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M \
-  --key-buffer-size=4M --max-connections=20 --table-open-cache=200 --thread-cache-size=4 &
+  --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --skip-log-bin --innodb-log-file-size=8M \
+  --skip-name-resolve --performance-schema=OFF --innodb-buffer-pool-size=16M --innodb-log-buffer-size=2M \
+  --key-buffer-size=2M --aria-pagecache-buffer-size=8M --tmp-table-size=4M --max-heap-table-size=4M \
+  --max-connections=15 --table-open-cache=128 --table-definition-cache=128 --thread-cache-size=2 &
 for i in $(seq 1 120); do
   if mariadb-admin --socket="$SOCK" -uroot ping >/dev/null 2>&1; then break; fi
   sleep 1
 done
 # 세션 서명 키는 시작할 때마다 새로 만든다 (데모라 다시 시작하면 로그인이 풀려도 된다)
 export SESSION_SECRET="${SESSION_SECRET:-$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')}"
-# 호스팅이 정해 주는 PORT로 연다 (Hugging Face 7860, Render 10000 등)
-exec fastapi run backend/main.py --host 0.0.0.0 --port "${PORT:-7860}"
+# 호스팅이 정해 주는 PORT로 연다 (Hugging Face 7860, Render 10000 등).
+# fastapi CLI 대신 uvicorn을 바로 띄워 메모리를 아낀다 (앞단 프록시의 https 정보는 그대로 받는다)
+exec python -m uvicorn backend.main:app --host 0.0.0.0 --port "${PORT:-7860}" \
+  --proxy-headers --forwarded-allow-ips='*' --no-access-log

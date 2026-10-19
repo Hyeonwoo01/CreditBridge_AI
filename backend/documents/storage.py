@@ -7,9 +7,6 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-import boto3
-from botocore.exceptions import ClientError
-
 from backend.config import Settings, get_settings
 
 
@@ -17,6 +14,8 @@ class ObjectStorage:
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         self._bucket = settings.s3_bucket
         self._sse = settings.s3_server_side_encryption
+        import boto3  # 공개 데모(DiskStorage)는 boto3를 불러오지 않아 메모리를 아낀다
+
         self._client = client or boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint_url,
@@ -44,6 +43,8 @@ class ObjectStorage:
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
     def ensure_bucket(self) -> None:
+        from botocore.exceptions import ClientError
+
         try:
             self._client.head_bucket(Bucket=self._bucket)
         except ClientError:

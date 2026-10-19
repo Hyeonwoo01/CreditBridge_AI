@@ -5,13 +5,15 @@ import json
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-import anthropic
 from pydantic import BaseModel, ValidationError
 
 from backend.config import Settings, get_settings
 from backend.errors import ConfigurationError, LLMError, LLMRefusalError
+
+if TYPE_CHECKING:
+    import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,9 @@ def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
 
 
 class LLMClient:
-    def __init__(self, settings: Settings, client: anthropic.Anthropic | None = None) -> None:
+    def __init__(self, settings: Settings, client: "anthropic.Anthropic | None" = None) -> None:
+        import anthropic  # SDK는 실제로 Claude를 쓸 때만 불러온다 (데모 모드는 메모리를 아낀다)
+
         if not settings.claude_model:
             raise ConfigurationError("CLAUDE_MODEL is not set")
         self._model = settings.claude_model
@@ -96,6 +100,8 @@ class LLMClient:
         max_tokens: int = 16000,
     ) -> LLMResult[T]:
         """프롬프트를 보내고 결과를 Pydantic으로 검증한다. 검증 실패 시 1회 재시도한다."""
+        import anthropic
+
         content: list[dict[str, Any]] = [
             {
                 "type": "image",
