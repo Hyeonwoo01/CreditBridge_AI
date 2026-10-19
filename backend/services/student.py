@@ -274,7 +274,8 @@ def _save_supplement(
     return key
 
 
-def submit_request(session: Session, student: User, request: TransferRequest) -> None:
+def submit_request(session: Session, student: User, request: TransferRequest) -> int:
+    """학사처에 심사를 요청한다. 정보가 충분한 과목은 바로 학과 교수에게 배정하고 그 건수를 돌려준다."""
     if request.status != RequestStatus.DRAFT:
         raise CreditBridgeError(tr("이미 제출한 요청이에요."))
     syllabi = syllabus_repo.of_request(session, request.id)
@@ -286,6 +287,9 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
     request.submitted_at = utcnow()
     audit.record(session, student, "request.submit", "transfer_request", str(request.id), courses=len(syllabi))
     session.commit()
+    from backend.services import review  # review → decisions → appeals → student 순환을 피해 여기서 불러온다
+
+    return review.assign_ready(session, request)
 
 
 # ---------- 진행 상황 포털 (FR-21) ----------

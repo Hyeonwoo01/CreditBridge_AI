@@ -10,8 +10,9 @@ from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedErr
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import Assignment, Course, CourseEvaluation, Department, Syllabus, TransferRequest, User
-from backend.models.enums import Role
+from backend.models.enums import EvaluationStatus, Recommendation, RequestStatus, Role
 from backend.repositories import catalog as catalog_repo
+from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
 from backend.repositories import syllabi as syllabus_repo
@@ -188,58 +189,101 @@ def pick_reviewer(
     return chosen, None
 
 
+def _assign_by_department(
+    session: Session, institution_id: int, evaluation: CourseEvaluation, actor: User | None
+) -> str | None:
+    """후보 과목의 학과 교수 중 배정이 가장 적은 사람에게 배정한다. 못 하면 이유(화면 문구)를 돌려준다.
+    actor가 None이면 학생 제출 때의 자동 배정(시스템)."""
+    course = (
+        catalog_repo.get_course(session, evaluation.candidate_course_id) if evaluation.candidate_course_id else None
+    )
+    if course is None or course.institution_id != institution_id:
+        return tr("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요.")
+    try:
+        reviewer, original = pick_reviewer(session, institution_id, course.dept, utcnow().date())
+    except CreditBridgeError as exc:
+        return str(exc)
+    evaluation_repo.add_assignment(
+        session,
+        Assignment(
+            course_evaluation_id=evaluation.id,
+            reviewer_id=reviewer.id,
+            assigned_by=actor.id if actor else None,
+            reassigned_from=original.id if original else None,
+        ),
+    )
+    notifications.notify(
+        session,
+        [reviewer],
+        "assignment.created",
+        (
+            N_("새 심사가 배정됐어요: {course} → {code} (부재 교수 대리)")
+            if original
+            else N_("새 심사가 배정됐어요: {course} → {code}")
+        ).format(course=_course(session, evaluation), code=course.code),
+        f"/professor/evaluations/{evaluation.id}",
+    )
+    audit.record(
+        session,
+        actor,
+        "assignment.create",
+        "course_evaluation",
+        str(evaluation.id),
+        reviewer=reviewer.id,
+        delegated_from=original.id if original else None,
+        auto=actor is None,
+    )
+    return None
+
+
 def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) -> tuple[int, list[str]]:
-    """학과 담당 교수 중 배정이 가장 적은 사람에게 배정한다 (심사관·관리자)."""
+    """학과 담당 교수 중 배정이 가장 적은 사람에게 배정한다 (심사관·관리자). 이미 교수가 있는 건(제출 때 자동
+    배정된 건 포함)은 건너뛴다 — 담당 교수를 바꾸려면 교수 지정 배정(assign_to)을 쓴다."""
     institution_id = ensure_assigner(evaluator)
-    today = utcnow().date()
     assigned, problems = 0, []
     for evaluation_id in evaluation_ids:
         evaluation = evaluation_repo.get(session, evaluation_id)
-        if evaluation is None:
+        if evaluation is None or evaluation_repo.active_assignment(session, evaluation.id) is not None:
             continue
-        course = (
-            catalog_repo.get_course(session, evaluation.candidate_course_id) if evaluation.candidate_course_id else None
-        )
-        if course is None or course.institution_id != institution_id:
-            problems.append(tr("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요."))
-            continue
-        try:
-            reviewer, original = pick_reviewer(session, institution_id, course.dept, today)
-        except CreditBridgeError as exc:
-            problems.append(str(exc))
-            continue
-        evaluation_repo.add_assignment(
-            session,
-            Assignment(
-                course_evaluation_id=evaluation.id,
-                reviewer_id=reviewer.id,
-                assigned_by=evaluator.id,
-                reassigned_from=original.id if original else None,
-            ),
-        )
-        notifications.notify(
-            session,
-            [reviewer],
-            "assignment.created",
-            (
-                N_("새 심사가 배정됐어요: {course} → {code} (부재 교수 대리)")
-                if original
-                else N_("새 심사가 배정됐어요: {course} → {code}")
-            ).format(course=_course(session, evaluation), code=course.code),
-            f"/professor/evaluations/{evaluation.id}",
-        )
-        audit.record(
-            session,
-            evaluator,
-            "assignment.create",
-            "course_evaluation",
-            str(evaluation.id),
-            reviewer=reviewer.id,
-            delegated_from=original.id if original else None,
-        )
-        assigned += 1
+        problem = _assign_by_department(session, institution_id, evaluation, evaluator)
+        if problem:
+            problems.append(problem)
+        else:
+            assigned += 1
     session.commit()
     return assigned, sorted(set(problems))
+
+
+AUTO_ASSIGNABLE = (Recommendation.DIRECT, Recommendation.ELECTIVE, Recommendation.NONE)
+
+
+def assign_ready(session: Session, request: TransferRequest) -> int:
+    """학생이 심사를 요청했을 때(그리고 제출 뒤 보완 자료로 다시 분석이 끝났을 때), 정보가 충분한 과목은
+    심사관을 거치지 않고 학과 교수에게 바로 배정한다. 배정한 건수를 돌려준다.
+
+    정보가 충분하다 = 분석이 끝났고, 정보 부족이 아니고, 대응 과목(학과)을 찾았고, 열린 보완 요청이 없다.
+    나머지(정보 부족·대응 과목 없음·학과에 교수 없음)는 심사 큐에 남아 심사관이 처리한다."""
+    if request.status != RequestStatus.SUBMITTED:
+        return 0
+    syllabi = syllabus_repo.of_request(session, request.id)
+    asked = {m.syllabus_id for m in material_repo.for_syllabi(session, [s.id for s in syllabi]) if m.status == "open"}
+    assigned = 0
+    for syllabus in syllabi:
+        evaluation = evaluation_repo.latest_for_syllabus(session, syllabus.id)
+        if (
+            evaluation is None
+            or syllabus.id in asked
+            or evaluation.status != EvaluationStatus.DONE
+            or evaluation.recommendation not in AUTO_ASSIGNABLE
+            or evaluation.candidate_course_id is None
+            or evaluation_repo.active_assignment(session, evaluation.id) is not None
+            or decision_repo.for_evaluation(session, evaluation.id) is not None
+        ):
+            continue
+        if _assign_by_department(session, request.target_institution_id, evaluation, None) is None:
+            assigned += 1
+    session.commit()
+    return assigned
 
 
 def set_away(session: Session, professor: User, days: int, delegate_id: int | None) -> int:

@@ -42,7 +42,7 @@
 | 영역 | 컴포넌트 | 내용 | 토큰 |
 | --- | --- | --- | --- |
 | 머리 카드 | `page-header-card` | 사각 아이콘 / 제목 "{기관} 편입 학점 심사 대기열" + "미처리 N건" 배지 / "판정 완료 N건 · 심사관 {이름}" | 카드 `{rounded.lg}`, 아이콘 48px parchment `{rounded.md}` + `{colors.primary}`, 제목 24→26px/600, 배지 `{colors.surface-reject-subtle}`+`{colors.status-reject}` |
-| 일괄 배정 | `button-primary` 작은 캡슐 | 표에서 고른 행을 배정(`form="assign-form"`으로 표 폼 제출) | 사람+ 아이콘 |
+| 일괄 배정 | `button-primary` 작은 캡슐 | 표에서 고른 행을 배정(`form="assign-form"`으로 표 폼 제출). 이미 교수가 있는 행은 건너뜀. 정보가 충분한 과목은 학생이 제출할 때 자동 배정되므로, 큐에는 주로 정보 부족·대응 과목 없음·학과에 교수가 없는 건이 남는다 | 사람+ 아이콘 |
 | SIS 내보내기 | `button-secondary-pill` 작은 캡슐 | 확정 판정 CSV 다운로드 | 테두리 `{colors.hairline}`, 글자 `{colors.ink}`, 다운로드 아이콘 |
 | 지표 카드 | `kpi-card` ×4 | 대기 중 심사 건수 / 고신뢰 / 정보 부족·보완 필요 / 평균 심사 소요 기간(제출→첫 판정) | 수치 36px/600 `tabular-nums`, 고신뢰 `{colors.status-approve}`, 정보 부족 `{colors.status-elective}`, 단위 17px muted. `lg` 4열 → 2열 |
 | 검색 | `search-input` | 이름·출신 대학·과목 코드·과목명·후보 과목·`#요청번호`로 찾음(띄어쓴 단어는 모두 포함해야 함, 최대 100자). 엔터로 조회, 현재 필터 유지 | `{colors.canvas-parchment}` 배경, 1px 헤어라인, `{rounded.pill}`, 높이 44px |

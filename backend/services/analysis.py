@@ -20,8 +20,8 @@ from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import LLMError, LLMNotConfiguredError
 from backend.i18n import N_
-from backend.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry
-from backend.models.enums import EvaluationStatus, Recommendation, SyllabusStatus
+from backend.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry, TransferRequest
+from backend.models.enums import EvaluationStatus, Recommendation, RequestStatus, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
@@ -310,6 +310,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     if previous is not None and previous.id != evaluation.id:
         _copy_result(session, previous, evaluation)
         session.commit()
+        _assign_if_submitted(session, request)
         return evaluation
 
     try:
@@ -438,7 +439,17 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         ],
     )
     session.commit()
+    _assign_if_submitted(session, request)
     return evaluation
+
+
+def _assign_if_submitted(session: Session, request: TransferRequest) -> None:
+    """이미 심사를 요청한 건이 (보완 자료 등으로) 다시 분석됐으면, 정보가 충분해진 과목을 학과 교수에게 배정한다."""
+    if request.status != RequestStatus.SUBMITTED:
+        return
+    from backend.services import review  # review → decisions → appeals → student → analysis 순환을 피해 여기서
+
+    review.assign_ready(session, request)
 
 
 def _copy_result(session: Session, source: CourseEvaluation, target: CourseEvaluation) -> None:

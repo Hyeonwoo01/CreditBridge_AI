@@ -75,7 +75,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | S4 | POST | `/student/requests/{id}/syllabi` | 학생(본인) | `files[]`(최대 30), `csrf_token` | 303→S3 | P03 | FR-01 |
 | S5 | POST | `/student/requests/{id}/transcript` | 학생(본인) | `file`, `csrf_token` | 303→S3 | P03 | FR-02·13 |
 | S6 | POST | `/student/requests/{id}/entries/{entry_id}` | 학생(본인) | `syllabus_id`(빈 값=연결 안 함), `csrf_token` | 303→S3`#transcript` | P03 | FR-02 |
-| S7 | POST | `/student/requests/{id}/submit` | 학생(본인) | `csrf_token` | 303→S3 | P03 | FR-21 |
+| S7 | POST | `/student/requests/{id}/submit` | 학생(본인) | `csrf_token` | 303→S3. 정보가 충분한 과목(분석 완료·정보 부족 아님·대응 과목 있음·열린 보완 요청 없음)은 이때 학과 교수에게 자동 배정 | P03 | FR-18·21 |
 | S8 | POST | `/student/requests/{id}/delete-documents` | 학생(본인) | `csrf_token` | 303→S3 | P03 | FR-13 |
 | S9 | GET | `/student/syllabi/{id}` | 학생(본인) | – | 303→그 강의계획서의 최신 분석(S10) | P03 | – |
 | S10 | GET | `/student/evaluations/{id}` | 학생(본인) | – | HTML (새 결과 알림 읽음 처리) | P04 | FR-05~08·22·25 |
@@ -90,7 +90,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | # | 메서드 | 경로 | 역할 | 입력 | 응답 | 화면 | FR |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | R1 | GET | `/review` | 심사관 | `tab`(all·high·low·insufficient·conflict), `department`, `sort`(submitted·coverage·department), `q`(≤100), `page` | HTML | P05 | FR-11·17 |
-| R2 | POST | `/review/assign` | 심사관 | `evaluation_ids[]`, `tab`, `csrf_token` | 303→R1 | P05 | FR-18 |
+| R2 | POST | `/review/assign` | 심사관 | `evaluation_ids[]`, `tab`, `csrf_token` | 303→R1 (이미 교수가 있는 건은 건너뜀) | P05 | FR-18 |
 | R3 | GET | `/review/export.csv` | 심사관 | – | 파일(CSV) | P05·P10 | FR-24 |
 | R4 | GET | `/review/evaluations/{id}` | 심사관(소속 기관) | – | HTML | P06 | FR-05~11·22·25 |
 | R5 | POST | `/review/evaluations/{id}/materials` | 심사관 | `items[]`, `note`, `csrf_token` | 303→R4 | P06 | FR-22 |

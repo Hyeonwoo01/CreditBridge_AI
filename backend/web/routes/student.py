@@ -163,8 +163,14 @@ def submit(
     check_csrf(request, csrf_token)
     transfer = student_service.get_own_request(session, user, request_id)
     try:
-        student_service.submit_request(session, user, transfer)
-        flash(request, tr("학사처에 심사를 요청했어요. 진행 상황은 이 화면에서 확인할 수 있어요."))
+        assigned = student_service.submit_request(session, user, transfer)
+        send_notifications()
+        flash(
+            request,
+            tr("학사처에 심사를 요청했어요. {assigned}과목은 학과 교수에게 바로 배정됐어요.", assigned=assigned)
+            if assigned
+            else tr("학사처에 심사를 요청했어요. 진행 상황은 이 화면에서 확인할 수 있어요."),
+        )
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)

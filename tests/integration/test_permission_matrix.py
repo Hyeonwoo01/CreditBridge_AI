@@ -15,8 +15,11 @@ def user_of(db: Session, email: str) -> User:
 
 
 def test_admin_assigns_and_reassigns_without_seeing_ai_results(client: TestClient, seeded: Session) -> None:
-    rid = submitted_request(client, seeded, "calculus.txt", "data_structures.txt")
-    calc, ds = latest(seeded, "calculus.txt", rid), latest(seeded, "data_structures.txt", rid)
+    # 정보가 충분한 미적분은 제출 때 학과 교수에게 자동 배정되고, 정보 부족 선형대수·대응 과목 없는 한국사는 남는다
+    rid = submitted_request(client, seeded, "calculus.txt", "linear_algebra_sparse.txt", "korean_history.txt")
+    auto = latest(seeded, "calculus.txt", rid)
+    assert reviewer_of(seeded, auto).department_name == "Mathematics"
+    calc, ds = latest(seeded, "linear_algebra_sparse.txt", rid), latest(seeded, "korean_history.txt", rid)
 
     token = login(client, "admin@msu.example")
     page = client.get("/admin/assignments").text
@@ -50,7 +53,7 @@ def test_admin_assigns_and_reassigns_without_seeing_ai_results(client: TestClien
     student = user_of(seeded, "jiwon@student.example")
     r = client.post(f"/admin/assignments/{ds.id}", data={"reviewer_id": student.id, "csrf_token": token})
     assert "활성 교수를 골라 주세요" in r.text
-    assert "미배정" in client.get("/admin/assignments").text  # ds는 아직 미배정
+    assert "미배정" in client.get("/admin/assignments").text  # 한국사는 아직 미배정
 
     # 심사관도 같은 규칙으로 특정 교수 배정 가능, 학생·교수는 불가
     login(client, other.email)

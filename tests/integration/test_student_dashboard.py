@@ -116,8 +116,8 @@ def test_staff_nav_badges_count_their_own_work(client: TestClient, seeded: Sessi
     from backend.models import PrivacyRequest, User
     from backend.services import institution_data
 
-    rid = submitted_request(client, seeded, "calculus.txt")
-    ev = latest(seeded, "calculus.txt", rid)
+    rid = submitted_request(client, seeded, "linear_algebra_sparse.txt")  # 정보 부족이라 자동 배정되지 않는다
+    ev = latest(seeded, "linear_algebra_sparse.txt", rid)
     token = login(client, "rachel@msu.example")
     page = client.get("/review").text
     assert "교수 배정이 필요한 과목 1개" in page
@@ -128,7 +128,12 @@ def test_staff_nav_badges_count_their_own_work(client: TestClient, seeded: Sessi
     prof = reviewer_of(seeded, ev)
     token = login(client, prof.email)
     assert "판정할 심사 1건" in client.get("/professor").text
-    approve(client, ev, token)
+    r = client.post(  # 정보 부족 건은 그대로 승인할 수 없어 사유를 골라 반려한다
+        f"/professor/evaluations/{ev.id}/decision",
+        data={"action": "reject", "reason_codes": ["weeks_insufficient"], "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, r.text
     assert "판정할 심사" not in client.get("/professor").text
 
     token = login(client, "jiwon@student.example")

@@ -2,6 +2,8 @@
 
 import logging
 
+from sqlalchemy.orm import Session
+
 from backend.ai.llm_client import get_llm
 from backend.db.session import SessionLocal
 from backend.documents.storage import get_storage
@@ -12,22 +14,31 @@ from backend.workers.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
+def _deliver(session: Session) -> None:
+    """분석 뒤 자동 배정으로 쌓인 교수 알림을 메일·푸시로도 보낸다 (설정이 없으면 아무것도 하지 않는다)."""
+    notifications.deliver_pending(session)
+    push.deliver_pending(session)
+
+
 @celery_app.task(name="syllabus.process")
 def process_syllabus(syllabus_id: int) -> None:
     with SessionLocal() as session:
         analysis.process_syllabus(session, syllabus_id, llm=get_llm(), storage=get_storage())
+        _deliver(session)
 
 
 @celery_app.task(name="syllabus.supplement")
 def add_supplement(syllabus_id: int, file_key: str) -> None:
     with SessionLocal() as session:
         analysis.add_supplement(session, syllabus_id, file_key, llm=get_llm(), storage=get_storage())
+        _deliver(session)
 
 
 @celery_app.task(name="syllabus.evaluate")
 def evaluate_syllabus(syllabus_id: int) -> None:
     with SessionLocal() as session:
         analysis.evaluate_syllabus(session, syllabus_id, llm=get_llm())
+        _deliver(session)
 
 
 @celery_app.task(name="transcript.process")

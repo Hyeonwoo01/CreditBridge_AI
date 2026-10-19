@@ -269,8 +269,9 @@ def test_role_based_access(client: TestClient, seeded: Session) -> None:
     login(client, "senior@student.example")
     assert client.get(f"/student/evaluations/{calc.id}").status_code == 403
     assert client.get(f"/api/v1/evaluations/{calc.id}").status_code == 403
-    # 배정 전 교수는 볼 수 없다
-    login(client, "dkim@msu.example")
+    # 배정되지 않은 교수는 볼 수 없다 (미적분은 제출 때 수학과 교수 한 명에게 자동 배정)
+    assigned = reviewer_of(seeded, calc)
+    login(client, "lchen@msu.example" if assigned.email == "dkim@msu.example" else "dkim@msu.example")
     assert client.get(f"/professor/evaluations/{calc.id}").status_code == 403
     # 학생은 심사 큐에 들어갈 수 없다
     login(client, "jiwon@student.example")
