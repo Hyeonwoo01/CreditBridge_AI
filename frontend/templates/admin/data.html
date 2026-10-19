@@ -87,7 +87,7 @@
   <form method="post" action="/admin/data/courses" enctype="multipart/form-data" class="card grid content-start gap-3">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <h2 class="font-semibold">{{ _("① 과목 CSV 가져오기") }}</h2>
-    <p class="text-sm text-muted">{{ _("첫 줄 열 이름:") }} <code class="rounded bg-parchment px-1">{{ course_columns | join(',') }}</code></p>
+    <p class="text-sm text-muted">{{ _("첫 줄 열 이름:") }} <code class="rounded bg-parchment px-1 break-all">{{ course_columns | join(',') }}</code></p>
     <ul class="list-disc pl-5 text-sm text-muted">
       <li>{{ _("과목 코드가 이미 있으면 과목명·학점·학과·필수 개념을 새 값으로 고쳐요.") }}</li>
       <li><strong class="text-ink">concepts</strong>{{ _(": 학과가 정한 필수 개념을") }} <code>;</code>{{ _("로 구분 (예:") }} <code>Limits;Derivatives;Integrals</code>{{ _("). AI가 개념마다 다뤘는지 비교해요.") }}</li>
@@ -146,7 +146,7 @@
   <form method="post" action="/admin/data/accounts" enctype="multipart/form-data" class="card grid content-start gap-3">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <h2 class="font-semibold">{{ _("③ 계정 CSV 가져오기") }}</h2>
-    <p class="text-sm text-muted">{{ _("첫 줄 열 이름:") }} <code class="rounded bg-parchment px-1">{{ account_columns | join(',') }}</code></p>
+    <p class="text-sm text-muted">{{ _("첫 줄 열 이름:") }} <code class="rounded bg-parchment px-1 break-all">{{ account_columns | join(',') }}</code></p>
     <ul class="list-disc pl-5 text-sm text-muted">
       <li>{{ _("role: student·evaluator·professor·admin (또는 학생·심사관·교수·관리자)") }}</li>
       <li>{{ _("교수는") }} <strong class="text-ink">department</strong>{{ _("가 필수예요. 과목 CSV의 학과명과 똑같이 적어야 그 학과 과목이 배정돼요.") }}</li>

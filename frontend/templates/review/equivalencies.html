@@ -10,7 +10,7 @@
 <form method="post" action="/review/equivalencies" enctype="multipart/form-data" class="mt-6 grid gap-3 dropzone">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <span class="font-semibold">{{ _("CSV 파일 올리기") }}</span>
-  <span class="text-sm text-muted">{{ _("엑셀에서") }} <strong>{{ _("다른 이름으로 저장 → CSV UTF-8") }}</strong>{{ _("로 저장해 주세요. 첫 줄 열 이름:") }} <code class="rounded bg-parchment px-1">{{ columns | join(',') }}</code></span>
+  <span class="text-sm text-muted">{{ _("엑셀에서") }} <strong>{{ _("다른 이름으로 저장 → CSV UTF-8") }}</strong>{{ _("로 저장해 주세요. 첫 줄 열 이름:") }} <code class="rounded bg-parchment px-1 break-all">{{ columns | join(',') }}</code></span>
   <span class="text-sm text-muted">{{ _("result는 direct·elective·none(또는 직접 인정·선택 인정·불인정), decided_on은 YYYY-MM-DD, 출신 대학은 등록된 이름 그대로 써 주세요. 한 줄이라도 틀리면 아무것도 저장하지 않아요.") }}</span>
   <input type="file" name="file" required accept=".csv,text/csv" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-parchment file:text-primary file:px-4 file:py-2 file:font-normal">
   <button class="btn-primary w-fit">{{ _("가져오기") }}</button>
