@@ -9,7 +9,7 @@
 3. **근거를 보고 최종 판정 (학과 교수)**: 양쪽 강의계획서 구절을 나란히 보고 승인·수정·반려합니다. 추천과 다르게 판정하면 사유를 고르고, 과거 판정과 다르면 확정 전에 경보가 뜹니다.
 4. **보완 자료와 이의 신청**: 정보가 모자라면 학생에게 자료를 요청하고, 학생은 근거 자료를 붙여 이의 신청할 수 있습니다. 재판정도 이전 판정을 지우지 않고 새로 남깁니다.
 5. **기관 운영 (관리자)**: 계정·과목 CSV와 기준 강의계획서 등록, 문서 삭제 승인, 운영 통계, 감사 로그, 학사정보시스템 연동(`GET /api/v1/sis/decisions`)을 합니다.
-6. **기록과 알림**: 판정 근거 리포트 PDF, 화면·메일 알림을 제공합니다. 화면은 한국어·영어로 볼 수 있고, 상단 언어 버튼으로 바꾸면 그 계정의 알림·메일도 같은 언어로 갑니다.
+6. **기록과 알림**: 판정 근거 리포트 PDF, 화면·메일 알림, 휴대폰·컴퓨터 브라우저 웹 푸시(설정 시)를 제공합니다. 화면은 한국어·영어로 볼 수 있고, 상단 언어 버튼으로 바꾸면 그 계정의 알림·메일도 같은 언어로 갑니다.
 
 역할별 화면과 메뉴는 아래 [주요 화면](#주요-화면), 화면별 세부는 [화면 명세서](docs/screens/README.md)에 있습니다.
 
@@ -62,6 +62,8 @@
 
 사전 설치: [Docker Desktop](https://www.docker.com/products/docker-desktop/), Git
 
+Docker Desktop을 먼저 실행하고, 창 왼쪽 아래에 **Engine running**이 보일 때까지 기다린 뒤 터미널(Windows는 PowerShell)에서 한 줄씩 실행합니다.
+
 ```bash
 git clone https://github.com/Hyeonwoo01/CreditBridge_AI.git
 cd CreditBridge_AI
@@ -73,8 +75,32 @@ docker compose --profile app up -d --build
 처음에는 이미지 내려받기와 빌드에 몇 분 걸립니다. DB(PostgreSQL 17)는 볼륨이 비어 있을 때 `db/init.sql`(테이블)과 `db/data.sql`(데모 계정·과목 초기 데이터)로 한 번 초기화되고, 웹 컨테이너가 시작하면서 문서 버킷을 만듭니다.
 브라우저에서 http://localhost:8000 을 엽니다. 모든 포트를 127.0.0.1에만 열어 같은 네트워크의 다른 기기에서는 접속할 수 없습니다.
 
+- 로그인: 아래 [데모 계정](#데모-계정) 중 하나로 들어갑니다(비밀번호 `demo1234`).
 - 끄기: `docker compose --profile app down` (데이터는 남음, 모두 지우려면 `down -v`)
-- 로그 보기: `docker compose --profile app logs -f web worker`
+- 다시 켜기: `docker compose --profile app up -d` / 코드를 새로 받은 뒤(`git pull`)에는 `up -d --build`
+- 상태·로그 보기: `docker compose --profile app ps`, `docker compose --profile app logs -f web worker`
+- 파일 저장소는 S3 호환 SeaweedFS 컨테이너(`s3`)를 씁니다. 운영에서는 AWS S3로 바꿉니다.
+
+#### 내 이메일로 계정 만들기
+
+회원가입 화면은 없습니다. 기관 관리자가 명단으로 계정을 만들어 주는 방식입니다.
+
+1. 관리자(`admin@msu.example`)로 로그인 → **계정·과목** → **③ 계정 CSV**에서 "예시 파일 받기"
+2. `email,name,role,department` 형식으로 적고 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장 (role은 student·evaluator·professor·admin, 교수는 과목에 있는 학과명 필수)
+3. 올리면 새 계정마다 임시 비밀번호가 화면에 한 번만 나옵니다. 그 비밀번호로 로그인하면 새 비밀번호로 바꾸는 화면이 먼저 나옵니다.
+
+메일 발송(`SMTP_HOST`)을 설정하지 않았으면 메일은 보내지 않으므로 실제로 없는 주소여도 됩니다. 이미 만든 계정의 이메일은 바꿀 수 없고(이름·학과만 수정), 바꾸려면 새 계정을 만들고 이전 계정을 비활성화합니다.
+
+#### 막힐 때
+
+| 증상 | 원인과 해결 |
+| --- | --- |
+| `failed to connect to the docker API ... dockerDesktopLinuxEngine` | Docker Desktop이 꺼져 있습니다. 실행하고 Engine running이 보이면 다시 실행하세요. `docker info`에 `Server:` 정보가 나오면 준비된 것입니다 |
+| `fatal: not a git repository`, `no configuration file provided` | 저장소 폴더 밖에서 실행했습니다. `cd CreditBridge_AI`로 들어가서 실행하세요 |
+| 브라우저에 "localhost 연결을 거부했습니다" | 아직 빌드·시작 중이거나 웹 컨테이너가 멈췄습니다. `up` 명령이 끝날 때까지 기다린 뒤 `docker compose --profile app ps`로 `web`이 실행 중인지 보고, 아니면 `docker compose --profile app logs web --tail 40`으로 오류를 확인하세요 |
+| 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose --profile app down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
+| WSL 관련 오류로 Docker Desktop이 켜지지 않음 | 관리자 PowerShell에서 `wsl --update` 후 Docker Desktop을 다시 실행하세요 |
+| 강의계획서를 올리면 "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요" | `.env`에 `ANTHROPIC_API_KEY`와 `CLAUDE_MODEL`이 없습니다. 넣고 `docker compose --profile app up -d`를 다시 실행하세요 |
 
 ### 예시용 공개 데모로 올리기 (Render 무료)
 
@@ -96,7 +122,9 @@ uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 �
 uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 터미널: 매일 기한 알림 (하나만 띄움)
 ```
 
-데모 계정 (비밀번호 모두 `demo1234`, 로컬 전용)
+#### 데모 계정
+
+비밀번호 모두 `demo1234` (로컬 전용, 운영에서는 `SEED_DEMO=false`로 만들지 않음)
 
 | 역할 | 이메일 |
 | --- | --- |
@@ -115,7 +143,7 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
 
 코드를 고치기 전에 [CLAUDE.md](CLAUDE.md)를 먼저 읽어 주세요. 사람과 Claude Code가 함께 따르는 규칙이며, Claude Code는 이 파일을 자동으로 읽습니다. 핵심만 옮기면:
 
-- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, PostgreSQL 17 + psycopg 3, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
+- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, PostgreSQL 17 + psycopg 3, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, pywebpush(웹 푸시), Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
 - **구조**: web → services → repositories → models. SQL은 `backend/repositories`에만, LLM 호출은 `backend/ai/llm_client.py`로만, 프롬프트는 `backend/ai/prompts/*.md`(바꾸면 버전 올림), 추천 규칙은 `backend/services/scoring.py` 한 곳(바꾸면 `RULES_VERSION` 올림).
 - **사람이 최종 판정**: AI는 추천만 합니다. 판정 확률(%)은 계산·표시하지 않고, 확정 판정에는 `decided_by`가 필수이며, `decisions`·`audit_logs`는 INSERT만 합니다(재판정도 새 행).
 - **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.
@@ -166,6 +194,7 @@ backend/         ← 백엔드 (Python, import 이름도 backend)
   services/      analysis(파이프라인) · scoring(추천 규칙) · student · review(심사 대기열) · decisions(판정·경보)
                  materials · appeals(이의 신청·근거 자료) · privacy · notifications · sis · equivalencies · precedents(학생 인정 사례)
                  stats(통계·관리자 콘솔) · views(화면 조회·학생 대시보드·역할별 메뉴 배지 nav_badges)
+                 push(웹 푸시 구독·발송) · calibration(추천 기준값 보정 계산)
                  institution_data(계정·과목 CSV, 기준 강의계획서, 출신 대학, 첫 관리자) · csv_import(CSV 공통)
   repositories/  SQL은 여기만
   models/        SQLAlchemy 2.0, 테이블당 1파일
@@ -203,4 +232,3 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋)
 - 일관성 경보의 유사도 기준(`SIMILARITY_MIN = 0.80`)은 첫 측정 후 확정하는 임시값입니다.
 - 추천 등급 기준값(직접 인정 0.75·선택 인정 0.40)도 임시값입니다. 교수 판정이 쌓이면 `uv run python -m scripts.calibrate_scoring --institution "대학 이름"`(또는 전문가 라벨 CSV `--csv`)으로 지금 값의 일치율·오인정률과 제안값을 보고, 사람이 승인하면 `backend/services/scoring.py`를 고치고 `RULES_VERSION`을 올리세요(자동으로 바꾸지 않아요).
 - 화면 문구를 추가·수정하면 `backend/locales/en.json`에 영어를 함께 넣고 `uv run python -m scripts.i18n_check`로 빠진 번역이 없는지 확인하세요. AI 근거 설명은 한 번의 분석으로 한국어(학생용)와 영어(교직원용)를 함께 받아 화면 언어에 맞춰 보여 줘요(프롬프트 `evaluation-v2`). 그 전에 분석한 결과는 다시 분석하기 전까지 한국어로만 보여요.
-- 0007 마이그레이션 이전에 올린 강의계획서에는 원본 쪽 번호가 없어요. `uv run python -m scripts.backfill_page_offsets`를 한 번 돌리면 텍스트 PDF는 채워져요(LLM 호출 없음). 스캔본은 다시 올리면 채워져요. 새 테이블 `evaluation_notes`의 앱 계정 권한(SELECT·INSERT·DELETE)도 [docs/db-grants.sql](docs/db-grants.sql)대로 부여하세요.
