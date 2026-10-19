@@ -11,7 +11,7 @@
 
 화면은 **한국어·영어**로 볼 수 있어요. 상단 메뉴의 언어 버튼("English" / "한국어")으로 바꾸면 그 계정의 알림·메일도 같은 언어로 가요. 처음 들어올 때는 브라우저 언어를 따릅니다.
 
-기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md)
+기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·화면 버튼 대응) · [ERD](docs/ERD.md)(엔티티·속성·관계)
 
 ## AI가 판정을 추천하는 방식
 

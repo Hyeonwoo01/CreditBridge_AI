@@ -5,7 +5,8 @@
 AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한다.
 기준 문서: docs/spec.md(페르소나·테스트 명세·기술스택·기능 명세 통합본), docs/DESIGN.md(화면 디자인 시스템: 단일 Action Blue, 1px 헤어라인, 그림자 없음),
 docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개인정보 처리),
-docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문구).
+docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문구),
+docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API), docs/ERD.md(데이터베이스 구조: 엔티티·속성·관계).
 
 ## 고정 스택 (이 목록 밖의 라이브러리를 추가하지 말 것)
 - Python 3.12 / uv (pip install 금지, uv add 사용)

@@ -287,7 +287,7 @@ def precedents(
     user: User = Student,
     session: Session = Depends(get_db),
 ) -> Response:
-    """선배 인정 사례: 같은 출신 대학 과목이 소속 대학에서 어떻게 인정됐는지 (동등 과목표 + 확정 판정 건수)."""
+    """선배 인정 사례: 같은 출신 대학 과목이 소속 대학에서 어떻게 인정됐는지 (기관 동등 과목표 기준)."""
     return render(
         request, "student/precedents.html", user=user, found=precedent_service.search(session, user, source, q)
     )
