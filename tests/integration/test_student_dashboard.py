@@ -8,7 +8,7 @@ from backend.models import Appeal
 from scripts.make_demo_pdfs import text_to_pdf
 from tests.conftest import login
 from tests.integration.test_pipeline import latest, new_request, upload
-from tests.integration.test_review_extras import approve
+from tests.integration.test_review_extras import approve, reject
 from tests.integration.test_workflow import assign, professor_for, reviewer_of, submitted_request
 
 TRANSCRIPT = (
@@ -57,7 +57,7 @@ def test_dashboard_lists_todos_and_readiness(client: TestClient, seeded: Session
 
 def test_nav_badges_for_new_results_clear_when_viewed(client: TestClient, seeded: Session) -> None:
     ev, _, token = professor_for(client, seeded, "calculus.txt")
-    approve(client, ev, token)
+    reject(client, ev, token)  # 직접 인정은 이의 신청을 받지 않아 불인정으로 확정
 
     token = login(client, "jiwon@student.example")
     home = client.get("/student").text
@@ -78,7 +78,9 @@ def test_nav_badges_for_new_results_clear_when_viewed(client: TestClient, seeded
     login(client, "jiwon@student.example")
     assert "새 이의 신청 결과 1건" in client.get("/student").text
     assert "기각" in client.get("/student/appeals").text
-    assert "새 이의 신청 결과" not in client.get("/student").text
+    home = client.get("/student").text
+    assert "새 이의 신청 결과" not in home
+    assert "이의 신청할 수 있는 과목" not in home  # 과목당 한 번: 기각된 과목은 다시 셈하지 않는다
 
 
 def test_precedents_show_only_institution_equivalency_table(client: TestClient, seeded: Session) -> None:

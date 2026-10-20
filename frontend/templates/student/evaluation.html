@@ -15,7 +15,12 @@
 </form>
 {% endif %}
 
-{% if v.decision and not v.open_appeal %}
+{% if v.decision and not v.open_appeal and v.appeal_block %}
+<section class="mt-8 grid gap-1 rounded-md bg-parchment p-5" aria-label="{{ _('이의 신청') }}">
+  <span class="font-semibold">{{ v.appeal_block | t }}</span>
+  <span class="text-sm text-muted">{{ _("판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.") }}</span>
+</section>
+{% elif v.decision and not v.open_appeal %}
 <section class="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-md border border-hairline p-5">
   <div class="grid gap-1">
     <span class="font-semibold">{{ _("판정 결과에 이의가 있나요?") }}</span>

@@ -36,6 +36,16 @@ def notes_for(db: Session, email: str) -> list[str]:
     return [n.message for n in db.scalars(select(Notification).where(Notification.user_id == user.id))]
 
 
+def reject(client: TestClient, ev: CourseEvaluation, token: str) -> None:
+    """불인정 판정 (직접 인정은 이의 신청을 받지 않으므로 이의 신청 테스트는 이 판정으로 한다)."""
+    r = client.post(
+        f"/professor/evaluations/{ev.id}/decision",
+        data={"action": "reject", "reason_codes": ["no_lab"], "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, r.text
+
+
 def approve(client: TestClient, ev: CourseEvaluation, token: str) -> None:
     r = client.post(
         f"/professor/evaluations/{ev.id}/decision",
@@ -195,7 +205,7 @@ def test_appeal_accept_and_redecide_keeps_original_decision(client: TestClient, 
 
 def test_appeal_dismiss_requires_note(client: TestClient, seeded: Session) -> None:
     ev, _, token = professor_for(client, seeded, "calculus.txt")
-    approve(client, ev, token)
+    reject(client, ev, token)
     student_token = login(client, "jiwon@student.example")
     client.post(
         f"/student/evaluations/{ev.id}/appeal",
@@ -474,7 +484,7 @@ def test_admin_console_shows_recent_audit_without_student_names(client: TestClie
 
 def test_student_sees_own_appeals_and_report_links_back(client: TestClient, seeded: Session) -> None:
     ev, _, token = professor_for(client, seeded, "calculus.txt")
-    approve(client, ev, token)
+    reject(client, ev, token)
     report = f"/evaluations/{ev.id}/report"
     assert f'href="/professor/evaluations/{ev.id}"' in client.get(report).text  # 교수 → 판정 화면
 
@@ -508,13 +518,13 @@ def test_student_sees_own_appeals_and_report_links_back(client: TestClient, seed
 def test_appeal_form_with_evidence_files(client: TestClient, seeded: Session, fake_storage: FakeStorage) -> None:
     """이의 신청 작성 화면: 원 판정 요약, 근거 자료 첨부, 내려받기 권한, 삭제 요청 시 함께 삭제 (FR-23·FR-13)."""
     ev, prof, token = professor_for(client, seeded, "calculus.txt")
-    approve(client, ev, token)
+    reject(client, ev, token)
 
     token = login(client, "jiwon@student.example")
     form = f"/student/evaluations/{ev.id}/appeal"
     assert form in client.get(f"/student/evaluations/{ev.id}").text  # 과목 결과에서 작성 화면으로
     page = client.get(form).text
-    assert "이의 신청 작성" in page and "이의를 신청할 판정" in page and "직접 인정" in page
+    assert "이의 신청 작성" in page and "이의를 신청할 판정" in page and "불인정" in page
     assert 'name="files"' in page and 'enctype="multipart/form-data"' in page
 
     reason = "미분과 적분의 응용까지 15주 동안 배웠고 강의 노트와 시험지로 증명할 수 있어요."

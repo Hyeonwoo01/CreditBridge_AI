@@ -254,6 +254,9 @@ def appeal_form(
 ) -> Response:
     """이의 신청 작성 (FR-23): 원 판정 요약, 사유, 근거 자료."""
     view = views.evaluation_view(session, user, evaluation_id)
+    if view.appeal_block:
+        flash(request, f"{tr(view.appeal_block)} {tr(appeal_service.VISIT_OFFICE)}", "error")
+        return RedirectResponse(f"/student/evaluations/{evaluation_id}", status_code=303)
     return render(request, "student/appeal_form.html", user=user, v=view, limits=_appeal_limits())
 
 

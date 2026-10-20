@@ -86,6 +86,11 @@ class EvaluationView:
         return self.result.candidates[0] if self.result and self.result.candidates else None
 
     @property
+    def appeal_block(self) -> str | None:
+        """이의 신청을 받지 않는 이유 (직접 인정, 이미 처리된 이의 신청). 받을 수 있거나 판정 전이면 None."""
+        return appeal_service.block_reason(self.decision, self.appeals) if self.decision else None
+
+    @property
     def open_appeal(self) -> Appeal | None:
         return next((a for a in self.appeals if a.status in ("submitted", "accepted")), None)
 

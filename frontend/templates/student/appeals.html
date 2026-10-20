@@ -8,6 +8,7 @@
   <h1 class="page-title">{{ _("이의 신청") }}</h1>
   <p class="text-sm text-muted">{{ _("판정이 끝난 과목에 이의를 신청하고, 낸 이의 신청의 처리 상황을 확인해요.") }}</p>
 </header>
+<p class="mt-4 rounded-md bg-parchment px-4 py-3 text-sm">{{ _("직접 인정된 과목은 이의 신청을 받지 않고, 이의 신청은 과목당 한 번이에요(기각·재판정으로 끝나면 다시 신청할 수 없어요).") }} {{ _("판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.") }}</p>
 
 {% set open_count = rows | selectattr("appeal.status", "in", ["submitted", "accepted"]) | list | length %}
 {% if rows %}
@@ -22,7 +23,7 @@
 <section class="mt-8 grid gap-3" aria-labelledby="appealable-title">
   <div class="grid gap-1">
     <h2 id="appealable-title" class="section-title">{{ _("이의 신청할 수 있는 과목") }}</h2>
-    <p class="text-sm text-muted">{{ _("학과 교수의 판정이 확정됐고 처리 중인 이의 신청이 없는 과목이에요.") }}</p>
+    <p class="text-sm text-muted">{{ _("학과 교수의 판정이 확정된 과목 중 직접 인정이 아니고 아직 이의 신청을 하지 않은 과목이에요.") }}</p>
   </div>
   <ul class="grid divide-y divide-hairline rounded-lg border border-hairline bg-white">
     {% for c in appealable %}
@@ -67,8 +68,10 @@
       <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("학사처") }}</span><span>{{ _("받아들였어요") }}{% if a.handled_at %} · {{ time(a.handled_at, "date") }}{% endif %}{{ _(". 학과 교수가 다시 판정하고 있어요.") }}</span></li>
       {% elif a.status == 'dismissed' %}
       <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("학사처") }}</span><span>{{ _("기각했어요") }}{% if a.handled_at %} · {{ time(a.handled_at, "date") }}{% endif %}{% if a.handler_note %} — {{ a.handler_note }}{% endif %}{{ _(". 원 판정이 그대로 유지돼요.") }}</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("안내") }}</span><span>{{ _("이 과목은 다시 이의 신청할 수 없어요. 판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.") }}</span></li>
       {% elif a.status == 'redecided' %}
       <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("재판정") }}</span><span>{% if r.redecided %}<strong class="{{ 'text-approve' if r.redecided.result in ('direct', 'elective') else 'text-reject' }}">{{ r.redecided.result | rec }}</strong> · {{ time(r.redecided.decided_at, "date") }} · {{ _('결과가 바뀌었어요') if r.changed else _('원 판정과 같은 결과예요') }}{% else %}{{ _("완료") }}{% endif %}</span></li>
+      <li class="flex flex-wrap gap-x-2"><span class="w-24 shrink-0 text-muted">{{ _("안내") }}</span><span>{{ _("이 과목은 다시 이의 신청할 수 없어요. 판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.") }}</span></li>
       {% endif %}
     </ol>
   </article>

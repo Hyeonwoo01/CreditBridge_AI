@@ -15,7 +15,7 @@ from backend.errors import CreditBridgeError, DuplicateRowError, NotFoundError, 
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import Appeal, AppealFile, Assignment, CourseEvaluation, Decision, Syllabus, TransferRequest, User
-from backend.models.enums import AppealStatus, Role
+from backend.models.enums import AppealStatus, Recommendation, Role
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -32,6 +32,20 @@ MIN_REASON_CHARS = 20
 MAX_REASON_CHARS = 3000
 MAX_FILES = 3  # 이의 신청 근거 자료
 OPEN = (AppealStatus.SUBMITTED, AppealStatus.ACCEPTED)
+# 이의 신청을 받지 않는 과목 (학생 화면에 그대로 보인다). 더 알고 싶으면 학과 사무실로 안내한다
+DIRECT_NOT_APPEALABLE = N_("직접 인정된 과목은 이의 신청을 받지 않아요.")
+ALREADY_APPEALED = N_("이의 신청은 과목당 한 번이라, 이미 처리된 이 과목은 다시 신청할 수 없어요.")
+VISIT_OFFICE = N_("판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.")
+
+
+def block_reason(decision: Decision, appeals: list[Appeal]) -> str | None:
+    """이의 신청을 받지 않는 이유 (N_ 원문). 받을 수 있으면 None.
+    직접 인정은 더 나은 결과가 없고, 기각·재판정으로 끝난 이의 신청이 있으면 다시 받지 않는다."""
+    if decision.result == Recommendation.DIRECT:
+        return DIRECT_NOT_APPEALABLE
+    if any(a.status in (AppealStatus.DISMISSED, AppealStatus.REDECIDED) for a in appeals):
+        return ALREADY_APPEALED
+    return None
 
 
 @dataclass(frozen=True)
@@ -72,8 +86,12 @@ def file_appeal(
     decision = decision_repo.for_evaluation(session, evaluation.id)
     if decision is None:
         raise CreditBridgeError(tr("판정이 확정된 과목만 이의 신청을 할 수 있어요."))
-    if any(a.status in OPEN for a in appeal_repo.for_evaluation(session, evaluation.id)):
+    previous = appeal_repo.for_evaluation(session, evaluation.id)
+    if any(a.status in OPEN for a in previous):
         raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요."))
+    blocked = block_reason(decision, previous)
+    if blocked:
+        raise CreditBridgeError(f"{tr(blocked)} {tr(VISIT_OFFICE)}")
     reason = reason.strip()
     if len(reason) < MIN_REASON_CHARS:
         raise CreditBridgeError(
@@ -299,7 +317,7 @@ def student_rows(session: Session, student: User) -> list[StudentAppealRow]:
 
 @dataclass(frozen=True)
 class Appealable:
-    """이의 신청할 수 있는 과목: 판정이 확정됐고 처리 중인 이의 신청이 없다."""
+    """이의 신청할 수 있는 과목: 판정이 확정됐고(직접 인정 제외) 아직 이의 신청을 하지 않았다."""
 
     evaluation: CourseEvaluation
     syllabus: Syllabus
@@ -316,6 +334,8 @@ def appealable(session: Session, student: User) -> list[Appealable]:
             if row.evaluation is None or row.decision is None:
                 continue
             if row.appeal is not None and row.appeal.status in OPEN:
+                continue
+            if block_reason(row.decision, [row.appeal] if row.appeal else []):
                 continue
             out.append(Appealable(row.evaluation, row.syllabus, request, row.decision))
     return out
