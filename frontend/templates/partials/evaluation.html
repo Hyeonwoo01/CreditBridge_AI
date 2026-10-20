@@ -41,7 +41,8 @@
     {% if v.candidate %}
       <p>{% if ev.recommendation == 'insufficient' %}<span class="text-muted">{{ _("판단 대상 후보") }}</span> {% endif %}<strong>{{ v.request.target_institution.name }} {{ v.candidate.code }}</strong> {{ _("{title} · {credits}학점", title=(v.candidate.title), credits=(v.candidate.credits | round(1))) }}</p>
     {% else %}
-      <p class="font-semibold">{{ _("대응하는 과목을 찾지 못했어요") }}</p>
+      {# 선택 인정이면 특정 과목 대신 일반 선택 학점으로 인정을 추천한 것이라 "못 찾았다"만 보이면 모순처럼 읽힌다 #}
+      <p class="font-semibold">{{ _("대응하는 전공 과목은 없어요 · 일반 선택 학점으로 인정을 추천해요") if ev.recommendation == 'elective' else _("대응하는 과목을 찾지 못했어요") }}</p>
     {% endif %}
     {% if ev.summary %}<p class="text-sm text-ink-80">{{ r | ai('summary', ev.summary) }}</p>{% endif %}
     <p class="text-xs text-muted">{{ _("AI 추천이며 확정이 아니에요. 최종 판정은 학과 교수가 합니다.") }}</p>

@@ -162,6 +162,9 @@ def test_no_equivalent_course_is_not_forced(client: TestClient, seeded: Session)
     ev = latest(seeded, "korean_history.txt")
     assert ev.candidate_course_id is None
     assert ev.recommendation == "elective"
+    # 특정 과목 없이 선택 인정이면 "못 찾았다" 대신 일반 선택 학점 추천으로 보여 준다
+    page = client.get(f"/student/evaluations/{ev.id}").text
+    assert "일반 선택 학점으로 인정을 추천해요" in page and "대응하는 과목을 찾지 못했어요" not in page
 
 
 def test_course_outside_catalog_departments_gets_no_candidates(
