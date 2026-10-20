@@ -1,0 +1,55 @@
+# AWS 프리티어 배포용 (EC2 한 대 + RDS PostgreSQL + S3). 절차: docs/deploy-aws.md
+#   실행: docker compose -f docker-compose.prod.yml up -d --build
+#   설정: 같은 폴더의 .env (deploy/aws/env.example을 복사해 채운다)
+# 로컬용 docker-compose.yml과 달리 DB(RDS)와 파일 저장소(S3)는 AWS 것을 쓰고, Caddy가 https 인증서를 자동으로 붙인다.
+# EC2 t3.micro(메모리 1GB)에 맞춰 프로세스를 줄였다: 웹 1개, 작업 처리 1개(매일 알림 beat 포함), Redis 작게.
+
+x-app: &app
+  build: .
+  image: creditbridge-app:latest
+  env_file: .env
+  restart: unless-stopped
+  environment: &app-env
+    APP_ENV: production
+    REDIS_URL: redis://redis:6379/0
+    # 운영에서는 데모 계정을 만들지 않는다 (첫 관리자는 scripts.create_admin)
+    SEED_DEMO: "false"
+    # 메모리 조각화를 줄인다 (작은 서버)
+    MALLOC_ARENA_MAX: "2"
+
+services:
+  web:
+    <<: *app
+    depends_on: [redis]
+    # 밖에서는 Caddy(443)로만 들어온다
+    expose: ["8000"]
+
+  worker:
+    <<: *app
+    # -B: 매일 기한 알림(beat)을 같은 프로세스에서 돌려 메모리를 아낀다. 이 서비스는 하나만 띄운다
+    command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "worker", "-B",
+              "--concurrency=1", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
+    depends_on: [redis]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "64mb", "--save", "60", "1"]
+    volumes: ["redis-data:/data"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SITE_DOMAIN: "${SITE_DOMAIN:?.env에 SITE_DOMAIN을 적어 주세요}"
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web]
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

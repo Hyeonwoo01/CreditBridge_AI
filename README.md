@@ -106,6 +106,10 @@ docker compose up -d --build              # 프론트엔드·백엔드·DB·작�
 | 강의계획서를 올리면 "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요" | `.env`에 `ANTHROPIC_API_KEY`와 `CLAUDE_MODEL`이 없습니다. 넣고 `docker compose up -d`를 다시 실행하세요 |
 | 파일(강의계획서·기준 강의계획서)을 올리면 `Internal Server Error` | 파일 저장소 키가 비어 있던 예전 설정입니다. `git pull` 후 `docker compose up -d`를 다시 실행하세요 (지금은 `.env`에 `S3_ACCESS_KEY`가 없어도 기본값으로 동작) |
 
+### 실제 서비스로 올리기 (AWS 프리티어)
+
+EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 Claude 분석을 쓰는 사이트를 띄워요. `docker-compose.prod.yml`과 `deploy/aws/`를 쓰고, AWS 콘솔에서 누를 순서와 프리티어 설정은 [docs/deploy-aws.md](docs/deploy-aws.md)에 있어요.
+
 ### 예시용 공개 데모로 올리기 (Render 무료)
 
 컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).

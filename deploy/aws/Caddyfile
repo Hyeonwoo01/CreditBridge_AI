@@ -1,0 +1,10 @@
+# https 앞단 (docker-compose.prod.yml의 caddy). SITE_DOMAIN이 이 EC2의 공인 IP를 가리키면
+# Let's Encrypt 인증서를 자동으로 받고 갱신한다 (80·443 포트가 열려 있어야 한다).
+{$SITE_DOMAIN} {
+	encode gzip
+	# 강의계획서 업로드(파일당 20MB)보다 조금 크게
+	request_body {
+		max_size 25MB
+	}
+	reverse_proxy web:8000
+}
