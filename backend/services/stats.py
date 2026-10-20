@@ -226,7 +226,9 @@ ACTION_LABELS = {
     "account.bootstrap": (N_("첫 관리자 생성"), "neutral"),
     "course.import": (N_("과목 가져오기"), "neutral"),
     "course.reference_upload": (N_("기준 강의계획서 등록"), "neutral"),
+    "course.reference_remove": (N_("기준 강의계획서 빼기"), "reject"),
     "institution.create": (N_("출신 대학 등록"), "neutral"),
+    "institution.delete": (N_("출신 대학 삭제"), "reject"),
 }
 
 

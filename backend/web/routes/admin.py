@@ -354,6 +354,45 @@ def add_institution(
     return RedirectResponse("/admin/data#institutions", status_code=303)
 
 
+@router.post("/data/institutions/{institution_id}/delete")
+def delete_institution(
+    request: Request,
+    institution_id: int,
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """잘못 등록한 출신 대학 지우기. 학생 계정·편입 요청·동등 과목표가 가리키면 지우지 않는다."""
+    check_csrf(request, csrf_token)
+    try:
+        name = institution_data.delete_source_institution(session, user, institution_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        flash(request, tr("출신 대학 {name}을(를) 지웠어요.", name=name))
+    return RedirectResponse("/admin/data#institutions", status_code=303)
+
+
+@router.post("/data/courses/{course_id}/reference/remove")
+def remove_reference(
+    request: Request,
+    course_id: int,
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        course = institution_data.remove_reference(session, user, course_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        flash(request, tr("{code} 기준 강의계획서를 뺐어요. 이 과목은 AI 비교 후보에서 빠져요.", code=course.code))
+    return RedirectResponse("/admin/data#courses", status_code=303)
+
+
 @router.post("/data/courses/{course_id}/reference")
 def upload_reference(
     request: Request,

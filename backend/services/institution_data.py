@@ -105,6 +105,7 @@ class Overview:
     courses: list[CourseRow]
     departments_without_professor: list[str]
     source_institutions: list[Institution]
+    used_source_ids: set[int] = field(default_factory=set)  # 학생·요청·동등 과목표가 가리켜 지울 수 없는 출신 대학
 
     @property
     def missing_reference(self) -> int:
@@ -141,6 +142,7 @@ def overview(session: Session, admin: User) -> Overview:
         courses=[CourseRow(c, uploads.get(c.code)) for c in courses],
         departments_without_professor=[d.name for d in departments if d.id not in staffed],
         source_institutions=catalog_repo.source_institutions(session),
+        used_source_ids=catalog_repo.used_source_institution_ids(session),
     )
 
 
@@ -451,6 +453,32 @@ def add_source_institution(session: Session, admin: User, name: str, country: st
     return institution
 
 
+def delete_source_institution(session: Session, admin: User, institution_id: int) -> str:
+    """잘못 등록한 출신 대학을 지운다. 출신 대학 목록은 모든 기관이 함께 쓰므로 어디서도 쓰지 않을 때만 지운다.
+    지운 대학 이름을 돌려준다."""
+    ensure_admin(admin)
+    institution = catalog_repo.get_institution(session, institution_id)
+    if institution is None or institution.is_target:
+        raise NotFoundError(tr("출신 대학을 찾을 수 없어요."))
+    usage = catalog_repo.institution_usage(session, institution.id)
+    if any(usage.values()):
+        labels = {
+            "students": tr("학생 계정 {n}개", n=usage["students"]),
+            "requests": tr("편입 요청 {n}건", n=usage["requests"]),
+            "equivalencies": tr("동등 과목표 {n}건", n=usage["equivalencies"]),
+            "others": tr("기타 기록 {n}건", n=usage["others"]),
+        }
+        parts = [label for key, label in labels.items() if usage[key]]
+        raise CreditBridgeError(
+            tr("{name}은(는) 쓰이고 있어 지울 수 없어요 ({uses}).", name=institution.name, uses=", ".join(parts))
+        )
+    name = institution.name
+    catalog_repo.delete_institution(session, institution)
+    audit.record(session, admin, "institution.delete", "institution", str(institution_id), name=name)
+    session.commit()
+    return name
+
+
 # ---------- 기준 강의계획서 ----------
 
 
@@ -481,6 +509,22 @@ def upload_reference(
     audit.record(session, admin, "course.reference_upload", "course", str(course.id), syllabus=syllabus.id)
     session.commit()
     return syllabus, course
+
+
+def remove_reference(session: Session, admin: User, course_id: int) -> Course:
+    """과목에서 기준 강의계획서를 뺀다. 과목은 AI 비교 후보에서 빠지고, 이미 낸 분석 결과·판정은 그대로 둔다.
+    파일과 강의계획서 행은 기록으로 남긴다(지우지 않음)."""
+    institution_id = ensure_admin(admin)
+    course = catalog_repo.get_course(session, course_id)
+    if course is None or course.institution_id != institution_id:
+        raise NotFoundError(tr("과목을 찾을 수 없어요."))
+    if course.reference_syllabus_id is None:
+        raise CreditBridgeError(tr("{code}에는 뺄 기준 강의계획서가 없어요.", code=course.code))
+    removed = course.reference_syllabus_id
+    course.reference_syllabus_id = None
+    audit.record(session, admin, "course.reference_remove", "course", str(course.id), syllabus=removed)
+    session.commit()
+    return course
 
 
 def process_reference(

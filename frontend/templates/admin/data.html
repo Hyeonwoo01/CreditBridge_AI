@@ -108,7 +108,7 @@
   <div class="card overflow-x-auto p-0">
     <table class="w-full min-w-[900px] text-sm">
       <thead class="bg-pearl text-left text-xs text-muted">
-        <tr><th class="px-5 py-3 font-normal">{{ _("과목") }}</th><th class="px-3 py-3 font-normal">{{ _("학과") }}</th><th class="px-3 py-3 font-normal">{{ _("학점") }}</th><th class="px-3 py-3 font-normal">{{ _("필수 개념") }}</th><th class="px-3 py-3 font-normal">{{ _("기준 강의계획서") }}</th><th class="px-5 py-3 font-normal">{{ _("올리기") }}</th></tr>
+        <tr><th class="px-5 py-3 font-normal">{{ _("과목") }}</th><th class="px-3 py-3 font-normal">{{ _("학과") }}</th><th class="px-3 py-3 font-normal">{{ _("학점") }}</th><th class="px-3 py-3 font-normal">{{ _("필수 개념") }}</th><th class="px-3 py-3 font-normal">{{ _("기준 강의계획서") }}</th><th class="px-5 py-3 font-normal">{{ _("올리기·빼기") }}</th></tr>
       </thead>
       <tbody>
       {% for r in o.courses %}
@@ -132,6 +132,12 @@
               <input id="ref-{{ c.id }}" type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="max-w-[220px] text-xs file:mr-2 file:rounded-full file:border-0 file:bg-parchment file:px-3 file:py-1.5 file:text-primary">
               <button class="btn-secondary btn-sm">{{ _('바꾸기') if c.reference_syllabus_id else _('올리기') }}</button>
             </form>
+            {% if c.reference_syllabus_id %}
+            <form method="post" action="/admin/data/courses/{{ c.id }}/reference/remove" class="mt-2" data-confirm="{{ _('{code} 기준 강의계획서를 뺄까요? 이 과목은 AI 비교 후보에서 빠져요. 이미 나온 분석 결과·판정은 그대로예요.', code=(c.code)) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="btn-text btn-sm text-xs">{{ _("기준 강의계획서 빼기") }}</button>
+            </form>
+            {% endif %}
           </td>
         </tr>
       {% else %}
@@ -194,9 +200,16 @@
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
   <div class="grid gap-3">
     <h2 class="section-title">{{ _("④ 출신 대학") }}</h2>
-    <p class="text-sm text-muted">{{ _("학생 계정에 정해 두는 출신 대학 목록이에요(계정 CSV의 source_institution, 계정 수정). 계정 CSV와 기존 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 해요.") }}</p>
+    <p class="text-sm text-muted">{{ _("학생 계정에 정해 두는 출신 대학 목록이에요(계정 CSV의 source_institution, 계정 수정). 계정 CSV와 기존 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 해요.") }} {{ _("잘못 등록한 대학은 아직 아무 데서도 쓰지 않을 때만 지울 수 있어요(목록은 모든 기관이 함께 써요).") }}</p>
     <ul class="card grid gap-0 p-0 text-sm">
-      {% for i in o.source_institutions %}<li class="flex justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0"><span>{{ i.name }}</span><span class="font-mono text-xs text-muted">{{ i.country }}</span></li>
+      {% for i in o.source_institutions %}<li class="flex items-center justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0">
+        <span>{{ i.name }} <span class="ml-1 font-mono text-xs text-muted">{{ i.country }}</span></span>
+        {% if i.id in o.used_source_ids %}<span class="text-xs text-muted" title="{{ _('학생 계정·편입 요청·동등 과목표에서 쓰는 출신 대학은 지울 수 없어요') }}">{{ _("사용 중") }}</span>
+        {% else %}<form method="post" action="/admin/data/institutions/{{ i.id }}/delete" data-confirm="{{ _('출신 대학 {name}을(를) 지울까요?', name=i.name) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn-text btn-sm text-xs">{{ _("지우기") }}</button>
+        </form>{% endif %}
+      </li>
       {% else %}<li class="px-5 py-6 text-center text-muted">{{ _("아직 등록된 출신 대학이 없어요.") }}</li>{% endfor %}
     </ul>
   </div>

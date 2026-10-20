@@ -1,7 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, CompoundSelect, func, or_, select, union
 from sqlalchemy.orm import Session
 
-from backend.models import Course, Department, Institution
+from backend.models import Course, Department, Equivalency, Institution, Syllabus, TransferRequest, User
 
 
 def target_institutions(session: Session) -> list[Institution]:
@@ -97,3 +97,42 @@ def add_institution(session: Session, institution: Institution) -> Institution:
 def target_institution_by_name(session: Session, name: str) -> Institution | None:
     stmt = select(Institution).where(Institution.is_target.is_(True), Institution.name == name.strip())
     return session.scalars(stmt).first()
+
+
+def used_source_institution_ids(session: Session) -> set[int]:
+    """학생 계정·편입 요청·동등 과목표 중 한 곳이라도 가리키는 출신 대학 id."""
+    stmt: CompoundSelect[tuple[int | None]] = union(
+        select(User.source_institution_id).where(User.source_institution_id.is_not(None)),
+        select(TransferRequest.source_institution_id),
+        select(Equivalency.source_institution_id),
+    )
+    return {int(i) for i in session.scalars(stmt) if i is not None}
+
+
+def institution_usage(session: Session, institution_id: int) -> dict[str, int]:
+    """기관을 가리키는 행 수 (지울 수 있는지 확인용). 0인 항목도 돌려준다."""
+
+    def count(model: type, *conditions: ColumnElement[bool]) -> int:
+        return int(session.scalar(select(func.count()).select_from(model).where(or_(*conditions))) or 0)
+
+    return {
+        "students": count(User, User.source_institution_id == institution_id, User.institution_id == institution_id),
+        "requests": count(
+            TransferRequest,
+            TransferRequest.source_institution_id == institution_id,
+            TransferRequest.target_institution_id == institution_id,
+        ),
+        "equivalencies": count(
+            Equivalency,
+            Equivalency.source_institution_id == institution_id,
+            Equivalency.target_institution_id == institution_id,
+        ),
+        "others": count(Syllabus, Syllabus.institution_id == institution_id)
+        + count(Course, Course.institution_id == institution_id)
+        + count(Department, Department.institution_id == institution_id),
+    }
+
+
+def delete_institution(session: Session, institution: Institution) -> None:
+    session.delete(institution)
+    session.flush()

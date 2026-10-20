@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 78개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 80개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -15,11 +15,11 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- |
 | 화면 조회 | `GET` → HTML | 28 | 화면 하나에 조회 API 하나. 화면에 보이는 데이터를 서버가 모아 HTML에 넣어 보낸다 (조회 함수는 5절) |
 | 이동 | `GET` → 303 | 2 | `GET /`(역할별 홈으로), `GET /student/syllabi/{id}`(최신 분석으로) |
-| 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 36 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
+| 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 38 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
 | 파일 내려받기 | `GET` → PDF·CSV·원본 파일·스크립트 | 5 | 리포트 PDF, 원본 강의계획서, 이의 신청 근거 자료, SIS CSV, 웹 푸시 서비스 워커(`/sw.js`) |
 | HTMX 조각 | `GET` → HTML 조각 | 2 | 알림 배지 숫자, 상단 보조 바 집계 칩 |
 | JSON API | `GET`/`POST` → JSON | 5 | 분석 결과 조회, 판정 저장, 학사정보시스템 연동(`/api/v1/...`), 웹 푸시 구독·해제 |
-| 합계 | | 78 | GET 39, POST 39 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
+| 합계 | | 80 | GET 39, POST 41 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
 
 ### 1.2 공통 규칙
 
@@ -135,6 +135,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M6 | POST | `/admin/data/password-reset` | 관리자 | `email`, `csrf_token` | 303 또는 HTML(임시 비밀번호 한 번만) | P18 | – |
 | M7 | POST | `/admin/data/accounts/active` | 관리자 | `email`, `action`(deactivate·reactivate), `next`(선택, `/admin/accounts/{id}`만), `csrf_token` | 303→M2`#account-active` 또는 M15 | P18 | FR-12 |
 | M8 | POST | `/admin/data/institutions` | 관리자 | `name`, `country`, `csrf_token` | 303→M2`#institutions` | P18 | – |
+| M20 | POST | `/admin/data/courses/{id}/reference/remove` | 관리자 | `csrf_token` | 303→M2`#courses` + 플래시 (과목 연결만 끊음, 강의계획서 행은 남김) | P18 | FR-05 |
+| M21 | POST | `/admin/data/institutions/{id}/delete` | 관리자 | `csrf_token` | 303→M2`#institutions` + 플래시 (학생 계정·편입 요청·동등 과목표가 가리키면 거절) | P18 | – |
 | M9 | GET | `/admin/privacy` | 관리자 | – | HTML | P08 | FR-13 |
 | M10 | POST | `/admin/privacy/{id}` | 관리자 | `csrf_token` | 303→M9 | P08 | FR-13 |
 | M11 | GET | `/admin/sis` | 관리자 | – | HTML | P15 | FR-24 |
@@ -303,10 +305,12 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P15 | 토큰 폐기 | M12 `action=revoke` |
 | P18 | 과목 가져오기 | M3 |
 | P18 | 기준 강의계획서 올리기·바꾸기 | M4 |
+| P18 | 기준 강의계획서 빼기 (확인창) | M20 |
 | P18 | 계정 가져오기 | M5 |
 | P18 | 설정 링크 메일 보내기 / 임시 비밀번호 발급 (확인창) | M6 |
 | P18 | 비활성화 (확인창) · 다시 활성화 | M7 `action=deactivate` · `action=reactivate` |
 | P18 | 출신 대학 추가 | M8 |
+| P18 | 출신 대학 지우기 (확인창, 쓰지 않는 대학만) | M21 |
 | P18 | 이메일을 모르면 계정 목록에서 찾기 | M14 |
 | P18 | 단계 바로가기 4개 · 예시 파일 받기 · 임시 비밀번호 CSV 받기 | 화면 안 (같은 화면 위치) · 정적 파일 · 화면 안 (data URI) |
 | P16 | 찾기 (행위·대상 종류·대상 번호·기간) · 초기화 · 대상 링크(그 대상만) · 이전·다음 페이지 | M13 (조건을 쿼리로) |
