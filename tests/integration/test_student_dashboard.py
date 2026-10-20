@@ -155,3 +155,19 @@ def test_staff_nav_badges_count_their_own_work(client: TestClient, seeded: Sessi
     overview = institution_data.overview(seeded, admin)
     setup = overview.missing_reference + len(overview.departments_without_professor)
     assert (f"준비가 필요한 항목 {setup}건" in page) == (setup > 0)
+
+
+def test_progress_marks_only_the_next_step_as_current(client: TestClient, seeded: Session) -> None:
+    """분석이 끝났지만 심사 요청 전: '최종 확정'이 진행 중으로 보이면 안 된다 (다음 할 일은 심사 요청)."""
+    token = login(client, "jiwon@student.example")
+    rid = new_request(client, seeded, token)
+    upload(client, rid, token, "calculus.txt")
+    page = client.get(f"/student/requests/{rid}").text
+    aside = page[page.index('aria-label="심사 진행 현황"') :]
+    assert "진행 중" not in aside.split("</ol>")[0]
+    assert "학사처에 심사를 요청하면 시작돼요" in aside
+
+    client.post(f"/student/requests/{rid}/submit", data={"csrf_token": token})
+    steps = client.get(f"/student/requests/{rid}").text
+    steps = steps[steps.index('aria-label="심사 진행 현황"') :].split("</ol>")[0]
+    assert steps.count("진행 중") == 1 and steps.index("진행 중") < steps.index("최종 확정")  # 학과 교수 심사가 진행 중

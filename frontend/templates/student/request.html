@@ -138,7 +138,8 @@
       <ol class="grid">
         {% for label, done, hint in steps %}
         {% set current = not done and not ns.current_set and (loop.index0 != 2 or submitted) %}
-        {% if current %}{% set ns.current_set = true %}{% endif %}
+        {# 앞 단계가 끝나지 않았으면 뒤 단계는 '진행 중'이 아니다 (심사 요청 전에 '최종 확정'이 진행 중으로 보이던 문제) #}
+        {% if not done %}{% set ns.current_set = true %}{% endif %}
         <li class="relative grid grid-cols-[24px_1fr] gap-3 pb-5 last:pb-0">
           {% if not loop.last %}<span class="absolute top-6 bottom-0 left-[11px] w-px {{ 'bg-primary' if done else 'bg-hairline' }}" aria-hidden="true"></span>{% endif %}
           <span class="relative grid size-6 place-items-center rounded-full text-xs font-semibold {{ 'bg-primary text-white' if done else ('border-2 border-primary bg-white text-primary' if current else 'border border-hairline bg-white text-muted') }}">{% if done %}<svg class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 10 3.5 3.5L15 7" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}{{ loop.index }}{% endif %}</span>
