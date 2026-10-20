@@ -114,6 +114,8 @@ def add_syllabi(
 ) -> UploadResult:
     """파일을 검증해 객체 스토리지에 저장하고 강의계획서 행을 만든다. 분석 작업 등록은 호출자가 한다."""
     settings = get_settings()
+    if request.status == RequestStatus.CLOSED:
+        raise CreditBridgeError(tr("문서를 삭제해 종료된 요청이에요. 새 요청을 만들어 주세요."))
     if request.status != RequestStatus.DRAFT:
         raise CreditBridgeError(tr("심사에 제출한 요청에는 과목을 추가할 수 없어요."))
     if syllabus_repo.count_of_request(session, request.id) + len(files) > settings.max_syllabi_per_request:

@@ -66,7 +66,7 @@
     <div class="flex items-start justify-between gap-4">
       <div class="grid gap-1">
         <span class="font-semibold">{{ r.source_institution.name }} → {{ r.target_institution.name }}{% if r.major %} · {{ r.major }}{% endif %}</span>
-        <span class="text-sm text-muted">{{ _("만든 날 {time} · {draft}", time=(time(r.created_at, "date")), draft=({"draft": _("준비 중 (사전 시뮬레이션)"), "submitted": _("학사처 심사 중"), "decided": _("판정 완료")}[r.status])) }}</span>
+        <span class="text-sm text-muted">{{ _("만든 날 {time} · {draft}", time=(time(r.created_at, "date")), draft=({"draft": _("준비 중 (사전 시뮬레이션)"), "submitted": _("학사처 심사 중"), "decided": _("판정 완료"), "closed": _("문서 삭제로 종료")}[r.status])) }}</span>
       </div>
       <span aria-hidden="true">›</span>
     </div>

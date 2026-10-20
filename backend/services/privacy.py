@@ -16,8 +16,9 @@ from backend.errors import CreditBridgeError, DuplicateRowError, NotFoundError, 
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import PrivacyRequest, TransferRequest, User
-from backend.models.enums import PrivacyStatus, Role, SyllabusStatus
+from backend.models.enums import PrivacyStatus, RequestStatus, Role, SyllabusStatus
 from backend.repositories import appeals as appeal_repo
+from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
 from backend.repositories import notes as note_repo
 from backend.repositories import privacy as privacy_repo
@@ -42,6 +43,8 @@ def is_overdue(privacy: PrivacyRequest, now: datetime | None = None) -> bool:
 def request_deletion(session: Session, student: User, request: TransferRequest) -> PrivacyRequest:
     if request.student_id != student.id:
         raise PermissionDeniedError(tr("본인의 편입 요청만 삭제를 요청할 수 있어요."))
+    if request.status == RequestStatus.CLOSED:
+        raise CreditBridgeError(tr("이미 문서를 삭제한 요청이에요."))
     latest = privacy_repo.latest_for_request(session, request.id)
     if latest is not None and latest.status != PrivacyStatus.COMPLETED:
         raise CreditBridgeError(tr("이미 처리 중인 삭제 요청이 있어요."))
@@ -64,6 +67,14 @@ def request_deletion(session: Session, student: User, request: TransferRequest) 
         "privacy.requested",
         N_("문서 삭제 요청이 접수됐어요 (요청 #{id}). 기한 안에 처리해 주세요.").format(id=request.id),
         "/review/privacy",
+    )
+    # 승인은 기관 관리자가 하므로 접수 때부터 알린다 (기한이 급하면 심사관 처리 전에도 승인할 수 있다)
+    notifications.notify(
+        session,
+        notifications.staff(session, request.target_institution_id, Role.ADMIN),
+        "privacy.requested",
+        N_("문서 삭제 요청이 접수됐어요 (요청 #{id}). 심사관 처리 뒤 승인해 주세요.").format(id=request.id),
+        "/admin/privacy",
     )
     audit.record(session, student, "privacy.request", "transfer_request", str(request.id), privacy=privacy.id)
     session.commit()
@@ -114,6 +125,16 @@ def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: i
     if privacy.status == PrivacyStatus.COMPLETED:
         raise CreditBridgeError(tr("이미 삭제를 마친 요청이에요."))
     _delete_documents(session, storage, request)
+    # 문서가 없으니 요청을 끝낸다: 학생 화면은 종료로, 심사 큐·교수 목록에서는 빠진다 (판정 기록은 그대로)
+    request.status = RequestStatus.CLOSED
+    reviewers = evaluation_repo.deactivate_assignments_of_request(session, request.id)
+    notifications.notify(
+        session,
+        [u for u in (user_repo.get_by_id(session, r) for r in reviewers) if u is not None],
+        "assignment.closed",
+        N_("문서 삭제가 승인돼 요청 #{id}의 심사가 종료됐어요.").format(id=request.id),
+        "/professor",
+    )
     privacy.status = PrivacyStatus.COMPLETED
     privacy.approved_by = admin.id
     privacy.completed_at = utcnow()
@@ -183,8 +204,11 @@ def rows(session: Session, user: User) -> list[PrivacyRow]:
 
 
 def pending_count(session: Session, user: User) -> int:
-    """메뉴 배지: 심사관은 처리할 요청(requested), 기관 관리자는 승인할 요청(reviewed) 수."""
+    """메뉴 배지: 심사관은 처리할 요청(requested), 기관 관리자는 끝나지 않은 요청 전부
+    (심사관 처리 전 요청도 기관 관리자가 승인할 수 있고 처리 기한 책임이 있다)."""
     if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
         raise PermissionDeniedError(tr("심사관과 기관 관리자만 볼 수 있어요."))
-    waiting = PrivacyStatus.REQUESTED if user.role == Role.EVALUATOR else PrivacyStatus.REVIEWED
-    return sum(1 for p, _ in privacy_repo.of_institution(session, user.institution_id) if p.status == waiting)
+    waiting = (
+        {PrivacyStatus.REQUESTED} if user.role == Role.EVALUATOR else {PrivacyStatus.REQUESTED, PrivacyStatus.REVIEWED}
+    )
+    return sum(1 for p, _ in privacy_repo.of_institution(session, user.institution_id) if p.status in waiting)

@@ -102,6 +102,21 @@ def active_assignments_for(session: Session, reviewer_id: int) -> list[Assignmen
     return list(session.scalars(stmt))
 
 
+def deactivate_assignments_of_request(session: Session, request_id: int) -> list[int]:
+    """요청의 진행 중인 교수 배정을 모두 끝낸다 (문서 삭제로 종료). 배정이 끝난 교수 id를 돌려준다."""
+    stmt = (
+        select(Assignment)
+        .join(CourseEvaluation, CourseEvaluation.id == Assignment.course_evaluation_id)
+        .where(CourseEvaluation.transfer_request_id == request_id, Assignment.is_active.is_(True))
+    )
+    reviewers = []
+    for assignment in session.scalars(stmt):
+        assignment.is_active = False
+        reviewers.append(assignment.reviewer_id)
+    session.flush()
+    return sorted(set(reviewers))
+
+
 def add_assignment(session: Session, assignment: Assignment) -> Assignment:
     session.execute(
         update(Assignment)

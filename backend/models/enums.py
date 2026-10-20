@@ -12,6 +12,7 @@ class RequestStatus(StrEnum):
     DRAFT = "draft"  # 학생이 자료를 올리는 중 (사전 시뮬레이션)
     SUBMITTED = "submitted"  # 학사처에 심사 요청
     DECIDED = "decided"  # 모든 과목 판정 완료
+    CLOSED = "closed"  # 문서 삭제 승인으로 종료 (더 올리거나 심사하지 않는다. 판정 기록은 남는다)
 
 
 class SyllabusStatus(StrEnum):

@@ -548,5 +548,23 @@ INSERT INTO institution_sources (institution_id, source_institution_id, created_
 
 UPDATE alembic_version SET version_num='0004' WHERE alembic_version.version_num = '0003';
 
+-- Running upgrade 0004 -> 0005
+
+ALTER TABLE transfer_requests DROP CONSTRAINT ck_transfer_requests_status_valid;
+
+ALTER TABLE transfer_requests ADD CONSTRAINT ck_transfer_requests_status_valid CHECK (status IN ('draft', 'submitted', 'decided', 'closed'));
+
+UPDATE transfer_requests SET status = 'closed'
+        WHERE id IN (SELECT transfer_request_id FROM privacy_requests WHERE status = 'completed');
+
+UPDATE assignments SET is_active = false
+        WHERE is_active AND course_evaluation_id IN (
+            SELECT e.id FROM course_evaluations AS e
+            JOIN transfer_requests AS r ON r.id = e.transfer_request_id
+            WHERE r.status = 'closed'
+        );
+
+UPDATE alembic_version SET version_num='0005' WHERE alembic_version.version_num = '0004';
+
 COMMIT;
 

@@ -370,6 +370,7 @@ class BoardRow:
     assigned_at: date | None
     delegated: bool
     default_reviewer_id: int | None  # 선택 상자 기본값: 지금 담당 교수, 없으면 그 학과 첫 교수
+    auto: bool = False  # 학생이 심사를 요청할 때 시스템이 학과 교수에게 자동 배정
 
 
 @dataclass(frozen=True)
@@ -412,6 +413,7 @@ def assignment_board(session: Session, admin: User, show: str) -> AssignmentBoar
                 default_reviewer_id=reviewer.id
                 if reviewer
                 else (first_of.get(course.department_id) if course else None),
+                auto=bool(assignment and assignment.assigned_by is None),
             )
         )
     unassigned = sum(1 for r in rows if r.reviewer is None)

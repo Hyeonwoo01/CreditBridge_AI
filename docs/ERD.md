@@ -345,7 +345,7 @@ erDiagram
 | source_institution_id | BIGINT | FK→institutions, NN | 출신 대학 (만들 때 학생 계정의 값을 복사 — 나중에 계정이 바뀌어도 그대로) |
 | target_institution_id | BIGINT | FK→institutions, NN, IX | 대상 대학 |
 | major | VARCHAR(100) | NN | 편입 전공 (만들 때 학생 계정의 학과명을 복사) |
-| status | VARCHAR(20) | NN, IX | draft(사전 시뮬레이션) · submitted · decided (FR-21) |
+| status | VARCHAR(20) | NN, IX | draft(사전 시뮬레이션) · submitted · decided (FR-21) · closed(문서 삭제 승인으로 종료: 더 올리거나 심사하지 않고 심사 큐·교수 목록에서 빠짐, 판정 기록은 남음. Alembic 0005) |
 | submitted_at | TIMESTAMP | null | 학사처에 심사 요청한 시각 |
 | transcript_file_key | VARCHAR(255) | null | 성적표 원본 파일 키 (삭제 승인 후 null) |
 | transcript_masked_name | VARCHAR(100) | null | 가린 이름 `L** J****` (FR-13) |
