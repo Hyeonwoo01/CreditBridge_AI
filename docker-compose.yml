@@ -1,9 +1,12 @@
-# 로컬 인프라만: docker compose up -d db redis s3
-# 앱까지 한 번에 (버킷·데모 계정 자동): docker compose --profile app up -d --build → http://localhost:8000
-# DB를 처음부터 다시 만들기: docker compose --profile app down -v (볼륨 삭제) 후 다시 up
+# 프론트엔드·백엔드·DB 전부 한 번에: docker compose up -d --build → http://localhost:8000
+#   (화면은 web 컨테이너의 FastAPI가 frontend/ 템플릿으로 함께 그려 보낸다. 버킷·데모 계정은 자동)
+# 개발용으로 인프라만: docker compose up -d db redis s3
+# 끄기: docker compose down (데이터는 남음) / DB를 처음부터 다시 만들기: docker compose down -v 후 다시 up
+# 모든 서비스는 restart: unless-stopped — Docker Desktop을 켜면 직접 끄지 않은 서비스는 다시 켜진다
 services:
   db:
     image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_DB: creditbridge
       POSTGRES_USER: creditbridge
@@ -22,20 +25,24 @@ services:
 
   redis:
     image: redis:7
+    restart: unless-stopped
     ports: ["127.0.0.1:6379:6379"]
 
   # S3 호환 파일 저장소 (개발용 SeaweedFS). MinIO는 공식 이미지 배포가 끊겨 바꿨다. 운영은 AWS S3
   # 개발용이라 인증 없이 열고 localhost에만 연다 (앱의 S3 키 값은 무엇이든 통과)
   s3:
     image: chrislusf/seaweedfs:4.48
+    restart: unless-stopped
     command: ["server", "-s3", "-dir=/data"]
     ports: ["127.0.0.1:9000:8333"]
     volumes: ["s3-data:/data"]
 
   web:
-    profiles: ["app"]
     build: .
-    env_file: .env
+    # .env가 없어도 뜬다 (API 키 등은 .env에 넣으면 적용)
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://creditbridge:change-me@db:5432/creditbridge
       REDIS_URL: redis://redis:6379/0
@@ -44,35 +51,39 @@ services:
       SEED_DEMO: ${SEED_DEMO:-true}
     # 내 컴퓨터에서만 접속하도록 localhost에만 연다
     ports: ["127.0.0.1:8000:8000"]
-    restart: on-failure
+    restart: unless-stopped
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_started}
       s3: {condition: service_started}
 
   worker:
-    profiles: ["app"]
     build: .
-    env_file: .env
+    # .env가 없어도 뜬다 (API 키 등은 .env에 넣으면 적용)
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://creditbridge:change-me@db:5432/creditbridge
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://s3:8333
     command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]
     depends_on: [db, redis, s3]
-    restart: on-failure
+    restart: unless-stopped
 
   # 기한 알림을 매일 정해진 시각(REMINDER_HOUR_UTC)에 작업 큐에 넣는다. 반드시 하나만 띄운다
   beat:
-    profiles: ["app"]
     build: .
-    env_file: .env
+    # .env가 없어도 뜬다 (API 키 등은 .env에 넣으면 적용)
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://creditbridge:change-me@db:5432/creditbridge
       REDIS_URL: redis://redis:6379/0
     command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "beat", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
     depends_on: [redis]
-    restart: on-failure
+    restart: unless-stopped
 
 volumes:
   db-data:

@@ -67,18 +67,21 @@ Docker Desktop을 먼저 실행하고, 창 왼쪽 아래에 **Engine running**�
 ```bash
 git clone https://github.com/Hyeonwoo01/CreditBridge_AI.git
 cd CreditBridge_AI
-cp .env.example .env                      # Windows PowerShell: copy .env.example .env
-# .env를 열어 ANTHROPIC_API_KEY와 CLAUDE_MODEL을 넣는다 (없으면 화면·업로드는 되지만 AI 분석은 "설정이 없어 분석하지 못했어요"로 실패 표시)
-docker compose --profile app up -d --build
+cp .env.example .env                      # (선택) Windows PowerShell: copy .env.example .env
+# .env에 ANTHROPIC_API_KEY와 CLAUDE_MODEL을 넣으면 실제 AI 분석. .env가 없어도 실행은 되고, AI 분석만 "설정이 없어 분석하지 못했어요"로 실패 표시
+docker compose up -d --build              # 프론트엔드·백엔드·DB·작업 큐·파일 저장소를 한 번에
 ```
+
+`docker-compose.yml` 하나에 서비스 6개가 들어 있습니다: `web`(FastAPI 백엔드가 `frontend/` 화면까지 함께 그려 보냄, :8000), `worker`(AI 분석 등 오래 걸리는 작업), `beat`(매일 기한 알림), `db`(PostgreSQL 17), `redis`(작업 큐), `s3`(파일 저장소). 모두 `restart: unless-stopped`라 PC를 다시 켜도 Docker Desktop만 실행하면 직접 끄지 않은 서비스는 다시 켜집니다.
 
 처음에는 이미지 내려받기와 빌드에 몇 분 걸립니다. DB(PostgreSQL 17)는 볼륨이 비어 있을 때 `db/init.sql`(테이블)과 `db/data.sql`(데모 계정·과목 초기 데이터)로 한 번 초기화되고, 웹 컨테이너가 시작하면서 문서 버킷을 만듭니다.
 브라우저에서 http://localhost:8000 을 엽니다. 모든 포트를 127.0.0.1에만 열어 같은 네트워크의 다른 기기에서는 접속할 수 없습니다.
 
 - 로그인: 아래 [데모 계정](#데모-계정) 중 하나로 들어갑니다(비밀번호 `demo1234`).
-- 끄기: `docker compose --profile app down` (데이터는 남음, 모두 지우려면 `down -v`)
-- 다시 켜기: `docker compose --profile app up -d` / 코드를 새로 받은 뒤(`git pull`)에는 `up -d --build`
-- 상태·로그 보기: `docker compose --profile app ps`, `docker compose --profile app logs -f web worker`
+- 끄기: `docker compose down` (데이터는 남음, 모두 지우려면 `down -v`)
+- 다시 켜기: Docker Desktop을 켜면 자동으로 다시 켜짐(`docker compose down`으로 끈 뒤에는 `docker compose up -d`) / 코드를 새로 받은 뒤(`git pull`)에는 `docker compose up -d --build`
+- 예전 명령 `docker compose --profile app ...`도 그대로 동작합니다(이제 프로필 없이 전부 뜸).
+- 상태·로그 보기: `docker compose ps`, `docker compose logs -f web worker`
 - 파일 저장소는 S3 호환 SeaweedFS 컨테이너(`s3`)를 씁니다. 운영에서는 AWS S3로 바꿉니다.
 
 #### 내 이메일로 계정 만들기
@@ -97,10 +100,10 @@ docker compose --profile app up -d --build
 | --- | --- |
 | `failed to connect to the docker API ... dockerDesktopLinuxEngine` | Docker Desktop이 꺼져 있습니다. 실행하고 Engine running이 보이면 다시 실행하세요. `docker info`에 `Server:` 정보가 나오면 준비된 것입니다 |
 | `fatal: not a git repository`, `no configuration file provided` | 저장소 폴더 밖에서 실행했습니다. `cd CreditBridge_AI`로 들어가서 실행하세요 |
-| 브라우저에 "localhost 연결을 거부했습니다" | 아직 빌드·시작 중이거나 웹 컨테이너가 멈췄습니다. `up` 명령이 끝날 때까지 기다린 뒤 `docker compose --profile app ps`로 `web`이 실행 중인지 보고, 아니면 `docker compose --profile app logs web --tail 40`으로 오류를 확인하세요 |
-| 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose --profile app down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
+| 브라우저에 "localhost 연결을 거부했습니다" | 아직 빌드·시작 중이거나 웹 컨테이너가 멈췄습니다. `up` 명령이 끝날 때까지 기다린 뒤 `docker compose ps`로 `web`이 실행 중인지 보고, 아니면 `docker compose logs web --tail 40`으로 오류를 확인하세요 |
+| 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
 | WSL 관련 오류로 Docker Desktop이 켜지지 않음 | 관리자 PowerShell에서 `wsl --update` 후 Docker Desktop을 다시 실행하세요 |
-| 강의계획서를 올리면 "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요" | `.env`에 `ANTHROPIC_API_KEY`와 `CLAUDE_MODEL`이 없습니다. 넣고 `docker compose --profile app up -d`를 다시 실행하세요 |
+| 강의계획서를 올리면 "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요" | `.env`에 `ANTHROPIC_API_KEY`와 `CLAUDE_MODEL`이 없습니다. 넣고 `docker compose up -d`를 다시 실행하세요 |
 
 ### 예시용 공개 데모로 올리기 (Render 무료)
 
@@ -157,7 +160,7 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
    ```bash
    uv run python -m scripts.create_admin --institution "대학 이름" --country KR \
        --email admin@univ.ac.kr --name "학사정보처 관리자" --tuition 1350 --degree 130
-   # Docker: docker compose --profile app exec web uv run --no-group dev python -m scripts.create_admin ...
+   # Docker: docker compose exec web uv run --no-group dev python -m scripts.create_admin ...
    ```
    임시 비밀번호가 한 번만 출력됩니다. 첫 로그인 때 새 비밀번호(10자 이상)로 바꿔야 다른 화면을 쓸 수 있습니다.
 2. **과목 CSV** (`/admin/data`): `code,title,credits,department,level,concepts`. `concepts`는 학과가 정한 필수 개념을 `;`로 구분해 적습니다. 과목 코드가 이미 있으면 새 값으로 고칩니다.

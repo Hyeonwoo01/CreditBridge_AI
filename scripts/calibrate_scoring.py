@@ -5,7 +5,7 @@
   uv run python -m scripts.calibrate_scoring --institution "Midwest State University"
   # 전문가 라벨 골든셋 CSV (열: coverage, level, result)
   uv run python -m scripts.calibrate_scoring --csv golden.csv --max-over 0.03
-Docker: docker compose --profile app exec web uv run --no-group dev python -m scripts.calibrate_scoring ...
+Docker: docker compose exec web uv run --no-group dev python -m scripts.calibrate_scoring ...
 
 제안값을 쓰려면 backend/services/scoring.py의 DIRECT_MIN·ELECTIVE_MIN을 고치고 RULES_VERSION을 올린다.
 """

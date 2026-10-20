@@ -3,7 +3,7 @@
 실행 예:
   uv run python -m scripts.create_admin --institution "Midwest State University" --country US \
       --email admin@msu.edu --name "학사정보처 관리자" --tuition 1350 --degree 120
-Docker: docker compose --profile app exec web uv run --no-group dev python -m scripts.create_admin ...
+Docker: docker compose exec web uv run --no-group dev python -m scripts.create_admin ...
 
 임시 비밀번호를 한 번만 출력한다. 첫 로그인 때 새 비밀번호로 바꿔야 한다.
 이후 계정·과목은 관리자 화면(/admin/data)에서 가져온다.

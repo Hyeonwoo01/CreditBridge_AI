@@ -43,6 +43,6 @@
 | --- | --- | --- |
 | ERD.md를 보고 `db/init.sql` 만들기 | `db/init.sql`은 Alembic 마이그레이션에서 생성한다 (`scripts/export_db_sql.sh`). 손으로 고치지 않는다 | 스키마 변경은 Alembic으로만 한다는 규칙(CLAUDE.md). 테스트 `tests/unit/test_db_sql.py`가 init.sql과 마이그레이션이 같은지 검사 |
 | 초기 데이터 `db/data.sql` (스크립트 활용) | 데모 시드 스크립트(`scripts/seed_demo.py`)를 임시 DB에 실행한 뒤 `pg_dump`로 내보낸다 | 비밀번호 해시·만든 시각은 내보낼 때마다 달라진다(정상). 운영 DB에는 넣지 않는다 |
-| docker-compose.yml 수정 후 내렸다 다시 띄우기 | `db` 서비스가 `postgres:17`이고, 볼륨이 비어 있을 때만 init.sql → data.sql이 실행된다 | init.sql·data.sql을 바꾸면 `docker compose --profile app down -v`로 볼륨까지 지우고 다시 띄워야 반영된다 |
+| docker-compose.yml 수정 후 내렸다 다시 띄우기 | `db` 서비스가 `postgres:17`이고, 볼륨이 비어 있을 때만 init.sql → data.sql이 실행된다 | init.sql·data.sql을 바꾸면 `docker compose down -v`로 볼륨까지 지우고 다시 띄워야 반영된다 |
 | Frontend Mocking → 실제 API | **해당 없음.** 화면은 FastAPI가 DB에서 바로 그려 보내는 서버 렌더링(Jinja2 + HTMX)이라 목(mock) 데이터 단계가 없다. 처음부터 실제 API·DB를 쓴다 | 같은 서버가 http://localhost:8000 에서 화면과 API를 함께 연다 |
 | 공개 데모 (Render) | 데모 컨테이너도 PostgreSQL 17로 바꿨다. Render에 반영하려면 Manual Deploy가 필요 | `render.yaml`이 `autoDeploy: false` |
