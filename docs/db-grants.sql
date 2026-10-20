@@ -7,6 +7,8 @@ GRANT USAGE ON SCHEMA public TO creditbridge_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON institutions       TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON users              TO creditbridge_app;
+-- 대학별 출신 대학 목록: 잘못 등록한 대학을 목록에서 지운다
+GRANT SELECT, INSERT, DELETE         ON institution_sources TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON departments        TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON courses            TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON syllabi            TO creditbridge_app;

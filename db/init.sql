@@ -518,5 +518,35 @@ UPDATE users AS u
 
 UPDATE alembic_version SET version_num='0003' WHERE alembic_version.version_num = '0002';
 
+-- Running upgrade 0003 -> 0004
+
+CREATE TABLE institution_sources (
+    institution_id BIGINT NOT NULL, 
+    source_institution_id BIGINT NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_institution_sources PRIMARY KEY (id), 
+    CONSTRAINT fk_institution_sources_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id), 
+    CONSTRAINT fk_institution_sources_source_institution_id_institutions FOREIGN KEY(source_institution_id) REFERENCES institutions (id), 
+    CONSTRAINT uq_institution_sources_institution_id UNIQUE (institution_id, source_institution_id)
+);
+
+INSERT INTO institution_sources (institution_id, source_institution_id, created_at)
+        SELECT DISTINCT pair.target_id, pair.source_id, now() AT TIME ZONE 'utc'
+        FROM (
+            SELECT institution_id AS target_id, source_institution_id AS source_id FROM users
+            WHERE institution_id IS NOT NULL AND source_institution_id IS NOT NULL
+            UNION SELECT target_institution_id, source_institution_id FROM transfer_requests
+            UNION SELECT target_institution_id, source_institution_id FROM equivalencies
+            UNION SELECT actor.institution_id, src.id FROM audit_logs AS a
+                JOIN users AS actor ON actor.id = a.actor_id
+                JOIN institutions AS src ON src.id::text = a.target_id
+            WHERE a.action = 'institution.create' AND actor.institution_id IS NOT NULL
+        ) AS pair
+        JOIN institutions AS t ON t.id = pair.target_id AND t.is_target
+        JOIN institutions AS s ON s.id = pair.source_id AND NOT s.is_target;
+
+UPDATE alembic_version SET version_num='0004' WHERE alembic_version.version_num = '0003';
+
 COMMIT;
 

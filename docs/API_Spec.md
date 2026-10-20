@@ -134,9 +134,9 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M5 | POST | `/admin/data/accounts` | 관리자 | `file`(CSV), `csrf_token` | HTML(결과 카드, 임시 비밀번호는 한 번만) / 422 | P18 | FR-12 |
 | M6 | POST | `/admin/data/password-reset` | 관리자 | `email`, `csrf_token` | 303 또는 HTML(임시 비밀번호 한 번만) | P18 | – |
 | M7 | POST | `/admin/data/accounts/active` | 관리자 | `email`, `action`(deactivate·reactivate), `next`(선택, `/admin/accounts/{id}`만), `csrf_token` | 303→M2`#account-active` 또는 M15 | P18 | FR-12 |
-| M8 | POST | `/admin/data/institutions` | 관리자 | `name`, `country`, `csrf_token` | 303→M2`#institutions` | P18 | – |
+| M8 | POST | `/admin/data/institutions` | 관리자 | `name`, `country`, `csrf_token` | 303→M2`#institutions` (우리 대학 목록에 추가. 다른 대학이 만든 같은 이름 행은 함께 씀) | P18 | – |
 | M20 | POST | `/admin/data/courses/{id}/reference/remove` | 관리자 | `csrf_token` | 303→M2`#courses` + 플래시 (과목 연결만 끊음, 강의계획서 행은 남김) | P18 | FR-05 |
-| M21 | POST | `/admin/data/institutions/{id}/delete` | 관리자 | `csrf_token` | 303→M2`#institutions` + 플래시 (학생 계정·편입 요청·동등 과목표가 가리키면 거절) | P18 | – |
+| M21 | POST | `/admin/data/institutions/{id}/delete` | 관리자 | `csrf_token` | 303→M2`#institutions` + 플래시 (우리 대학 목록에서 지움. 우리 학생 계정·편입 요청·동등 과목표가 가리키면 거절, 다른 대학도 안 쓰면 행까지 삭제) | P18 | – |
 | M9 | GET | `/admin/privacy` | 관리자 | – | HTML | P08 | FR-13 |
 | M10 | POST | `/admin/privacy/{id}` | 관리자 | `csrf_token` | 303→M9 | P08 | FR-13 |
 | M11 | GET | `/admin/sis` | 관리자 | – | HTML | P15 | FR-24 |

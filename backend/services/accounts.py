@@ -128,7 +128,7 @@ def account_form(session: Session, admin: User, user_id: int) -> AccountForm:
         departments = [user.dept, *departments]
     delegate = user_repo.get_by_id(session, user.delegate_user_id) if user.delegate_user_id else None
     options = [p for p in user_repo.professors_of(session, institution_id) if p.id != user.id]
-    sources = catalog_repo.source_institutions(session) if user.role == Role.STUDENT else []
+    sources = catalog_repo.source_institutions(session, institution_id) if user.role == Role.STUDENT else []
     return AccountForm(AccountRow(user, delegate), departments, options, sources)
 
 
@@ -182,10 +182,12 @@ def update_account(
             user.department_id = department_id
             changed.append("major")
         source_institution_id = source_institution_id or None
-        if source_institution_id is not None and source_institution_id != user.source_institution_id:
-            source = catalog_repo.get_institution(session, source_institution_id)
-            if source is None or source.is_target:
-                raise CreditBridgeError(tr("등록된 출신 대학을 골라 주세요."))
+        if (
+            source_institution_id is not None
+            and source_institution_id != user.source_institution_id
+            and catalog_repo.source_link(session, institution_id, source_institution_id) is None
+        ):
+            raise CreditBridgeError(tr("등록된 출신 대학을 골라 주세요."))
         if source_institution_id != user.source_institution_id:
             user.source_institution_id = source_institution_id
             changed.append("source_institution")

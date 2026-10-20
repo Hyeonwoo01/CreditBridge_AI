@@ -200,7 +200,7 @@
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
   <div class="grid gap-3">
     <h2 class="section-title">{{ _("④ 출신 대학") }}</h2>
-    <p class="text-sm text-muted">{{ _("학생 계정에 정해 두는 출신 대학 목록이에요(계정 CSV의 source_institution, 계정 수정). 계정 CSV와 기존 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 해요.") }} {{ _("잘못 등록한 대학은 아직 아무 데서도 쓰지 않을 때만 지울 수 있어요(목록은 모든 기관이 함께 써요).") }}</p>
+    <p class="text-sm text-muted">{{ _("학생 계정에 정해 두는 출신 대학 목록이에요(계정 CSV의 source_institution, 계정 수정). 계정 CSV와 기존 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 해요.") }} {{ _("목록은 우리 대학 것만 보여요. 잘못 등록한 대학은 우리 학생 계정·편입 요청·동등 과목표에서 쓰지 않을 때 지울 수 있어요.") }}</p>
     <ul class="card grid gap-0 p-0 text-sm">
       {% for i in o.source_institutions %}<li class="flex items-center justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0">
         <span>{{ i.name }} <span class="ml-1 font-mono text-xs text-muted">{{ i.country }}</span></span>

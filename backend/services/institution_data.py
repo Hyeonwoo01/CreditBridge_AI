@@ -141,8 +141,8 @@ def overview(session: Session, admin: User) -> Overview:
         inactive=user_repo.inactive_count(session, institution_id),
         courses=[CourseRow(c, uploads.get(c.code)) for c in courses],
         departments_without_professor=[d.name for d in departments if d.id not in staffed],
-        source_institutions=catalog_repo.source_institutions(session),
-        used_source_ids=catalog_repo.used_source_institution_ids(session),
+        source_institutions=catalog_repo.source_institutions(session, institution_id),
+        used_source_ids=catalog_repo.used_source_institution_ids(session, institution_id),
     )
 
 
@@ -289,7 +289,7 @@ def import_accounts(session: Session, admin: User, filename: str, data: bytes, b
                     )
                 )
             if source_name:
-                source = catalog_repo.source_institution_by_name(session, source_name)
+                source = catalog_repo.source_institution_by_name(session, institution_id, source_name)
                 if source is None:
                     problems.append(
                         tr(
@@ -439,42 +439,47 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
 
 
 def add_source_institution(session: Session, admin: User, name: str, country: str) -> Institution:
-    ensure_admin(admin)
+    """④ 출신 대학 목록에 올린다. 다른 대학이 같은 이름으로 먼저 만든 행이 있으면 그 행을 함께 쓴다."""
+    institution_id = ensure_admin(admin)
     name, country = name.strip(), country.strip().upper()
     if not name or len(name) > 200:
         raise CreditBridgeError(tr("대학 이름을 200자 이내로 적어 주세요."))
     if not re.fullmatch(r"[A-Z]{2}", country):
         raise CreditBridgeError(tr("국가는 두 글자 코드로 적어 주세요 (예: KR, US)."))
-    if catalog_repo.source_institution_by_name(session, name) is not None:
+    if catalog_repo.source_institution_by_name(session, institution_id, name) is not None:
         raise CreditBridgeError(tr("이미 등록된 출신 대학이에요."))
-    institution = catalog_repo.add_institution(session, Institution(name=name, country=country, is_target=False))
+    institution = catalog_repo.shared_source_by_name(session, name)
+    if institution is None:
+        institution = catalog_repo.add_institution(session, Institution(name=name, country=country, is_target=False))
+    catalog_repo.add_source_link(session, institution_id, institution.id)
     audit.record(session, admin, "institution.create", "institution", str(institution.id))
     session.commit()
     return institution
 
 
-def delete_source_institution(session: Session, admin: User, institution_id: int) -> str:
-    """잘못 등록한 출신 대학을 지운다. 출신 대학 목록은 모든 기관이 함께 쓰므로 어디서도 쓰지 않을 때만 지운다.
-    지운 대학 이름을 돌려준다."""
-    ensure_admin(admin)
-    institution = catalog_repo.get_institution(session, institution_id)
-    if institution is None or institution.is_target:
+def delete_source_institution(session: Session, admin: User, source_id: int) -> str:
+    """잘못 등록한 출신 대학을 우리 대학 목록에서 지운다. 우리 학생 계정·편입 요청·동등 과목표가 가리키면 지우지 않는다.
+    다른 대학도 쓰지 않는 행이면 행까지 지운다. 지운 대학 이름을 돌려준다."""
+    institution_id = ensure_admin(admin)
+    institution = catalog_repo.get_institution(session, source_id)
+    if institution is None or catalog_repo.source_link(session, institution_id, source_id) is None:
         raise NotFoundError(tr("출신 대학을 찾을 수 없어요."))
-    usage = catalog_repo.institution_usage(session, institution.id)
+    usage = catalog_repo.source_usage(session, institution_id, source_id)
     if any(usage.values()):
         labels = {
             "students": tr("학생 계정 {n}개", n=usage["students"]),
             "requests": tr("편입 요청 {n}건", n=usage["requests"]),
             "equivalencies": tr("동등 과목표 {n}건", n=usage["equivalencies"]),
-            "others": tr("기타 기록 {n}건", n=usage["others"]),
         }
         parts = [label for key, label in labels.items() if usage[key]]
         raise CreditBridgeError(
             tr("{name}은(는) 쓰이고 있어 지울 수 없어요 ({uses}).", name=institution.name, uses=", ".join(parts))
         )
     name = institution.name
-    catalog_repo.delete_institution(session, institution)
-    audit.record(session, admin, "institution.delete", "institution", str(institution_id), name=name)
+    catalog_repo.remove_source_link(session, institution_id, source_id)
+    if not catalog_repo.institution_referenced(session, source_id):
+        catalog_repo.delete_institution(session, institution)
+    audit.record(session, admin, "institution.delete", "institution", str(source_id), name=name)
     session.commit()
     return name
 

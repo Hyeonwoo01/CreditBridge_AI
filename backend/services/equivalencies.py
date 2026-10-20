@@ -48,7 +48,9 @@ def import_csv(session: Session, evaluator: User, filename: str, data: bytes) ->
     rows: list[Equivalency] = []
     for line_no, row in csv_import.read_rows(filename, data, COLUMNS, COLUMNS[:4], MAX_ROWS):
         problems = []
-        source = catalog_repo.source_institution_by_name(session, row.get("source_institution", ""))
+        source = catalog_repo.source_institution_by_name(
+            session, evaluator.institution_id, row.get("source_institution", "")
+        )
         if source is None:
             problems.append(tr("등록되지 않은 출신 대학"))
         label = row.get("source_course", "")

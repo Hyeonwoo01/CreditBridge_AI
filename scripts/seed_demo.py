@@ -18,6 +18,7 @@ from backend.models import (
     CourseEvaluation,
     Decision,
     Institution,
+    InstitutionSource,
     Syllabus,
     SyllabusChunk,
     TransferRequest,
@@ -69,6 +70,7 @@ def seed(session: Session) -> None:
     hankuk = Institution(name="Hankuk University (한국대학교)", country="KR", is_target=False)
     session.add_all([msu, hankuk])
     session.flush()
+    session.add(InstitutionSource(institution_id=msu.id, source_institution_id=hankuk.id))
 
     for c in MSU_COURSES:
         text = reference_syllabus_text(c)

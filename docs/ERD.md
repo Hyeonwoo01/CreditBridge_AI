@@ -6,11 +6,12 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (23개)
+## 1. 엔티티 한눈에 보기 (24개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
 | 기관·사용자 | `institutions` | 출신 대학과 대상(편입) 대학 | FR-12·15·24 |
+| | `institution_sources` | 대상 대학별 ④ 출신 대학 목록 (대학마다 자기 목록만) | FR-12 |
 | | `departments` | 대상 대학의 학과 (과목·교수 배정 기준) | FR-05·18 |
 | | `users` | 학생·심사관·교수·관리자 계정 | FR-12·19 |
 | | `courses` | 대상 대학 카탈로그 과목과 필수 개념 | FR-05 |
@@ -42,6 +43,8 @@ erDiagram
     institutions ||--o{ users : "소속"
     institutions ||--o{ users : "학생 출신 대학"
     institutions ||--o{ departments : "학과"
+    institutions ||--o{ institution_sources : "대상 대학의 출신 대학 목록"
+    institutions ||--o{ institution_sources : "목록에 오른 출신 대학"
     departments ||--o{ courses : "개설 학과"
     departments |o--o{ users : "소속 교수"
     institutions ||--o{ courses : "카탈로그"
@@ -87,6 +90,11 @@ erDiagram
         int tuition_per_credit
         int degree_credits
         varchar sis_token_hash
+    }
+    institution_sources {
+        bigint id PK
+        bigint institution_id FK "대상 대학"
+        bigint source_institution_id FK "출신 대학"
     }
     departments {
         bigint id PK
@@ -280,6 +288,13 @@ erDiagram
 | degree_credits | INT | null | 졸업 학점 (FR-15) |
 | sis_token_hash | VARCHAR(64) | null | 학사정보시스템 연동 토큰의 해시 (원문은 저장하지 않음, FR-24) |
 
+**institution_sources** — 대상 대학이 ④ 출신 대학 목록에 올린 출신 대학(Alembic 0004). `(institution_id, source_institution_id)` UNIQUE. 출신 대학 행(`institutions`, `is_target=false`)은 같은 이름이면 한 줄을 함께 쓰고, 이 표가 대학별 목록을 정한다. 계정 CSV·계정 수정·동등 과목표 CSV·학생 과목 검색은 자기 대학 목록의 출신 대학만 쓴다. 목록에서 지우면 연결만 지우고, 다른 대학도 어떤 행도 가리키지 않으면 출신 대학 행까지 지운다(그 대학 학생 계정·편입 요청·동등 과목표가 가리키면 지우지 않음).
+
+| 속성 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| institution_id | BIGINT | FK→institutions, NN | 대상 대학 |
+| source_institution_id | BIGINT | FK→institutions, NN | 출신 대학 |
+
 **departments** — 대상 대학의 학과. `(institution_id, name)` UNIQUE. 과목 CSV를 가져올 때 새 학과명이면 만들고, 계정 CSV·관리자 계정 수정은 과목이 있는 학과만 고른다. 학과명을 고치면 과목·교수가 함께 따라간다(Alembic 0011).
 
 | 속성 | 타입 | 제약 | 설명 |
@@ -456,6 +471,7 @@ erDiagram
 | 2 | 사용자 – 대리 심사자 (자기 참조) | 0..1 : N | users.delegate_user_id | FR-19 |
 | 3 | 대상 대학 – 과목 | 1 : N | courses.institution_id | FR-05 카탈로그 |
 | 3a | 대상 대학 – 학과 | 1 : N | departments.institution_id | FR-18 |
+| 3d | 대상 대학 – 출신 대학 목록 – 출신 대학 | N : M | institution_sources.institution_id·source_institution_id | FR-12 대학별 목록 |
 | 3b | 학과 – 과목 | 1 : N | courses.department_id | FR-05 후보 필터 |
 | 3c | 학과 – 교수 | 0..1 : N | users.department_id | FR-18 자동 배정, FR-19 같은 학과 대리 |
 | 4 | 과목 – 기준 강의계획서 | 0..1 : 0..1 | courses.reference_syllabus_id | FR-05 개념 비교 기준 |
@@ -488,7 +504,8 @@ erDiagram
 
 | 엔티티 | 만드는 API | 바꾸는 API | 읽는 화면(조회 API) |
 | --- | --- | --- | --- |
-| institutions | M8, 첫 관리자 스크립트 | M12(토큰) | S1·S15·M11 |
+| institutions | M8, 첫 관리자 스크립트 | M12(토큰), M21(쓰는 곳이 없으면 삭제) | S1·S15·M11 |
+| institution_sources | M8 | M21(삭제) | M2·M15·S15, M5·R11(이름 확인) |
 | users | M5, 첫 관리자 스크립트 | A3(실패 수·언어), A5, A7, A11, F2, M6, M7, M16(이름·department_id·대리 심사자) | 대부분 (권한·이름) |
 | departments | M3(새 학과명), M5 | – | M2·M14·M15·R1·M1(학과별 지표) |
 | courses | M3 | M3, M4 | R1·S10·R4·F3·M2 |

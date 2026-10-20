@@ -12,6 +12,7 @@ from backend.models.equivalency import Equivalency
 from backend.models.evaluation_note import EvaluationNote
 from backend.models.evidence_span import EvidenceSpan
 from backend.models.institution import Institution
+from backend.models.institution_source import InstitutionSource
 from backend.models.material_request import MaterialRequest
 from backend.models.notification import Notification
 from backend.models.privacy_request import PrivacyRequest
@@ -36,6 +37,7 @@ __all__ = [
     "EvaluationNote",
     "EvidenceSpan",
     "Institution",
+    "InstitutionSource",
     "MaterialRequest",
     "Notification",
     "PrivacyRequest",

@@ -42,7 +42,7 @@ def search(session: Session, student: User, source_id: int | None, query: str) -
     target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
     if target is None or not target.is_target:
         return PrecedentSearch(None, [], None, query)
-    sources = catalog_repo.source_institutions(session)
+    sources = catalog_repo.source_institutions(session, target.id)
     if source_id is None:
         mine = request_repo.of_student(session, student.id)
         source_id = mine[0].source_institution_id if mine else None

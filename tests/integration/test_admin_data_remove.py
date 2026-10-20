@@ -1,15 +1,20 @@
-"""관리자 '계정·과목' 화면: 기준 강의계획서 빼기, 잘못 등록한 출신 대학 지우기 (쓰이는 대학은 지우지 않음)."""
+"""관리자 '계정·과목' 화면: 기준 강의계획서 빼기, 대학별 출신 대학 목록과 지우기 (쓰이는 대학은 지우지 않음)."""
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import AuditLog, Course, Institution, Syllabus
+from backend.errors import CreditBridgeError, NotFoundError
+from backend.models import AuditLog, Course, Institution, Syllabus, User
+from backend.services import institution_data
+from backend.services.institution_data import bootstrap_admin
 from tests.conftest import login
 from tests.fakes import FakeLLM
 from tests.integration.test_pipeline import new_request, upload
 
 HANKUK = "Hankuk University (한국대학교)"
+HEADER = "email,name,role,department,source_institution\n"
 
 
 def test_remove_reference_takes_course_out_of_ai_candidates(
@@ -71,3 +76,35 @@ def test_delete_source_institution_only_when_unused(client: TestClient, seeded: 
     assert seeded.get(Institution, typo_id) is None and seeded.get(Institution, hankuk_id) is not None
     log = seeded.scalars(select(AuditLog).where(AuditLog.action == "institution.delete")).one()
     assert log.target_id == str(typo_id) and log.payload_json == {"name": "Typo Univ"}
+
+
+def test_each_institution_sees_only_its_own_source_list(client: TestClient, seeded: Session) -> None:
+    bootstrap_admin(seeded, "Other State University", "US", "admin@osu.edu", "OSU 관리자")
+    osu = seeded.scalars(select(User).where(User.email == "admin@osu.edu")).one()
+    msu_admin = seeded.scalars(select(User).where(User.email == "admin@msu.example")).one()
+
+    # 다른 대학(MSU)이 쓰는 출신 대학은 OSU 목록에 없다
+    assert institution_data.overview(seeded, osu).source_institutions == []
+    institution_data.add_source_institution(seeded, msu_admin, "Typo Univ", "KR")
+    assert [i.name for i in institution_data.overview(seeded, osu).source_institutions] == []
+    r = institution_data.import_accounts(
+        seeded, osu, "a.csv", (HEADER + "s@osu.edu,학생,student,,Typo Univ\n").encode(), by_email=False
+    )
+    assert r.errors and "등록되지 않은 출신 대학(Typo Univ)" in r.errors[0]
+
+    # 같은 이름을 OSU가 등록하면 행 하나를 함께 쓰고, OSU 목록에만 더해진다
+    institution_data.add_source_institution(seeded, osu, HANKUK, "KR")
+    assert len(seeded.scalars(select(Institution).where(Institution.name == HANKUK)).all()) == 1
+    assert [i.name for i in institution_data.overview(seeded, osu).source_institutions] == [HANKUK]
+    with pytest.raises(CreditBridgeError, match="이미 등록된"):
+        institution_data.add_source_institution(seeded, osu, HANKUK, "KR")
+
+    # OSU는 아직 쓰지 않으니 자기 목록에서 지울 수 있고, MSU가 쓰는 행은 그대로 남는다
+    hankuk = seeded.scalars(select(Institution).where(Institution.name == HANKUK)).one()
+    institution_data.delete_source_institution(seeded, osu, hankuk.id)
+    assert institution_data.overview(seeded, osu).source_institutions == []
+    assert seeded.get(Institution, hankuk.id) is not None
+    assert HANKUK in [i.name for i in institution_data.overview(seeded, msu_admin).source_institutions]
+    # 목록에 없는 대학은 지울 수 없다
+    with pytest.raises(NotFoundError):
+        institution_data.delete_source_institution(seeded, osu, hankuk.id)
