@@ -2,6 +2,8 @@
 
 **배포 사이트**: https://creditbridge-hw.duckdns.org
 
+배포 사이트에는 데모 계정이 없습니다. 기관 관리자가 만들어 준 계정으로만 로그인할 수 있고, 데모 계정(`demo1234`)은 [내 PC에서 실행](#데모-계정)했을 때만 씁니다.
+
 강의계획서를 분석해 편입 대학의 어떤 과목으로 학점이 인정될지 **원문 근거와 함께 추천**하고, **학과 교수가 그 근거를 보고 최종 판정**하는 편입 학점 심사 플랫폼입니다. AI는 추천만 하고 확정 권한은 사람에게만 있습니다.
 
 ## 할 수 있는 것
@@ -135,16 +137,22 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
 
 #### 데모 계정
 
-비밀번호 모두 `demo1234` (로컬 전용, 운영에서는 `SEED_DEMO=false`로 만들지 않음)
+내 PC에서 실행(Docker 또는 uv)하면 아래 계정이 미리 만들어져 있습니다. **비밀번호는 모두 `demo1234`** 입니다.
 
-| 역할 | 이메일 |
-| --- | --- |
-| 학생 | jiwon@student.example |
-| 심사관 | rachel@msu.example |
-| 수학과 교수 | dkim@msu.example, lchen@msu.example |
-| CS 교수 | oali@msu.example, spark@msu.example |
-| 관리자 | admin@msu.example |
-| 물리·화학·영어·역사 교수 | mbrown@msu.example, ewong@msu.example, alopez@msu.example, jreed@msu.example, twhite@msu.example |
+- 배포 사이트(https://creditbridge-hw.duckdns.org)에는 이 계정들이 없습니다. 운영에서는 `SEED_DEMO=false`로 데모 계정을 만들지 않고, 기관 관리자가 [계정 CSV](#내-이메일로-계정-만들기)로 계정을 만들어 줍니다.
+- [Render 공개 데모](#예시용-공개-데모로-올리기-render-무료)에서는 로그인 화면의 역할 버튼을 누르면 비밀번호 없이 바로 들어갑니다.
+
+| 역할 | 이메일 | 둘러볼 것 |
+| --- | --- | --- |
+| 학생 | jiwon@student.example | 한국대학교 → CSE 편입 요청, 강의계획서 올리기·이의 신청 |
+| 학생(선배) | senior@student.example | 작년에 선형대수가 직접 인정된 이력이 있는 학생(일관성 경보 시연용) |
+| 심사관 | rachel@msu.example | 심사 대기열, 교수 배정, 보완 자료 요청 |
+| 수학과 교수 | dkim@msu.example, lchen@msu.example | 미적분학·선형대수 판정 |
+| CS 교수 | oali@msu.example, spark@msu.example | C프로그래밍·자료구조 판정 |
+| 물리·화학·영어·역사 교수 | mbrown@msu.example, ewong@msu.example, alopez@msu.example, jreed@msu.example, twhite@msu.example | 해당 학과 과목 판정 |
+| 관리자 | admin@msu.example | 계정·과목 관리, 삭제 승인, 운영 통계, 감사 로그 |
+
+`retired@msu.example`은 작년 판정을 내린 퇴임 교수 기록용 계정이라 둘러볼 때는 쓰지 않습니다. 비밀번호를 바꿨거나 잊었으면 `docker compose down -v` 후 다시 `up -d --build` 하면 처음 상태로 돌아갑니다(올린 데이터도 지워짐).
 
 로그인하면 역할별 첫 화면으로 갑니다: 학생은 내 편입 요청 대시보드(할 일·서류 준비율, 요청을 누르면 시뮬레이션 리포트), 심사관은 심사 대기열, 교수(예: mbrown)는 배정된 심사(메뉴 옆 숫자는 판정할 건수), 관리자는 관리자 콘솔입니다.
 
