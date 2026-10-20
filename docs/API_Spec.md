@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 80개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 81개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -15,11 +15,11 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- |
 | 화면 조회 | `GET` → HTML | 28 | 화면 하나에 조회 API 하나. 화면에 보이는 데이터를 서버가 모아 HTML에 넣어 보낸다 (조회 함수는 5절) |
 | 이동 | `GET` → 303 | 2 | `GET /`(역할별 홈으로), `GET /student/syllabi/{id}`(최신 분석으로) |
-| 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 38 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
+| 처리(버튼) | `POST` (폼) → 303 리다이렉트 + 플래시 | 39 | 버튼 하나가 POST 하나를 부른다. 입력 오류는 같은 화면을 422로 다시 보여 주거나 빨강 플래시 |
 | 파일 내려받기 | `GET` → PDF·CSV·원본 파일·스크립트 | 5 | 리포트 PDF, 원본 강의계획서, 이의 신청 근거 자료, SIS CSV, 웹 푸시 서비스 워커(`/sw.js`) |
 | HTMX 조각 | `GET` → HTML 조각 | 2 | 알림 배지 숫자, 상단 보조 바 집계 칩 |
 | JSON API | `GET`/`POST` → JSON | 5 | 분석 결과 조회, 판정 저장, 학사정보시스템 연동(`/api/v1/...`), 웹 푸시 구독·해제 |
-| 합계 | | 80 | GET 39, POST 41 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
+| 합계 | | 81 | GET 39, POST 42 (버전 없는 옛 JSON 경로 `/api/...`는 같은 엔드포인트의 별칭이라 세지 않음) |
 
 ### 1.2 공통 규칙
 
@@ -93,6 +93,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | R2 | POST | `/review/assign` | 심사관 | `evaluation_ids[]`, `tab`, `csrf_token` | 303→R1 (이미 교수가 있는 건은 건너뜀) | P05 | FR-18 |
 | R3 | GET | `/review/export.csv` | 심사관 | – | 파일(CSV) | P05·P10 | FR-24 |
 | R4 | GET | `/review/evaluations/{id}` | 심사관(소속 기관) | – | HTML | P06 | FR-05~11·22·25 |
+| R14 | POST | `/review/evaluations/{id}/assign` | 심사관(소속 기관, 판정 전) | `reviewer_id`, `csrf_token` | 303→R4 + 플래시 (같은 교수면 거절, 바꾸면 이전 교수에게 알림) | P06 | FR-18 |
 | R5 | POST | `/review/evaluations/{id}/materials` | 심사관 | `items[]`, `note`, `csrf_token` | 303→R4 | P06 | FR-22 |
 | R13 | POST | `/review/evaluations/{id}/supplement` | 심사관(소속 기관, 판정 전·최신 분석) | `file`(PDF·JPG·PNG), `csrf_token` | 303→R1 (재분석은 작업 큐) / 오류는 303→R4`#supplement` | P06 | FR-22, 권한 매트릭스 문서 업로드 |
 | R6 | GET | `/review/appeals` | 심사관 | – | HTML | P07 | FR-23 |
@@ -267,6 +268,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P05 | SIS CSV 내보내기 | R3 |
 | P05 | 원문 대조 확인 → · 충돌 내역 확인 · 보완 요청 발송 · 과거 판례 N건 보기 | R4 (각각 `#history`·`#materials` 위치) |
 | P05 | 이 페이지 전체 선택 | 화면 안 |
+| P06 | 담당 교수 배정 [배정 / 바꾸기] | R14 |
 | P06 | 학생에게 보완 자료 요청 [요청 보내기] | R5 |
 | P06 | 학생 대신 보완 자료 올리기 [올리고 다시 분석] (확인창) | R13 |
 | P06 | 메모 남기기 | C4 |

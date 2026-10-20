@@ -417,6 +417,7 @@
  "교수는 학과가 필요(과목 배정 기준)": "faculty need a department (used for assignment)",
  "교수는 학과를 골라야 심사를 배정받을 수 있어요.": "Faculty need a department to be assigned reviews.",
  "교수라면 진행 중인 심사를 같은 학과 다른 교수에게 넘겨요. 넘길 교수가 없으면 배정을 비워 심사관이 다시 배정하게 해요.": "For faculty, open reviews move to another faculty member in the same department. If there is no one, the assignment is cleared for an evaluator to reassign.",
+ "교수를 골라 배정하면 교수에게 알림과 근거 요약이 함께 가요.": "Assigning sends the professor a notification with the evidence summary.",
  "교수를 골라 주세요": "Choose a faculty member",
  "교재": "Textbooks",
  "교재 목차(다룬 장 표시)": "Textbook table of contents (with covered chapters marked)",
@@ -489,6 +490,7 @@
  "다음 페이지": "Next page",
  "닫기": "Close",
  "담당 교수": "Assigned faculty",
+ "담당 교수 배정": "Assign professor",
  "담당 교수 일괄 배정": "Assign to faculty",
  "담당 교수: {reviewer}": "Assigned faculty: {reviewer}",
  "담당 교수·심사관": "assigned faculty, evaluators",
@@ -916,6 +918,7 @@
  "요청할 자료를 하나 이상 고르거나 메모를 적어 주세요.": "Choose at least one item or write a note.",
  "우리 기관에 그 계정이 없어요.": "There's no such account in your institution.",
  "우리 기관에 그 이메일의 계정이 없어요.": "There is no account with that email at our institution.",
+ "우리 기관에 활성 교수 계정이 없어요. 기관 관리자에게 교수 계정을 요청해 주세요.": "Your institution has no active professor accounts. Ask your institution admin to create one.",
  "우리 기관의 다른 교수를 대리 심사자로 골라 주세요.": "Choose another faculty member in your institution as the delegate.",
  "우리 기관의 활성 교수를 골라 주세요.": "Choose an active faculty member in your institution.",
  "운영 통계": "Statistics",
@@ -1101,6 +1104,7 @@
   "{n} items need setup ({courses} courses without a reference syllabus, {departments} departments without faculty)"
  ],
  "중": "Medium",
+ "지금 담당: {name}. 다른 교수로 바꾸면 이전 교수에게도 알림이 가요.": "Currently assigned: {name}. If you switch, the previous professor is notified too.",
  "지금 비밀번호를 무효로 하고 사용자 메일로": "Invalidates the current password and automatically emails the user a",
  "지금 한 번만": "They're shown only this once.",
  "지금 한 번만 보여드려요. 본인에게만 전달해 주세요. 이전 비밀번호와 로그인돼 있던 기기는 더 이상 쓸 수 없고, 다음 로그인 때 새 비밀번호로 바꿔야 해요.": "Shown only this once. Give it only to the account owner. The previous password and signed-in devices no longer work, and the user must change it at next sign-in.",
@@ -1394,7 +1398,8 @@
  "확정 판정을 학사정보시스템이 직접 가져가도록 연동 토큰을 발급해요. 이의 신청으로 재판정된 건은 최신 판정만 나가고, 대체한 이전 판정 번호가 함께 전달돼요.": "Issue an integration token so the student information system can pull final decisions directly. For appeals that were re-decided, only the latest decision is sent, together with the ID of the decision it replaced.",
  "활성": "Active",
  "후보 과목 학과의 담당 교수에게 근거 요약과 함께 배정돼요": "Assigned to faculty in the candidate course's department, with the evidence summary",
- "후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요.": "Reviews without a candidate course have no department, so they must be assigned manually.",
+ "후보 과목이 없는 건은 학과를 정할 수 없어요. 심사 건 화면의 '담당 교수 배정'에서 교수를 골라 주세요.": "Cases without a candidate course have no department to assign by. Pick a professor under 'Assign professor' on the case page.",
+ "후보 과목이 없어 학과로 자동 배정할 수 없어요. 학생의 편입 전공 학과 교수를 먼저 골라 두었어요.": "There's no candidate course, so this can't be auto-assigned by department. A professor from the student's transfer major is preselected.",
  "후보 없음": "no candidate",
  "휴대폰·컴퓨터 브라우저에 알림을 띄워요. 화면을 닫아 두어도 배정·판정 소식을 바로 알 수 있어요. 푸시에는 과목 코드와 처리 내용만 담고 이름·성적은 넣지 않아요.": "Shows alerts in your phone or computer browser, so you hear about assignments and decisions even with this page closed. Pushes contain only course codes and what happened, never names or grades."
 }

@@ -198,7 +198,9 @@ def _assign_by_department(
         catalog_repo.get_course(session, evaluation.candidate_course_id) if evaluation.candidate_course_id else None
     )
     if course is None or course.institution_id != institution_id:
-        return tr("후보 과목이 없는 건은 학과를 정할 수 없어 직접 배정해야 해요.")
+        return tr(
+            "후보 과목이 없는 건은 학과를 정할 수 없어요. 심사 건 화면의 '담당 교수 배정'에서 교수를 골라 주세요."
+        )
     try:
         reviewer, original = pick_reviewer(session, institution_id, course.dept, utcnow().date())
     except CreditBridgeError as exc:
@@ -416,6 +418,31 @@ def assignment_board(session: Session, admin: User, show: str) -> AssignmentBoar
     show = show if show in ("unassigned", "all") else "unassigned"
     picked = [r for r in rows if show == "all" or r.reviewer is None]
     return AssignmentBoard(picked, show, unassigned, len(rows), professors)
+
+
+@dataclass(frozen=True)
+class AssignOptions:
+    """심사관 심사 건 화면의 '담당 교수 배정' 선택 상자."""
+
+    professors: list[User]  # 같은 기관 활성 교수 (학과·이름 순)
+    default_reviewer_id: int | None  # 지금 담당 교수 → 후보 과목 학과 첫 교수 → 학생 편입 전공 학과 첫 교수
+
+
+def assign_options(
+    session: Session, user: User, evaluation: CourseEvaluation, request: TransferRequest
+) -> AssignOptions:
+    institution_id = ensure_assigner(user)
+    professors = user_repo.professors_of(session, institution_id)
+    current = evaluation_repo.active_assignment(session, evaluation.id)
+    if current is not None:
+        return AssignOptions(professors, current.reviewer_id)
+    course = (
+        catalog_repo.get_course(session, evaluation.candidate_course_id) if evaluation.candidate_course_id else None
+    )
+    # 후보 과목이 없으면(선택 인정·대응 과목 없음) 학생의 편입 전공 학과 교수를 먼저 보여 준다
+    department = course.dept.name if course and course.dept else request.major
+    default = next((p.id for p in professors if p.department_name == department), None)
+    return AssignOptions(professors, default)
 
 
 def assign_to(session: Session, user: User, evaluation_id: int, reviewer_id: int) -> User:

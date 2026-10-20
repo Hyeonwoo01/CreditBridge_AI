@@ -84,7 +84,30 @@ def evaluation_page(
     request: Request, evaluation_id: int, user: User = Evaluator, session: Session = Depends(get_db)
 ) -> Response:
     view = views.evaluation_view(session, user, evaluation_id, with_audit=True)
-    return render(request, "review/evaluation.html", user=user, v=view)
+    options = review_service.assign_options(session, user, view.evaluation, view.request)
+    return render(request, "review/evaluation.html", user=user, v=view, assign=options)
+
+
+@router.post("/evaluations/{evaluation_id}/assign")
+def assign_one(
+    request: Request,
+    evaluation_id: int,
+    reviewer_id: int = Form(...),
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    """심사관이 교수를 골라 배정하거나 바꾼다 (후보 과목이 없어 학과로 자동 배정할 수 없는 건 포함)."""
+    check_csrf(request, csrf_token)
+    try:
+        reviewer = review_service.assign_to(session, user, evaluation_id, reviewer_id)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_notifications()
+        flash(request, tr("{name} 교수에게 배정했어요.", name=reviewer.name))
+    return RedirectResponse(f"/review/evaluations/{evaluation_id}", status_code=303)
 
 
 @router.get("/export.csv")

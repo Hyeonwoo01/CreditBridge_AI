@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import Assignment, AuditLog, Notification, Syllabus
+from backend.models import Assignment, AuditLog, Notification, Syllabus, TransferRequest, User
 from backend.repositories import evaluations as evaluation_repo
 from tests.conftest import demo_pdf, login
 from tests.integration.test_pipeline import latest, new_request, upload
@@ -58,3 +58,43 @@ def test_submit_auto_assigns_only_courses_with_enough_information(client: TestCl
     assert reviewer_of(seeded, again).department_name == "Mathematics"
     login(client, "rachel@msu.example")
     assert "교수 배정이 필요한 과목 1개" in client.get("/review").text  # 한국사만 남음
+
+
+def test_evaluator_picks_professor_for_case_without_candidate(client: TestClient, seeded: Session) -> None:
+    """후보 과목이 없는 선택 인정 건: 심사관이 심사 건 화면에서 교수를 골라 배정하고, 바꿀 수도 있다."""
+    token = login(client, "jiwon@student.example")
+    rid = new_request(client, seeded, token)
+    upload(client, rid, token, "korean_history.txt")
+    client.post(f"/student/requests/{rid}/submit", data={"csrf_token": token})
+    history = latest(seeded, "korean_history.txt", rid)
+    assert history.candidate_course_id is None and evaluation_repo.active_assignment(seeded, history.id) is None
+
+    token = login(client, "rachel@msu.example")
+    r = client.post("/review/assign", data={"evaluation_ids": [history.id], "csrf_token": token})
+    assert "&#39;담당 교수 배정&#39;에서 교수를 골라 주세요" in r.text  # 일괄 배정은 학과를 몰라 안내만
+
+    page = client.get(f"/review/evaluations/{history.id}").text
+    assert "담당 교수 배정" in page and "학생의 편입 전공 학과 교수를 먼저 골라 두었어요" in page
+    major = seeded.get(TransferRequest, rid).major  # type: ignore[union-attr]
+    professors = sorted(seeded.scalars(select(User).where(User.role == "professor")), key=lambda p: p.name)
+    first = next(p for p in professors if p.department_name == major)
+    second = next(p for p in professors if p.id != first.id and p.is_active)
+    assert f'value="{first.id}" selected' in page  # 학생 편입 전공 학과의 첫 교수가 기본 선택
+
+    r = client.post(f"/review/evaluations/{history.id}/assign", data={"reviewer_id": first.id, "csrf_token": token})
+    assert f"{first.name} 교수에게 배정했어요" in r.text
+    assert reviewer_of(seeded, history).id == first.id
+    r = client.post(f"/review/evaluations/{history.id}/assign", data={"reviewer_id": first.id, "csrf_token": token})
+    assert "이미 그 교수에게 배정돼 있어요" in r.text
+
+    # 다른 교수로 바꾸면 새 교수와 이전 교수 모두 알림을 받는다
+    client.post(f"/review/evaluations/{history.id}/assign", data={"reviewer_id": second.id, "csrf_token": token})
+    seeded.expire_all()
+    assert reviewer_of(seeded, history).id == second.id
+    moved = seeded.scalars(select(Notification).where(Notification.user_id == first.id)).all()
+    assert any("다른 교수에게 넘어갔어요" in n.message for n in moved)
+
+    # 심사관만 (교수·학생은 이 경로로 배정할 수 없다)
+    token = login(client, "jiwon@student.example")
+    r = client.post(f"/review/evaluations/{history.id}/assign", data={"reviewer_id": first.id, "csrf_token": token})
+    assert r.status_code == 403
