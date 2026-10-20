@@ -18,7 +18,7 @@
 
 - AWS 프리티어 조건은 계정 가입 시기에 따라 다르다. **2025년 7월 15일 이후 가입**한 계정은 "무료 플랜"(최대 6개월, 크레딧 제공)이고, 그 전 계정은 12개월 무료 사용량(EC2 t2·t3.micro 750시간, RDS db.t3·t4g.micro 750시간·20GB, S3 5GB 등)이다. 조건은 바뀔 수 있으니 **콘솔에서 고를 때 "프리 티어 사용 가능(Free tier eligible)" 표시가 있는 것만** 고른다.
 - 이 구성은 그 표시가 붙는 가장 작은 사양만 쓴다: EC2 t3.micro 1대, EBS 20GB, RDS db.t4g.micro 단일 AZ 20GB, S3, 리전은 서울(ap-northeast-2).
-- 무료가 아닌 것: **공인 IPv4 주소**(2024년부터 시간당 과금, 12개월 무료 계정은 월 750시간 무료·무료 플랜은 크레딧에서 차감), 프리티어 범위를 넘는 사용량, 그리고 **Claude API 사용료**(AWS와 별도, Anthropic에 청구).
+- 무료가 아닌 것: **공인 IPv4 주소**(2024년부터 시간당 과금, 12개월 무료 계정은 월 750시간 무료·무료 플랜은 크레딧에서 차감), 프리티어 범위를 넘는 사용량, 그리고 **AI API 사용료**(AWS와 별도, Claude면 Anthropic·GPT면 OpenAI에 청구).
 - ElastiCache·ALB·NAT 게이트웨이·Multi-AZ는 프리티어가 아니라 쓰지 않는다 (Redis는 EC2 안에서 돌린다).
 - t3.micro는 메모리가 1GB라 스왑 2GB를 켜고 웹·작업 프로세스를 하나씩만 띄운다. 사용자가 몇 명이면 충분하지만, 동시에 여러 명이 분석을 돌리면 차례로 처리된다.
 
@@ -110,6 +110,7 @@ Let's Encrypt 인증서는 IP가 아니라 도메인 이름에 발급된다.
    | `DATABASE_URL` | `postgresql+psycopg://creditbridge:<RDS 비밀번호>@<RDS 엔드포인트>:5432/creditbridge?sslmode=require` |
    | `S3_BUCKET` | 1번 버킷 이름 (`S3_ACCESS_KEY`·`S3_SECRET_KEY`는 넣지 않는다) |
    | `ANTHROPIC_API_KEY`·`CLAUDE_MODEL` | Claude 키·모델 ID |
+   | (GPT를 쓸 때) `LLM_PROVIDER=openai`, `OPENAI_API_KEY`·`OPENAI_MODEL` | GPT 키·모델 ID. 추론 모델이 아니면 `OPENAI_REASONING_EFFORT=false` |
    | `SESSION_SECRET` | 위에서 만든 값 (한 번 정하면 바꾸지 않는다) |
 
    저장: `Ctrl+O` → Enter → `Ctrl+X`.
@@ -156,7 +157,7 @@ docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python 
 | https가 안 열리고 caddy 로그에 인증서 오류 | 도메인이 탄력적 IP를 가리키는지(DuckDNS update), 보안 그룹에 80·443이 0.0.0.0/0으로 열려 있는지 확인 후 `restart caddy` |
 | web 로그에 DB 연결 시간 초과 | RDS 보안 그룹이 EC2에서 5432를 허용하는지(4번 "EC2 컴퓨팅 리소스에 연결"), 엔드포인트·비밀번호 오타, `?sslmode=require` 확인 |
 | 업로드하면 오류, 로그에 `NoCredentialsError`·`AccessDenied` | EC2에 IAM 역할 `creditbridge-ec2`가 붙었는지, **메타데이터 홉 제한이 2인지**(EC2 → 작업 → 인스턴스 설정 → 인스턴스 메타데이터 옵션 수정), 정책의 버킷 이름 확인 |
-| "AI 분석 설정이 아직 없어" | `.env`의 `ANTHROPIC_API_KEY`·`CLAUDE_MODEL` 확인 후 `up -d` |
+| "AI 분석 설정이 아직 없어" | `.env`의 `LLM_PROVIDER`와 그 공급자의 키·모델(`ANTHROPIC_API_KEY`·`CLAUDE_MODEL` 또는 `OPENAI_API_KEY`·`OPENAI_MODEL`) 확인 후 `up -d` |
 | 빌드나 분석 중 서버가 멈춤 | 메모리 부족. `swapon --show`로 스왑 확인(setup-ec2.sh), `docker stats` |
 | 로그인 후 바로 다시 로그인 화면 | https가 아닌 주소로 접속함 (운영 모드는 https에서만 로그인 쿠키를 보낸다) |
 

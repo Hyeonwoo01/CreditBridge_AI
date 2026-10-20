@@ -535,7 +535,7 @@ def remove_reference(session: Session, admin: User, course_id: int) -> Course:
 def process_reference(
     session: Session, syllabus_id: int, course_id: int, *, llm: LLMClient, storage: ObjectStorage
 ) -> None:
-    """기준 강의계획서 텍스트를 읽어(스캔 페이지는 Claude 전사) 과목에 연결한다. 실패하면 이전 것을 그대로 쓴다."""
+    """기준 강의계획서 텍스트를 읽어(스캔 페이지는 AI 전사) 과목에 연결한다. 실패하면 이전 것을 그대로 쓴다."""
     syllabus = syllabus_repo.get(session, syllabus_id)
     course = catalog_repo.get_course(session, course_id)
     if syllabus is None or course is None or syllabus.source_file_key is None:
@@ -547,7 +547,7 @@ def process_reference(
     except (CreditBridgeError, LLMError) as exc:
         logger.warning("reference syllabus failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
         doc = analysis.DocumentText("", 0.0, [])
-        if isinstance(exc, LLMNotConfiguredError):  # 스캔본은 Claude로 전사하는데 설정이 없다
+        if isinstance(exc, LLMNotConfiguredError):  # 스캔본은 AI로 전사하는데 설정이 없다
             syllabus.status = SyllabusStatus.FAILED
             syllabus.error_message = analysis.NOT_CONFIGURED
             session.commit()

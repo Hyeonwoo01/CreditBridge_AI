@@ -1,9 +1,9 @@
-"""후보 과목 선정 (FR-05). MVP는 임베딩 없이 학과로 후보를 거른 뒤 Claude가 직접 비교한다."""
+"""후보 과목 선정 (FR-05). MVP는 임베딩 없이 학과로 후보를 거른 뒤 AI가 직접 비교한다."""
 
 import re
 from typing import Protocol
 
-# 한 번에 Claude에게 넘기는 후보 과목 수 상한 (기능명세서: 20~30개)
+# 한 번에 AI에게 넘기는 후보 과목 수 상한 (기능명세서: 20~30개)
 MAX_CANDIDATES = 30
 _STOP = {"and", "of", "the", "for", "in", "studies", "department"}
 _SYNONYMS = {

@@ -55,7 +55,7 @@
  "AI 구조화·근거 추출": "AI structuring & evidence extraction",
  "AI 분석": "AI analysis",
  "AI 분석 기반 예상치 · {status}": "Estimate based on AI analysis · {status}",
- "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요. 기관 관리자에게 알려 주세요.": "AI analysis isn't set up yet (no Claude API key), so this couldn't be analyzed. Please let your institution admin know.",
+ "AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요. 기관 관리자에게 알려 주세요.": "AI analysis isn't set up yet (no API key), so this couldn't be analyzed. Please let your institution admin know.",
  "AI 분석 중": "AI analyzing",
  "AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요.": "The AI analysis failed. Please request the analysis again in a moment.",
  "AI 추천": "AI recommendation",

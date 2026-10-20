@@ -68,7 +68,7 @@ Docker Desktop을 먼저 실행하고, 창 왼쪽 아래에 **Engine running**�
 git clone https://github.com/Hyeonwoo01/CreditBridge_AI.git
 cd CreditBridge_AI
 cp .env.example .env                      # (선택) Windows PowerShell: copy .env.example .env
-# .env에 ANTHROPIC_API_KEY와 CLAUDE_MODEL을 넣으면 실제 AI 분석. .env가 없어도 실행은 되고, AI 분석만 "설정이 없어 분석하지 못했어요"로 실패 표시
+# .env에 ANTHROPIC_API_KEY와 CLAUDE_MODEL을 넣으면 실제 AI 분석(GPT는 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL). .env가 없어도 실행은 되고, AI 분석만 "설정이 없어 분석하지 못했어요"로 실패 표시
 docker compose up -d --build              # 프론트엔드·백엔드·DB·작업 큐·파일 저장소를 한 번에
 ```
 
@@ -103,7 +103,7 @@ docker compose up -d --build              # 프론트엔드·백엔드·DB·작�
 | 브라우저에 "localhost 연결을 거부했습니다" | 아직 빌드·시작 중이거나 웹 컨테이너가 멈췄습니다. `up` 명령이 끝날 때까지 기다린 뒤 `docker compose ps`로 `web`이 실행 중인지 보고, 아니면 `docker compose logs web --tail 40`으로 오류를 확인하세요 |
 | 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
 | WSL 관련 오류로 Docker Desktop이 켜지지 않음 | 관리자 PowerShell에서 `wsl --update` 후 Docker Desktop을 다시 실행하세요 |
-| 강의계획서를 올리면 "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요" | `.env`에 `ANTHROPIC_API_KEY`와 `CLAUDE_MODEL`이 없습니다. 넣고 `docker compose up -d`를 다시 실행하세요 |
+| 강의계획서를 올리면 "AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요" | `.env`에 쓰는 AI의 키·모델이 없습니다. Claude면 `ANTHROPIC_API_KEY`·`CLAUDE_MODEL`, GPT면 `LLM_PROVIDER=openai`와 `OPENAI_API_KEY`·`OPENAI_MODEL`을 넣고 `docker compose up -d`를 다시 실행하세요 |
 | 파일(강의계획서·기준 강의계획서)을 올리면 `Internal Server Error` | 파일 저장소 키가 비어 있던 예전 설정입니다. `git pull` 후 `docker compose up -d`를 다시 실행하세요 (지금은 `.env`에 `S3_ACCESS_KEY`가 없어도 기본값으로 동작) |
 
 ### 실제 서비스로 올리기 (AWS 프리티어)
@@ -120,7 +120,7 @@ EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 Cla
 
 ```bash
 uv sync                                   # Python 3.12와 의존성 설치
-cp .env.example .env                      # ANTHROPIC_API_KEY, CLAUDE_MODEL 입력
+cp .env.example .env                      # ANTHROPIC_API_KEY, CLAUDE_MODEL 입력 (GPT면 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL)
 docker compose up -d db redis s3          # PostgreSQL 17(db/init.sql·data.sql로 초기화), Redis 7, S3 호환 저장소(SeaweedFS)
 uv run alembic upgrade head               # init.sql로 이미 최신이면 아무것도 안 함
 uv run python -m scripts.create_bucket
@@ -151,7 +151,7 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
 
 코드를 고치기 전에 [CLAUDE.md](CLAUDE.md)를 먼저 읽어 주세요. 사람과 Claude Code가 함께 따르는 규칙이며, Claude Code는 이 파일을 자동으로 읽습니다. 핵심만 옮기면:
 
-- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, PostgreSQL 17 + psycopg 3, Alembic, Celery + Redis, Anthropic 공식 SDK, PyMuPDF, pywebpush(웹 푸시), Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
+- **고정 스택**: Python 3.12·uv, FastAPI(`def` 엔드포인트), Pydantic 2, SQLAlchemy 2.0, PostgreSQL 17 + psycopg 3, Alembic, Celery + Redis, LLM은 Anthropic 공식 SDK(Claude) 또는 OpenAI 공식 SDK(GPT) 중 선택, PyMuPDF, pywebpush(웹 푸시), Jinja2 + HTMX + Tailwind. 목록 밖 라이브러리는 추가하기 전에 먼저 물어봅니다.
 - **구조**: web → services → repositories → models. SQL은 `backend/repositories`에만, LLM 호출은 `backend/ai/llm_client.py`로만, 프롬프트는 `backend/ai/prompts/*.md`(바꾸면 버전 올림), 추천 규칙은 `backend/services/scoring.py` 한 곳(바꾸면 `RULES_VERSION` 올림).
 - **사람이 최종 판정**: AI는 추천만 합니다. 판정 확률(%)은 계산·표시하지 않고, 확정 판정에는 `decided_by`가 필수이며, `decisions`·`audit_logs`는 INSERT만 합니다(재판정도 새 행).
 - **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.

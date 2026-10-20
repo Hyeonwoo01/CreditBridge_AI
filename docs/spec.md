@@ -411,7 +411,7 @@ CreditBridge AI는 Python 3.12와 PostgreSQL 17을 기반으로, 계층마다 �
 | 데이터베이스 | PostgreSQL | 17.x | 업무 데이터, 판정 이력(벡터 검색은 파일럿 이후) | MariaDB·MySQL 서버, 별도 벡터 DB(Pinecone, Chroma 등) |
 | 캐시·메시지 브로커 | Redis | 7.x | Celery 브로커, 단기 캐시 | RabbitMQ |
 | 백그라운드 작업 | Celery (+ beat 스케줄러) | 5.x | 문서 추출, 후보 과목 비교·판정 추천, 기준 강의계획서 처리, 알림·비밀번호 재설정 메일, 매일 기한 알림 | FastAPI BackgroundTasks(긴 작업), RQ, 스레드 직접 생성 |
-| LLM | Anthropic Claude API, 공식 anthropic Python SDK | SDK 최신 안정판 고정 | 구조화 추출, 후보 과목 비교·판정 추론, 스캔본 전사 | LangChain, LlamaIndex, 모델 ID 하드코딩 |
+| LLM | Anthropic Claude API(공식 anthropic SDK) 또는 OpenAI API(공식 openai SDK), `LLM_PROVIDER`로 선택 | SDK 최신 안정판 고정 | 구조화 추출, 후보 과목 비교·판정 추론, 스캔본 전사 | LangChain, LlamaIndex, 모델 ID 하드코딩 |
 | 임베딩 | MVP 미사용 (파일럿에서 sentence-transformers + BAAI/bge-m3 도입) | 파일럿 도입 시 1024차원 고정 | MVP는 학과로 후보 과목 20~30개를 거른 뒤 Claude가 직접 비교 | MVP 단계의 임베딩 모델·벡터 DB 도입 |
 | PDF 처리 | PyMuPDF | 1.x | 텍스트 레이어 추출, 페이지 이미지 변환 | PyPDF2, pdfminer, Tesseract |
 | 웹 푸시 | pywebpush (+ 브라우저 표준 Push API·서비스 워커) | 2.x | FR-20 모바일 알림: VAPID 서명·내용 암호화 후 브라우저 푸시 서비스로 발송 (VAPID 키 설정 시) | Firebase SDK, OneSignal 등 외부 푸시 SaaS, 직접 구현한 암호화 |
@@ -518,7 +518,7 @@ creditbridge/
 │   │                       #   sis · equivalencies · precedents · stats
 │   │                       #   auth · institution_data · csv_import · audit · views(화면 조회)
 │   ├── ai/
-│   │   ├── llm_client.py   # Anthropic SDK 호출 단일 진입점
+│   │   ├── llm_client.py   # LLM(Claude·GPT) 호출 단일 진입점
 │   │   ├── prompts/        # 프롬프트 템플릿 .md, 버전 관리
 │   │   ├── extraction.py   # 강의계획서 구조화 추출
 │   │   ├── candidates.py   # 학과 필터로 후보 과목 선정
@@ -585,7 +585,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - PostgreSQL 17 + psycopg 3 (postgresql+psycopg://, 동기 모드만), 비동기 드라이버(asyncpg 등) 금지
 - Alembic으로만 스키마 변경 (db/init.sql·db/data.sql은 scripts/export_db_sql.sh로 다시 만든다)
 - Celery 5 + Redis 7: 오래 걸리는 작업은 모두 Celery로
-- Anthropic 공식 SDK만 사용, LangChain/LlamaIndex 금지
+- LLM은 Anthropic 공식 SDK(Claude) 또는 OpenAI 공식 SDK(GPT)만 사용 (Settings.llm_provider로 선택), LangChain/LlamaIndex 금지
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
 - PDF: PyMuPDF만 사용
 - 웹 푸시: pywebpush만 사용 (서버 발송은 backend/services/push.py 한 곳, 무거운 의존성이라 보낼 때만 import)
@@ -601,7 +601,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - LLM 호출은 backend/ai/llm_client.py를 통해서만
 - 프롬프트는 backend/ai/prompts/*.md 파일로 관리 (첫 줄 `<!-- version: ... -->`, 바꾸면 버전을 올린다)
 - 환경변수는 backend/config.py의 Settings로만 읽기
-- 모델 ID는 Settings.claude_model 사용, 하드코딩 금지
+- 모델 ID는 Settings.claude_model·openai_model 사용, 하드코딩 금지
 - 후보 과목 선정은 backend/ai/candidates.py(학과 필터, 최대 30개), 개념 비교는 backend/ai/matching.py
 - 추천 등급·신뢰도 규칙은 backend/services/scoring.py 한 곳. 규칙을 바꾸면 RULES_VERSION을 올린다 (같은 입력 결과 재사용 키에 포함)
 
@@ -681,11 +681,17 @@ S3_ACCESS_KEY=change-me
 S3_SECRET_KEY=change-me-please
 # 운영 S3는 AES256 또는 aws:kms. KMS가 없는 로컬 저장소(SeaweedFS)는 비워 둔다.
 S3_SERVER_SIDE_ENCRYPTION=
+LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=
 # 착수 시점에 쓸 Claude 모델 ID (코드에 하드코딩하지 않는다)
 CLAUDE_MODEL=claude-opus-5-5
 # 정책 거절 시 서버 측 대체 모델 사용 (Claude API 전용, Bedrock·Vertex·프록시면 false)
 CLAUDE_SERVER_FALLBACK=true
+# GPT를 쓰려면 LLM_PROVIDER=openai와 아래 두 값 (모델 ID도 코드에 하드코딩하지 않는다)
+OPENAI_API_KEY=
+OPENAI_MODEL=
+# 추론 모델이 아니라 reasoning_effort를 받지 않는 GPT면 false
+OPENAI_REASONING_EFFORT=true
 # 임베딩 설정은 파일럿에서 추가
 SESSION_SECRET=change-me
 # 개인정보 삭제 요청 처리 기한(일)

@@ -8,7 +8,7 @@ CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입�
 
 | 항목 | 데모 모드 | 운영 |
 | --- | --- | --- |
-| AI 분석 | 예시 AI(`backend/ai/demo_llm.py`): Claude를 부르지 않고 강의계획서의 "Week N:" 줄과 기준 개념의 낱말 겹침으로 결과를 만든다. 비용 없음 | Claude API (`ANTHROPIC_API_KEY`) |
+| AI 분석 | 예시 AI(`backend/ai/demo_llm.py`): Claude를 부르지 않고 강의계획서의 "Week N:" 줄과 기준 개념의 낱말 겹침으로 결과를 만든다. 비용 없음 | Claude 또는 GPT API (`LLM_PROVIDER`와 그 키) |
 | 파일 저장 | 컨테이너 안 폴더(`DEMO_STORAGE_DIR`, `DiskStorage`) | S3 |
 | 작업 큐 | 요청 안에서 바로 실행(`CELERY_TASK_ALWAYS_EAGER=true`), Redis·worker·beat 없음 | Celery + Redis |
 | DB | 컨테이너 안 PostgreSQL 17. 이미지를 빌드할 때 미리 만들어 두고(`deploy/demo/build_db.sh`, 메모리를 작게 쓰는 설정 포함) 시작할 때 그대로 띄움 | 별도 PostgreSQL 17 |

@@ -1,4 +1,4 @@
-"""AI 분석 파이프라인: 문서 추출 → 구조화 → 학과 필터로 후보 선정 → Claude 개념별 비교 → 근거 검증 → 추천.
+"""AI 분석 파이프라인: 문서 추출 → 구조화 → 학과 필터로 후보 선정 → AI(Claude·GPT) 개념별 비교 → 근거 검증 → 추천.
 
 Celery 작업(backend/workers/tasks.py)이 호출한다. 웹 요청 안에서 직접 부르지 않는다.
 같은 원본(content_hash)은 이미 추출한 결과를, 같은 비교 입력은 이미 낸 판정을 재사용해 LLM을 다시 부르지 않는다.
@@ -60,7 +60,7 @@ class DocumentText:
 
 
 def document_to_text(llm: LLMClient, data: bytes, filename: str) -> DocumentText:
-    """텍스트·인식 품질 점수·페이지 위치표. 스캔 페이지는 Claude가 전사해 원래 페이지 자리에 넣는다."""
+    """텍스트·인식 품질 점수·페이지 위치표. 스캔 페이지는 AI가 전사해 원래 페이지 자리에 넣는다."""
     doc = doc_text.extract(data, filename)
     if not doc.scanned_pages:
         text, offsets = doc_text.join_pages(doc.pages)
@@ -176,13 +176,13 @@ def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: Obje
     )
 
 
-# Claude 키·모델이 설정되지 않은 서버에서 분석을 요청했을 때 (학생·교직원 화면에 그대로 보인다)
-NOT_CONFIGURED = N_("AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요. 기관 관리자에게 알려 주세요.")
+# AI 키·모델(LLM_PROVIDER에 맞는 것)이 설정되지 않은 서버에서 분석을 요청했을 때 (학생·교직원 화면에 그대로 보인다)
+NOT_CONFIGURED = N_("AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요. 기관 관리자에게 알려 주세요.")
 
 
 def _not_configured(exc: LLMError) -> bool:
     if isinstance(exc, LLMNotConfiguredError):
-        logger.error("claude is not configured", extra={"error": str(exc)})  # 빠진 설정 이름만, 개인정보 없음
+        logger.error("llm is not configured", extra={"error": str(exc)})  # 빠진 설정 이름만, 개인정보 없음
         return True
     return False
 
@@ -226,7 +226,7 @@ def add_supplement(
     filename = file_key.rsplit("/", 1)[-1]
     try:
         text = document_to_text(llm, storage.get(file_key), filename).text
-    except LLMError as exc:  # 스캔본 보완 자료는 Claude로 전사한다
+    except LLMError as exc:  # 스캔본 보완 자료는 AI로 전사한다
         syllabus.status = SyllabusStatus.FAILED
         syllabus.error_message = (
             NOT_CONFIGURED if _not_configured(exc) else N_("보완 자료에서 글자를 읽지 못했어요. 다시 올려 주세요.")

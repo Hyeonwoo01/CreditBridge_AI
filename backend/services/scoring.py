@@ -35,7 +35,7 @@ class Score:
 
 
 def apply_verification(status: str, coverage: float, verified: bool) -> float:
-    """Claude가 매긴 개념 커버리지(0~1)에 근거 검증 결과를 반영한다."""
+    """AI가 매긴 개념 커버리지(0~1)에 근거 검증 결과를 반영한다."""
     if status == "unclear":
         return 0.0
     if status in ("taught", "partial") and not verified:

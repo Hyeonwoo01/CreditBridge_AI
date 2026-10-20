@@ -1,5 +1,5 @@
 """업로드 문서 → 텍스트 (FR-01). PDF와 스캔 이미지(JPG·PNG)만 받는다.
-PDF 텍스트 레이어는 PyMuPDF로 읽고, 스캔 페이지와 이미지는 Claude가 전사한다."""
+PDF 텍스트 레이어는 PyMuPDF로 읽고, 스캔 페이지와 이미지는 AI(Claude·GPT)가 전사한다."""
 
 import re
 from bisect import bisect_right

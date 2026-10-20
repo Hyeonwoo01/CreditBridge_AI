@@ -18,7 +18,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - PostgreSQL 17 + psycopg 3 (postgresql+psycopg://, 동기 모드만), 비동기 드라이버(asyncpg 등) 금지
 - Alembic으로만 스키마 변경 (db/init.sql·db/data.sql은 scripts/export_db_sql.sh로 다시 만든다)
 - Celery 5 + Redis 7: 오래 걸리는 작업은 모두 Celery로
-- Anthropic 공식 SDK만 사용, LangChain/LlamaIndex 금지
+- LLM은 Anthropic 공식 SDK(Claude) 또는 OpenAI 공식 SDK(GPT)만 사용 (Settings.llm_provider로 선택), LangChain/LlamaIndex 금지
 - 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
 - PDF: PyMuPDF만 사용
 - 웹 푸시: pywebpush만 사용 (서버 발송은 backend/services/push.py 한 곳, 무거운 의존성이라 보낼 때만 import)
@@ -34,7 +34,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - LLM 호출은 backend/ai/llm_client.py를 통해서만
 - 프롬프트는 backend/ai/prompts/*.md 파일로 관리 (첫 줄 `<!-- version: ... -->`, 바꾸면 버전을 올린다)
 - 환경변수는 backend/config.py의 Settings로만 읽기
-- 모델 ID는 Settings.claude_model 사용, 하드코딩 금지
+- 모델 ID는 Settings.claude_model·openai_model 사용, 하드코딩 금지
 - 후보 과목 선정은 backend/ai/candidates.py(학과 필터, 최대 30개), 개념 비교는 backend/ai/matching.py
 - 추천 등급·신뢰도 규칙은 backend/services/scoring.py 한 곳. 규칙을 바꾸면 RULES_VERSION을 올린다 (같은 입력 결과 재사용 키에 포함)
 

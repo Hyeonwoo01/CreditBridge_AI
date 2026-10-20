@@ -40,4 +40,4 @@ class LLMRefusalError(LLMError):
 
 
 class LLMNotConfiguredError(LLMError):
-    """Claude 설정(ANTHROPIC_API_KEY·CLAUDE_MODEL)이 없어 AI를 부를 수 없음. 분석은 실패로 표시하고 안내한다."""
+    """AI 설정(LLM_PROVIDER에 맞는 API 키·모델)이 없어 AI를 부를 수 없음. 분석은 실패로 표시하고 안내한다."""

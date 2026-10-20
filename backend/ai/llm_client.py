@@ -1,19 +1,18 @@
-"""Anthropic SDK 호출 단일 진입점. 다른 모듈에서 SDK를 직접 호출하지 않는다."""
+"""LLM 호출 단일 진입점 (Claude: Anthropic SDK, GPT: OpenAI SDK). 다른 모듈에서 SDK를 직접 호출하지 않는다.
+
+어느 쪽을 쓸지는 Settings.llm_provider로 고르고, 호출하는 쪽은 parse() 하나만 쓴다."""
 
 import base64
 import json
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
 from backend.config import Settings, get_settings
 from backend.errors import LLMError, LLMNotConfiguredError, LLMRefusalError
-
-if TYPE_CHECKING:
-    import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -75,24 +74,45 @@ def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
     return result
 
 
-class LLMClient:
-    def __init__(self, settings: Settings, client: "anthropic.Anthropic | None" = None) -> None:
-        import anthropic  # SDK는 실제로 Claude를 쓸 때만 불러온다 (데모 모드는 메모리를 아낀다)
+@dataclass(frozen=True)
+class _Reply:
+    text: str
+    truncated: bool  # 출력 토큰 상한에 걸려 잘림
+    model: str
 
-        # 설정이 빠졌으면 여기서 멈추지 않고 부를 때 LLMNotConfiguredError를 낸다:
-        # 작업이 예외로 끝나 화면이 "분석 중"에 멈추는 대신 분석 실패와 설정 안내를 보여 준다
-        self._missing = [
-            name
-            for name, value in (
+
+class LLMClient:
+    def __init__(self, settings: Settings, client: Any | None = None) -> None:
+        """client는 테스트용 가짜 SDK 클라이언트. 없으면 고른 공급자의 SDK로 만든다
+        (SDK는 실제로 쓸 때만 불러온다: 데모 모드는 메모리를 아낀다)."""
+        self._provider = settings.llm_provider
+        if self._provider == "openai":
+            required = (("OPENAI_MODEL", settings.openai_model), ("OPENAI_API_KEY", settings.openai_api_key or client))
+            self._model = settings.openai_model
+        else:
+            required = (
                 ("CLAUDE_MODEL", settings.claude_model),
                 ("ANTHROPIC_API_KEY", settings.anthropic_api_key or client),
             )
-            if not value
-        ]
-        self._model = settings.claude_model
+            self._model = settings.claude_model
+        # 설정이 빠졌으면 여기서 멈추지 않고 부를 때 LLMNotConfiguredError를 낸다:
+        # 작업이 예외로 끝나 화면이 "분석 중"에 멈추는 대신 분석 실패와 설정 안내를 보여 준다
+        self._missing = [name for name, value in required if not value]
         # 서버 측 대체 모델은 Claude API에서만 쓸 수 있다. 다른 플랫폼이나 프록시를 거치면 끈다
         self._fallback = settings.claude_server_fallback
-        self._client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key or None, max_retries=3)
+        self._send_effort = settings.openai_reasoning_effort
+        self._client: Any
+        if client is not None or self._missing:
+            # 키가 없으면 SDK를 만들지 않는다 (OpenAI SDK는 키 없이 만들면 바로 예외를 낸다)
+            self._client = client
+        elif self._provider == "openai":
+            import openai
+
+            self._client = openai.OpenAI(api_key=settings.openai_api_key or None, max_retries=3)
+        else:
+            import anthropic
+
+            self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key or None, max_retries=3)
 
     @property
     def model(self) -> str:
@@ -108,50 +128,83 @@ class LLMClient:
         max_tokens: int = 16000,
     ) -> LLMResult[T]:
         """프롬프트를 보내고 결과를 Pydantic으로 검증한다. 검증 실패 시 1회 재시도한다."""
-        import anthropic
-
         if self._missing:
             raise LLMNotConfiguredError(f"not configured: {', '.join(self._missing)}")
-
-        content: list[dict[str, Any]] = [
-            {
-                "type": "image",
-                "source": {"type": "base64", "media_type": "image/png", "data": base64.b64encode(img).decode()},
-            }
-            for img in images or []
-        ]
-        content.append({"type": "text", "text": prompt})
         schema = strict_schema(output_model)
+        call = self._call_openai if self._provider == "openai" else self._call_anthropic
 
         last_error: Exception | None = None
         for attempt in range(2):
+            reply = call(prompt, images or [], schema, output_model.__name__, effort, max_tokens)
             try:
-                params: dict[str, Any] = {
-                    "model": self._model,
-                    "max_tokens": max_tokens,
-                    "output_config": {"effort": effort, "format": {"type": "json_schema", "schema": schema}},
-                    "messages": [{"role": "user", "content": content}],
-                }
-                if self._fallback:
-                    params["betas"] = [FALLBACK_BETA]
-                    params["fallbacks"] = "default"
-                response = self._client.beta.messages.create(**params)
-            except anthropic.APIError as exc:
-                raise LLMError(f"Claude API error: {type(exc).__name__}") from exc
-
-            if response.stop_reason == "refusal":
-                raise LLMRefusalError("the model declined the request")
-            text = "".join(block.text for block in response.content if block.type == "text")
-            try:
-                if response.stop_reason == "max_tokens":
+                if reply.truncated:
                     raise ValueError("output truncated at max_tokens")
-                return LLMResult(output=output_model.model_validate(json.loads(text)), model=response.model)
+                return LLMResult(output=output_model.model_validate(json.loads(reply.text)), model=reply.model)
             except (ValueError, ValidationError) as exc:
                 last_error = exc
                 logger.warning(
                     "llm output failed validation", extra={"attempt": attempt + 1, "model_type": output_model.__name__}
                 )
         raise LLMError(f"output failed validation twice: {type(last_error).__name__}")
+
+    def _call_anthropic(
+        self, prompt: str, images: list[bytes], schema: dict[str, Any], name: str, effort: Effort, max_tokens: int
+    ) -> _Reply:
+        import anthropic
+
+        content: list[dict[str, Any]] = [
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": base64.b64encode(img).decode()},
+            }
+            for img in images
+        ]
+        content.append({"type": "text", "text": prompt})
+        params: dict[str, Any] = {
+            "model": self._model,
+            "max_tokens": max_tokens,
+            "output_config": {"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+            "messages": [{"role": "user", "content": content}],
+        }
+        if self._fallback:
+            params["betas"] = [FALLBACK_BETA]
+            params["fallbacks"] = "default"
+        try:
+            response = self._client.beta.messages.create(**params)
+        except anthropic.APIError as exc:
+            raise LLMError(f"Claude API error: {type(exc).__name__}") from exc
+        if response.stop_reason == "refusal":
+            raise LLMRefusalError("the model declined the request")
+        text = "".join(block.text for block in response.content if block.type == "text")
+        return _Reply(text, response.stop_reason == "max_tokens", response.model)
+
+    def _call_openai(
+        self, prompt: str, images: list[bytes], schema: dict[str, Any], name: str, effort: Effort, max_tokens: int
+    ) -> _Reply:
+        import openai
+
+        content: list[dict[str, Any]] = [
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64," + base64.b64encode(img).decode()}}
+            for img in images
+        ]
+        content.append({"type": "text", "text": prompt})
+        params: dict[str, Any] = {
+            "model": self._model,
+            "max_completion_tokens": max_tokens,
+            # strict: 스키마에 맞는 JSON만 돌려준다 (strict_schema가 맞춘 형태 그대로)
+            "response_format": {"type": "json_schema", "json_schema": {"name": name, "schema": schema, "strict": True}},
+            "messages": [{"role": "user", "content": content}],
+        }
+        if self._send_effort:
+            params["reasoning_effort"] = effort
+        try:
+            response = self._client.chat.completions.create(**params)
+        except openai.APIError as exc:
+            raise LLMError(f"OpenAI API error: {type(exc).__name__}") from exc
+        choice = response.choices[0]
+        if choice.message.refusal or choice.finish_reason == "content_filter":
+            raise LLMRefusalError("the model declined the request")
+        return _Reply(choice.message.content or "", choice.finish_reason == "length", response.model)
 
 
 @lru_cache

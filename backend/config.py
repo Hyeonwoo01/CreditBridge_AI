@@ -1,6 +1,7 @@
 """환경변수 설정. 애플리케이션에서 환경변수는 이 모듈의 Settings로만 읽는다."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,10 +21,16 @@ class Settings(BaseSettings):
     # 운영 S3는 "AES256"(SSE-S3) 또는 "aws:kms". KMS가 없는 로컬 저장소(SeaweedFS)는 비워둔다.
     s3_server_side_encryption: str = ""
 
+    # 분석에 쓸 AI: "anthropic"(Claude) 또는 "openai"(GPT). 호출은 backend/ai/llm_client.py 한 곳
+    llm_provider: Literal["anthropic", "openai"] = "anthropic"
     anthropic_api_key: str = ""
     claude_model: str = ""
     # 정책 거절 시 서버가 다른 모델로 다시 시도 (Claude API 전용). Bedrock·Vertex·프록시를 쓰면 false
     claude_server_fallback: bool = True
+    openai_api_key: str = ""
+    openai_model: str = ""
+    # 추론 강도(reasoning_effort)를 보낸다. 추론 모델이 아니라 이 값을 받지 않는 모델이면 false
+    openai_reasoning_effort: bool = True
 
     session_secret: str = "change-me"
     celery_task_always_eager: bool = False
@@ -55,7 +62,7 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_subject: str = "mailto:admin@creditbridge.local"
 
-    # 공개 데모(예시용 배포, deploy/demo): Claude 대신 예시 AI, S3 대신 이 폴더에 파일 저장,
+    # 공개 데모(예시용 배포, deploy/demo): Claude·GPT 대신 예시 AI, S3 대신 이 폴더에 파일 저장,
     # 비밀번호 변경·초기화와 계정 비활성화를 막는다. 운영에서는 반드시 false
     demo_mode: bool = False
     demo_storage_dir: str = "/tmp/creditbridge-files"
