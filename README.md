@@ -104,6 +104,7 @@ docker compose up -d --build              # 프론트엔드·백엔드·DB·작�
 | 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
 | WSL 관련 오류로 Docker Desktop이 켜지지 않음 | 관리자 PowerShell에서 `wsl --update` 후 Docker Desktop을 다시 실행하세요 |
 | 강의계획서를 올리면 "AI 분석 설정(Claude API 키)이 아직 없어 분석하지 못했어요" | `.env`에 `ANTHROPIC_API_KEY`와 `CLAUDE_MODEL`이 없습니다. 넣고 `docker compose up -d`를 다시 실행하세요 |
+| 파일(강의계획서·기준 강의계획서)을 올리면 `Internal Server Error` | 파일 저장소 키가 비어 있던 예전 설정입니다. `git pull` 후 `docker compose up -d`를 다시 실행하세요 (지금은 `.env`에 `S3_ACCESS_KEY`가 없어도 기본값으로 동작) |
 
 ### 예시용 공개 데모로 올리기 (Render 무료)
 

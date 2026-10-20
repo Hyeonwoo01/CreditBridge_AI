@@ -47,6 +47,9 @@ services:
       DATABASE_URL: postgresql+psycopg://creditbridge:change-me@db:5432/creditbridge
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://s3:8333
+      # 로컬 SeaweedFS는 키를 검사하지 않지만 S3 클라이언트는 키가 있어야 요청을 보낸다 (.env에 없을 때 기본값)
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-change-me}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me-please}
       # 데모 카탈로그·계정 (db/data.sql로 이미 들어 있으면 건너뜀). 운영에서는 false
       SEED_DEMO: ${SEED_DEMO:-true}
     # 내 컴퓨터에서만 접속하도록 localhost에만 연다
@@ -67,6 +70,9 @@ services:
       DATABASE_URL: postgresql+psycopg://creditbridge:change-me@db:5432/creditbridge
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://s3:8333
+      # 로컬 SeaweedFS는 키를 검사하지 않지만 S3 클라이언트는 키가 있어야 요청을 보낸다 (.env에 없을 때 기본값)
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-change-me}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me-please}
     command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]
     depends_on: [db, redis, s3]
     restart: unless-stopped
