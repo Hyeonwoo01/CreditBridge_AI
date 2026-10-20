@@ -280,6 +280,7 @@
   "Received {n} syllabus. Results will appear when the AI analysis finishes.",
   "Received {n} syllabi. Results will appear when the AI analysis finishes."
  ],
+ "강의계획서 다시 분석": "Syllabus re-analyzed",
  "강의계획서 미등록 {unlinked}건": [
   "{unlinked} course without a syllabus",
   "{unlinked} courses without a syllabus"
@@ -668,10 +669,13 @@
  "분석에서 제외한 의심 문구 — {f}": "Suspicious wording excluded from analysis — {f}",
  "분석이 끝난 강의계획서에만 보완 자료를 올릴 수 있어요.": "Materials can only be added to syllabi whose analysis is complete.",
  "분석이 끝난 뒤에 제출할 수 있어요.": "You can submit after the analysis finishes.",
+ "분석이 너무 오래 걸려 멈췄어요. 같은 파일을 다시 올리면 다시 분석해요.": "Analysis took too long and was stopped. Upload the same file again to re-analyze it.",
+ "분석이 중간에 끊겨 다시 분석했어요.": "Analysis was interrupted and has been run again.",
  "분석하지 못한 강의계획서 {failed}건 다시 올리기": [
   "Re-upload {failed} syllabus that couldn't be analyzed",
   "Re-upload {failed} syllabi that couldn't be analyzed"
  ],
+ "분석하지 못했던 문서를 다시 분석해요: {names}": "Re-analyzing documents that failed before: {names}",
  "불인정": "No credit",
  "불인정 사유 저장 및 판정 확정": "Save reasons and finalize",
  "브라우저 설정에서 이 사이트의 알림이 차단돼 있어요. 설정에서 허용한 뒤 다시 열어 주세요.": "Notifications for this site are blocked in your browser settings. Allow them there, then reopen this page.",

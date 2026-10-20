@@ -10,6 +10,13 @@ def get(session: Session, evaluation_id: int) -> CourseEvaluation | None:
     return session.get(CourseEvaluation, evaluation_id)
 
 
+def running_for_syllabus(session: Session, syllabus_id: int) -> list[CourseEvaluation]:
+    stmt = select(CourseEvaluation).where(
+        CourseEvaluation.syllabus_id == syllabus_id, CourseEvaluation.status.in_(("queued", "running"))
+    )
+    return list(session.scalars(stmt))
+
+
 def latest_for_syllabus(session: Session, syllabus_id: int) -> CourseEvaluation | None:
     stmt = (
         select(CourseEvaluation)

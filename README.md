@@ -103,6 +103,7 @@ docker compose up -d --build              # 프론트엔드·백엔드·DB·작�
 | 브라우저에 "localhost 연결을 거부했습니다" | 아직 빌드·시작 중이거나 웹 컨테이너가 멈췄습니다. `up` 명령이 끝날 때까지 기다린 뒤 `docker compose ps`로 `web`이 실행 중인지 보고, 아니면 `docker compose logs web --tail 40`으로 오류를 확인하세요 |
 | 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
 | WSL 관련 오류로 Docker Desktop이 켜지지 않음 | 관리자 PowerShell에서 `wsl --update` 후 Docker Desktop을 다시 실행하세요 |
+| "AI 분석 중"이 몇 분 넘게 그대로 | 서버를 다시 띄운 직후라면 작업이 대기열로 돌아가 곧 다시 처리됩니다(최대 15분). 8분이 넘는 분석은 "너무 오래 걸려 멈췄어요"로 바뀌고, 같은 파일을 다시 올리면 다시 분석합니다. `docker compose logs --tail 40 worker`로 오류를 확인하세요 |
 | 강의계획서를 올리면 "AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요" | `.env`에 쓰는 AI의 키·모델이 없습니다. Claude면 `ANTHROPIC_API_KEY`·`CLAUDE_MODEL`, GPT면 `LLM_PROVIDER=openai`와 `OPENAI_API_KEY`·`OPENAI_MODEL`을 넣고 `docker compose up -d`를 다시 실행하세요 |
 | 파일(강의계획서·기준 강의계획서)을 올리면 `Internal Server Error` | 파일 저장소 키가 비어 있던 예전 설정입니다. `git pull` 후 `docker compose up -d`를 다시 실행하세요 (지금은 `.env`에 `S3_ACCESS_KEY`가 없어도 기본값으로 동작) |
 

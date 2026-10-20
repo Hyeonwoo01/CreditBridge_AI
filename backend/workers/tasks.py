@@ -2,6 +2,7 @@
 
 import logging
 
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy.orm import Session
 
 from backend.ai.llm_client import get_llm
@@ -20,24 +21,36 @@ def _deliver(session: Session) -> None:
     push.deliver_pending(session)
 
 
+# 시간 제한(celery_app.TASK_SOFT_LIMIT)에 걸리면 실패로 표시한다. 그대로 두면 화면이 '분석 중'에 멈춘다
+
+
 @celery_app.task(name="syllabus.process")
 def process_syllabus(syllabus_id: int) -> None:
     with SessionLocal() as session:
-        analysis.process_syllabus(session, syllabus_id, llm=get_llm(), storage=get_storage())
+        try:
+            analysis.process_syllabus(session, syllabus_id, llm=get_llm(), storage=get_storage())
+        except SoftTimeLimitExceeded:
+            analysis.mark_timed_out(session, syllabus_id)
         _deliver(session)
 
 
 @celery_app.task(name="syllabus.supplement")
 def add_supplement(syllabus_id: int, file_key: str) -> None:
     with SessionLocal() as session:
-        analysis.add_supplement(session, syllabus_id, file_key, llm=get_llm(), storage=get_storage())
+        try:
+            analysis.add_supplement(session, syllabus_id, file_key, llm=get_llm(), storage=get_storage())
+        except SoftTimeLimitExceeded:
+            analysis.mark_timed_out(session, syllabus_id)
         _deliver(session)
 
 
 @celery_app.task(name="syllabus.evaluate")
 def evaluate_syllabus(syllabus_id: int) -> None:
     with SessionLocal() as session:
-        analysis.evaluate_syllabus(session, syllabus_id, llm=get_llm())
+        try:
+            analysis.evaluate_syllabus(session, syllabus_id, llm=get_llm())
+        except SoftTimeLimitExceeded:
+            analysis.mark_timed_out(session, syllabus_id)
         _deliver(session)
 
 
@@ -46,6 +59,9 @@ def process_transcript(request_id: int) -> None:
     with SessionLocal() as session:
         try:
             analysis.process_transcript(session, request_id, llm=get_llm(), storage=get_storage())
+        except SoftTimeLimitExceeded:
+            session.rollback()
+            logger.warning("transcript processing timed out", extra={"request_id": request_id})
         except LLMError as exc:
             logger.warning(
                 "transcript processing failed", extra={"request_id": request_id, "error": type(exc).__name__}
@@ -62,7 +78,10 @@ def deliver_notifications() -> None:
 @celery_app.task(name="reference.process")
 def process_reference(syllabus_id: int, course_id: int) -> None:
     with SessionLocal() as session:
-        institution_data.process_reference(session, syllabus_id, course_id, llm=get_llm(), storage=get_storage())
+        try:
+            institution_data.process_reference(session, syllabus_id, course_id, llm=get_llm(), storage=get_storage())
+        except SoftTimeLimitExceeded:
+            analysis.mark_timed_out(session, syllabus_id)  # 이전 기준 강의계획서는 그대로 쓴다
 
 
 @celery_app.task(name="auth.password_reset_email")

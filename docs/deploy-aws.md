@@ -157,6 +157,7 @@ docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python 
 | https가 안 열리고 caddy 로그에 인증서 오류 | 도메인이 탄력적 IP를 가리키는지(DuckDNS update), 보안 그룹에 80·443이 0.0.0.0/0으로 열려 있는지 확인 후 `restart caddy` |
 | web 로그에 DB 연결 시간 초과 | RDS 보안 그룹이 EC2에서 5432를 허용하는지(4번 "EC2 컴퓨팅 리소스에 연결"), 엔드포인트·비밀번호 오타, `?sslmode=require` 확인 |
 | 업로드하면 오류, 로그에 `NoCredentialsError`·`AccessDenied` | EC2에 IAM 역할 `creditbridge-ec2`가 붙었는지, **메타데이터 홉 제한이 2인지**(EC2 → 작업 → 인스턴스 설정 → 인스턴스 메타데이터 옵션 수정), 정책의 버킷 이름 확인 |
+| "AI 분석 중"이 오래 그대로 | worker는 꺼질 때(`up -d`·`restart`) 하던 작업을 20초 마무리하고 못 끝낸 것은 대기열로 돌려놓는다. 서버가 갑자기 꺼진 경우는 15분 안에 다시 처리된다. 8분이 넘는 분석은 실패로 바뀌고 같은 파일을 다시 올리면 다시 분석한다. 원인은 `docker compose -f docker-compose.prod.yml logs --tail 40 worker` |
 | "AI 분석 설정이 아직 없어" | `.env`의 `LLM_PROVIDER`와 그 공급자의 키·모델(`ANTHROPIC_API_KEY`·`CLAUDE_MODEL` 또는 `OPENAI_API_KEY`·`OPENAI_MODEL`) 확인 후 `up -d` |
 | 빌드나 분석 중 서버가 멈춤 | 메모리 부족. `swapon --show`로 스왑 확인(setup-ec2.sh), `docker stats` |
 | 로그인 후 바로 다시 로그인 화면 | https가 아닌 주소로 접속함 (운영 모드는 https에서만 로그인 쿠키를 보낸다) |

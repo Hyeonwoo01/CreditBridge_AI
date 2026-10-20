@@ -74,6 +74,10 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-change-me}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me-please}
     command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]
+    # 끌 때(재시작·코드 반영) 하던 분석을 최대 20초 마무리하고, 못 끝낸 작업은 바로 대기열로 돌려놓는다.
+    # 기본 SIGTERM은 작업이 끝날 때까지 기다리다 강제 종료돼 작업이 Redis에 1시간 갇혔다 (celery_app.SOFT_SHUTDOWN_SECONDS)
+    stop_signal: SIGQUIT
+    stop_grace_period: 45s
     depends_on: [db, redis, s3]
     restart: unless-stopped
 

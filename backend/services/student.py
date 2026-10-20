@@ -104,6 +104,9 @@ def delete_empty_request(session: Session, student: User, request_id: int) -> No
 class UploadResult:
     created: list[Syllabus]
     duplicates: list[Syllabus]  # 이 요청에 이미 올린 같은 문서 (저장된 분석 결과를 그대로 쓴다)
+    # 분석에 실패했던 같은 문서: 다시 올리면 다시 분석한다 (글자 읽기부터 / AI 비교만)
+    reprocess: list[Syllabus] = field(default_factory=list)
+    reevaluate: list[Syllabus] = field(default_factory=list)
 
 
 def add_syllabi(
@@ -121,13 +124,21 @@ def add_syllabi(
             )
         )
     validated = [(f, doc_text.validate_upload(f.filename, f.data, settings.max_upload_mb)) for f in files]
-    created: list[Syllabus] = []
-    duplicates: list[Syllabus] = []
+    result = UploadResult(created=[], duplicates=[])
     for f, ext in validated:
         digest = analysis.content_hash(f.data)
         existing = syllabus_repo.in_request_with_hash(session, request.id, digest)
         if existing is not None:
-            duplicates.append(existing)
+            latest = evaluation_repo.latest_for_syllabus(session, existing.id)
+            if existing.status == SyllabusStatus.FAILED:
+                existing.status, existing.error_message = SyllabusStatus.UPLOADED, None
+                result.reprocess.append(existing)
+            elif existing.status == SyllabusStatus.READY and latest is not None and latest.status == "failed":
+                result.reevaluate.append(existing)
+            else:
+                result.duplicates.append(existing)
+                continue
+            audit.record(session, student, "syllabus.retry", "syllabus", str(existing.id), request=request.id)
             continue
         key = storage.new_key("syllabi", f.filename)
         storage.put(key, f.data, doc_text.CONTENT_TYPES[ext])
@@ -144,10 +155,10 @@ def add_syllabi(
                 status=SyllabusStatus.UPLOADED,
             ),
         )
-        created.append(syllabus)
+        result.created.append(syllabus)
         audit.record(session, student, "syllabus.upload", "syllabus", str(syllabus.id), request=request.id)
     session.commit()
-    return UploadResult(created=created, duplicates=duplicates)
+    return result
 
 
 def set_transcript(

@@ -29,6 +29,10 @@ services:
     # -B: 매일 기한 알림(beat)을 같은 프로세스에서 돌려 메모리를 아낀다. 이 서비스는 하나만 띄운다
     command: ["uv", "run", "--no-group", "dev", "celery", "-A", "backend.workers.celery_app", "worker", "-B",
               "--concurrency=1", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
+    # 끌 때(재시작·코드 반영) 하던 분석을 최대 20초 마무리하고, 못 끝낸 작업은 바로 대기열로 돌려놓는다.
+    # 기본 SIGTERM은 작업이 끝날 때까지 기다리다 강제 종료돼 작업이 Redis에 1시간 갇혔다 (celery_app.SOFT_SHUTDOWN_SECONDS)
+    stop_signal: SIGQUIT
+    stop_grace_period: 45s
     depends_on: [redis]
 
   redis:

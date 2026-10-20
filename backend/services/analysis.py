@@ -180,6 +180,28 @@ def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: Obje
 NOT_CONFIGURED = N_("AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요. 기관 관리자에게 알려 주세요.")
 
 
+# 작업 시간 제한(backend/workers/celery_app.py)을 넘긴 분석. 같은 파일을 다시 올리면 다시 분석한다 (student.add_syllabi)
+TIMED_OUT = N_("분석이 너무 오래 걸려 멈췄어요. 같은 파일을 다시 올리면 다시 분석해요.")
+# worker가 다시 시작돼 같은 강의계획서를 다시 분석할 때, 중간에 끊긴 이전 분석에 남기는 표시
+INTERRUPTED = N_("분석이 중간에 끊겨 다시 분석했어요.")
+
+
+def mark_timed_out(session: Session, syllabus_id: int) -> None:
+    """시간 제한에 걸린 작업: '분석 중'에 멈추지 않도록 강의계획서·진행 중 분석을 실패로 표시한다."""
+    session.rollback()
+    syllabus = syllabus_repo.get(session, syllabus_id)
+    if syllabus is None:
+        return
+    if syllabus.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING):
+        syllabus.status = SyllabusStatus.FAILED
+        syllabus.error_message = TIMED_OUT
+    for evaluation in evaluation_repo.running_for_syllabus(session, syllabus_id):
+        evaluation.status = EvaluationStatus.FAILED
+        evaluation.error_message = TIMED_OUT
+    session.commit()
+    logger.warning("analysis timed out", extra={"syllabus_id": syllabus_id})
+
+
 def _not_configured(exc: LLMError) -> bool:
     if isinstance(exc, LLMNotConfiguredError):
         logger.error("llm is not configured", extra={"error": str(exc)})  # 빠진 설정 이름만, 개인정보 없음
@@ -292,6 +314,10 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     )
     input_hash = _input_hash(prompt_version, llm.model, prompt)
 
+    # worker 재시작으로 끊겼다가 다시 넘어온 작업이면 이전의 '분석 중' 행을 닫는다 (화면이 분석 중으로 남지 않게)
+    for stale in evaluation_repo.running_for_syllabus(session, student.id):
+        stale.status = EvaluationStatus.FAILED
+        stale.error_message = INTERRUPTED
     before = evaluation_repo.latest_for_syllabus(session, student.id)
     evaluation = CourseEvaluation(
         transfer_request_id=request.id,

@@ -102,8 +102,14 @@ def upload_syllabi(
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
     else:
-        for s in result.created:
+        for s in [*result.created, *result.reprocess]:
             tasks.process_syllabus.delay(s.id)
+        for s in result.reevaluate:
+            tasks.evaluate_syllabus.delay(s.id)
+        retried = [*result.reprocess, *result.reevaluate]
+        if retried:
+            names = ", ".join(s.original_filename for s in retried)
+            flash(request, tr("분석하지 못했던 문서를 다시 분석해요: {names}", names=names))
         if result.created:
             flash(request, tr("강의계획서 {n}건을 받았어요. AI 분석이 끝나면 결과가 표시돼요.", n=len(result.created)))
         if result.duplicates:
