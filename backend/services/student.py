@@ -28,6 +28,7 @@ from backend.models import (
 )
 from backend.models.enums import PASSING_GRADES, RequestStatus, Role, SyllabusStatus, TranscriptStatus
 from backend.repositories import appeals as appeal_repo
+from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
@@ -236,12 +237,26 @@ def needs_transcript(session: Session, student: User) -> bool:
     return student.role == Role.STUDENT and transcript_repo.for_student(session, student.id) is None
 
 
+# 악용 방지: 학생 한 명이 24시간 동안 올릴 수 있는 횟수 (AI 비용과 공용 작업 대기열 보호). 감사 로그로 센다
+DAILY_UPLOAD_LIMITS = {"transcript.upload": 10, "syllabus.upload": 60, "syllabus.supplement": 30}
+
+
+def _check_daily_limit(session: Session, student: User, action: str, adding: int = 1) -> None:
+    limit = DAILY_UPLOAD_LIMITS[action]
+    used = audit_repo.count_since(session, student.id, action, utcnow() - timedelta(days=1))
+    if used + adding > limit:
+        raise UploadRejectedError(
+            tr("하루에 올릴 수 있는 횟수({limit}건)를 넘었어요. 내일 다시 올려 주세요.", limit=limit)
+        )
+
+
 def upload_account_transcript(
     session: Session, storage: ObjectStorage, student: User, file: UploadedFile
 ) -> StudentTranscript:
     """계정 성적표를 올리거나 바꾼다. 과목 목록은 작업 큐에서 뽑고(analysis.process_student_transcript),
     끝나면 아직 제출하지 않은 요청에만 복사한다. 제출한 요청은 그때의 목록을 그대로 쓴다."""
     ensure_student(student)
+    _check_daily_limit(session, student, "transcript.upload")
     ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
     transcript = transcript_repo.for_student(session, student.id)
     if transcript is None:
@@ -288,6 +303,7 @@ def add_syllabi(
         raise CreditBridgeError(tr("문서를 삭제해 종료된 요청이에요. 새 요청을 만들어 주세요."))
     if request.status != RequestStatus.DRAFT:
         raise CreditBridgeError(tr("심사에 제출한 요청에는 과목을 추가할 수 없어요."))
+    _check_daily_limit(session, student, "syllabus.upload", len(files))
     if request.course_key:
         # 성적표 과목 하나로 만든 요청: 그 과목의 강의계획서 한 건만 (분석에 실패한 것은 세지 않음)
         kept = [s for s in syllabus_repo.of_request(session, request.id) if s.status != SyllabusStatus.FAILED]
@@ -395,6 +411,7 @@ def store_supplement(
         raise CreditBridgeError(
             tr("심사 중인 과목은 학사처나 교수의 보완 자료 요청이 있을 때만 자료를 올릴 수 있어요.")
         )
+    _check_daily_limit(session, student, "syllabus.supplement")
     key = _save_supplement(session, storage, student, syllabus, file, open_requests)
     audit.record(session, student, "syllabus.supplement", "syllabus", str(syllabus.id))
     session.commit()

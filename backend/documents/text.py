@@ -14,6 +14,11 @@ ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
 CONTENT_TYPES = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 # 텍스트 레이어가 이보다 짧은 PDF 페이지는 스캔본으로 보고 이미지로 전사한다
 MIN_PAGE_CHARS = 40
+# 악용 방지: PDF 쪽수 상한, AI로 전사하는 스캔 페이지 수 상한(쪽마다 AI 호출), 이미지 픽셀 상한(메모리)
+MAX_PAGES = 60
+MAX_SCANNED_PAGES = 20
+MAX_PIXELS = 25_000_000
+RENDER_DPI = 150
 
 
 @dataclass
@@ -76,12 +81,59 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
         with doc:
             if doc.needs_pass:
                 raise UploadRejectedError(tr("암호가 걸린 PDF예요. 암호를 해제한 뒤 올려 주세요."))
+            if doc.page_count > MAX_PAGES:
+                raise UploadRejectedError(
+                    tr("PDF가 {pages}쪽을 넘어요. 필요한 쪽만 남겨 올려 주세요.", pages=MAX_PAGES)
+                )
     else:
+        # 픽셀 수를 머리말에서 먼저 확인한다: 작은 파일이 거대한 이미지로 풀려 메모리를 다 쓰지 않게
+        size = image_size(data)
+        if size is None:
+            raise UploadRejectedError(tr("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요."))
+        if size[0] * size[1] > MAX_PIXELS:
+            raise UploadRejectedError(tr("이미지 해상도가 너무 커요. 크기를 줄여서 올려 주세요."))
         try:
             pymupdf.Pixmap(data)
         except Exception as exc:
             raise UploadRejectedError(tr("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.")) from exc
     return ext
+
+
+_JPEG_SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+
+
+def image_size(data: bytes) -> tuple[int, int] | None:
+    """PNG·JPEG 머리말에서 (가로, 세로) 픽셀을 읽는다. 알 수 없으면 None."""
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":
+        return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+    if data[:2] != b"\xff\xd8":
+        return None
+    i = 2
+    while i + 4 <= len(data):
+        if data[i] != 0xFF:
+            return None
+        marker = data[i + 1]
+        if marker == 0xFF:  # 채움 바이트
+            i += 1
+            continue
+        if marker in (0x01, 0xD8) or 0xD0 <= marker <= 0xD7:
+            i += 2
+            continue
+        length = int.from_bytes(data[i + 2 : i + 4], "big")
+        if marker in _JPEG_SOF and i + 9 <= len(data):
+            return int.from_bytes(data[i + 7 : i + 9], "big"), int.from_bytes(data[i + 5 : i + 7], "big")
+        if length < 2:
+            return None
+        i += 2 + length
+    return None
+
+
+def _render(page: pymupdf.Page) -> bytes:
+    """스캔 페이지를 이미지로. 쪽 크기가 비정상적으로 크면 배율을 낮춰 MAX_PIXELS를 넘지 않게 한다."""
+    zoom = RENDER_DPI / 72
+    area = max(page.rect.width * page.rect.height, 1.0)
+    zoom = min(zoom, (MAX_PIXELS / area) ** 0.5)
+    return page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom)).tobytes("png")
 
 
 def extract(data: bytes, filename: str) -> ExtractedDocument:
@@ -100,10 +152,12 @@ def extract(data: bytes, filename: str) -> ExtractedDocument:
             text = page.get_text("text")
             if len(text.strip()) >= MIN_PAGE_CHARS:
                 pages.append(text)
-            else:
-                scanned.append(page.get_pixmap(dpi=150).tobytes("png"))
+            elif len(scanned) < MAX_SCANNED_PAGES:
+                scanned.append(_render(page))
                 scanned_index.append(number)
                 pages.append("")
+            else:
+                pages.append(text)  # 전사 상한을 넘은 스캔 페이지는 AI에 보내지 않는다
         total = len(doc)
     quality = (total - len(scanned)) / total if total else 0.0
     return ExtractedDocument(

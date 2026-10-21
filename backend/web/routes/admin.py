@@ -24,6 +24,7 @@ from backend.services import privacy as privacy_service
 from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
+from backend.services.csv_import import safe_cell
 from backend.services.student import DEFAULT_TRANSFER_CAP
 from backend.web.nav import nav_badges
 from backend.web.notify import send_notifications
@@ -271,7 +272,7 @@ def _password_sheet(created: list[institution_data.CreatedAccount]) -> str:
     writer = csv.writer(out)
     writer.writerow(["email", "name", "role", "temporary_password"])
     for a in created:
-        writer.writerow([a.email, a.name, a.role, a.temporary_password])
+        writer.writerow([safe_cell(a.email), safe_cell(a.name), a.role, a.temporary_password])
     encoded = base64.b64encode(("\ufeff" + out.getvalue()).encode()).decode()
     return f"data:text/csv;charset=utf-8;base64,{encoded}"
 

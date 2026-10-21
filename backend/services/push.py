@@ -10,6 +10,7 @@ import json
 import logging
 from datetime import timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from sqlalchemy.orm import Session
@@ -34,6 +35,11 @@ class SubscriptionKeys(BaseModel):
     auth: str = Field(min_length=8, max_length=100)
 
 
+# 크롬·엣지(FCM), 파이어폭스(Mozilla), 사파리·iOS(Apple), 윈도(WNS) 웹 푸시 서비스
+PUSH_SERVICE_DOMAINS = ("googleapis.com", "mozilla.com", "push.apple.com", "notify.windows.com")
+MAX_DEVICES = 10  # 사용자 한 명이 구독할 수 있는 기기 수
+
+
 class SubscriptionIn(BaseModel):
     """브라우저 PushSubscription.toJSON() 모양."""
 
@@ -42,9 +48,13 @@ class SubscriptionIn(BaseModel):
 
     @field_validator("endpoint")
     @classmethod
-    def https_only(cls, value: str) -> str:
+    def known_push_service(cls, value: str) -> str:
+        """브라우저 푸시 서비스 주소만 받는다: 아무 주소나 받으면 서버가 그 주소로 요청을 보내게 된다."""
         if not value.startswith("https://"):
             raise ValueError("endpoint must be https")
+        host = (urlsplit(value).hostname or "").lower()
+        if not any(host == domain or host.endswith("." + domain) for domain in PUSH_SERVICE_DOMAINS):
+            raise ValueError("unknown push service")
         return value
 
 
@@ -74,6 +84,10 @@ def subscribe(session: Session, user: User, data: dict[str, Any]) -> PushSubscri
         existing.auth = body.keys.auth
         session.commit()
         return existing
+    if push_repo.count_for(session, user.id) >= MAX_DEVICES:
+        raise PushSubscriptionError(
+            tr("푸시 알림은 기기 {n}대까지 받을 수 있어요. 쓰지 않는 기기에서 먼저 꺼 주세요.", n=MAX_DEVICES)
+        )
     subscription = push_repo.add(
         session, PushSubscription(user_id=user.id, endpoint=body.endpoint, p256dh=body.keys.p256dh, auth=body.keys.auth)
     )

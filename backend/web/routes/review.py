@@ -23,6 +23,7 @@ from backend.services import sis as sis_service
 from backend.services import stats as stats_service
 from backend.services import student as student_service
 from backend.services import views
+from backend.services.csv_import import safe_cell
 from backend.web.nav import nav_badges
 from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
@@ -116,11 +117,11 @@ def export_csv(user: User = Evaluator, session: Session = Depends(get_db)) -> Re
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=sis_service.FIELDS)
     writer.writeheader()
-    writer.writerows(rows)
+    writer.writerows({key: safe_cell(value) for key, value in row.items()} for row in rows)
     return Response(
         buffer.getvalue(),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=decisions.csv"},
+        headers={"Content-Disposition": "attachment; filename=decisions.csv", "Cache-Control": "no-store"},
     )
 
 

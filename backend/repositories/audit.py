@@ -43,6 +43,13 @@ def for_target(session: Session, target_type: str, target_id: str) -> list[Audit
     return list(session.scalars(stmt))
 
 
+def count_since(session: Session, actor_id: int, action: str, since: datetime) -> int:
+    stmt = select(func.count(AuditLog.id)).where(
+        AuditLog.actor_id == actor_id, AuditLog.action == action, AuditLog.created_at >= since
+    )
+    return session.scalar(stmt) or 0
+
+
 def last_at(session: Session, actor_id: int, action: str) -> datetime | None:
     stmt = select(func.max(AuditLog.created_at)).where(AuditLog.actor_id == actor_id, AuditLog.action == action)
     return session.scalar(stmt)

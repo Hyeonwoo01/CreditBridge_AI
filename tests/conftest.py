@@ -94,6 +94,9 @@ def client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
     from backend.main import app
+    from backend.security.throttle import LOGIN_FAILURES
+
+    LOGIN_FAILURES.clear()  # 테스트마다 IP 실패 횟수를 비운다 (모두 같은 testclient 주소)
     from backend.web.routes import admin as admin_routes
     from backend.web.routes import review as review_routes
     from backend.web.routes import shared as shared_routes

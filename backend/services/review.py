@@ -244,9 +244,15 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
     배정된 건 포함)은 건너뛴다 — 담당 교수를 바꾸려면 교수 지정 배정(assign_to)을 쓴다."""
     institution_id = ensure_assigner(evaluator)
     assigned, problems = 0, []
+    # 판정 전인 소속 기관 심사 건만 (초안·판정 끝난 건·다른 기관 건은 건너뛴다)
+    in_queue = {e.id for e, _, _ in evaluation_repo.review_queue(session, institution_id)}
     for evaluation_id in evaluation_ids:
         evaluation = evaluation_repo.get(session, evaluation_id)
-        if evaluation is None or evaluation_repo.active_assignment(session, evaluation.id) is not None:
+        if (
+            evaluation is None
+            or evaluation.id not in in_queue
+            or evaluation_repo.active_assignment(session, evaluation.id) is not None
+        ):
             continue
         problem = _assign_by_department(session, institution_id, evaluation, evaluator)
         if problem:

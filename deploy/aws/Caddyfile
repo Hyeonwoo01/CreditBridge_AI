@@ -7,4 +7,9 @@
 		max_size 25MB
 	}
 	reverse_proxy web:8000
+	# https만 쓰도록 브라우저에 알리고(HSTS), 서버 이름은 숨긴다. 나머지 보안 헤더는 앱이 붙인다
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
 }

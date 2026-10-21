@@ -245,6 +245,7 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋)
 
 ## 운영 시 확인할 것
 
+- 보안: 앱은 보안 헤더·운영 비밀값 검사·로그인 실패 제한(같은 IP 10분 30번)·학생별 하루 업로드 횟수(성적표 10, 강의계획서 60, 보완 자료 30)·PDF 60쪽·이미지 해상도·CSV 수식 주입 방지를 기본으로 갖고, 컨테이너는 root가 아닌 사용자로 돌아요. AWS 콘솔에서 할 일(루트 MFA, SSH 제한, IMDSv2, S3·RDS 공개 차단, AI 키 한도)은 [docs/deploy-aws.md](docs/deploy-aws.md)의 "보안 점검"을 따르세요. `SESSION_SECRET`가 32자보다 짧으면 운영 서버가 시작하지 않아요.
 - 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 실제 AI 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
 - 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.

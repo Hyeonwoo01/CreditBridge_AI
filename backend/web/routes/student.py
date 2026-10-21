@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
@@ -23,6 +25,15 @@ from backend.workers import tasks
 
 router = APIRouter(prefix="/student", dependencies=[Depends(nav_badges)])
 Student = Depends(require(Role.STUDENT))
+
+
+def _back(request: Request) -> str:
+    """이전 화면으로 돌아가기: 같은 사이트의 학생 화면 주소만 (Referer로 다른 사이트에 보내지 않는다)."""
+    referer = urlsplit(request.headers.get("referer") or "")
+    if referer.netloc and referer.netloc != request.url.netloc:
+        return "/student"
+    path = referer.path or ""
+    return path + (f"?{referer.query}" if referer.query else "") if path.startswith("/student") else "/student"
 
 
 def _read(files: list[UploadFile]) -> list[student_service.UploadedFile]:
@@ -235,7 +246,7 @@ def syllabus_result(
     evaluation_id = views.latest_evaluation_id(session, user, syllabus_id)
     if evaluation_id is None:
         flash(request, tr("아직 분석 중이에요. 잠시 후 다시 확인해 주세요."))
-        return RedirectResponse(request.headers.get("referer") or "/student", status_code=303)
+        return RedirectResponse(_back(request), status_code=303)
     return RedirectResponse(f"/student/evaluations/{evaluation_id}", status_code=303)
 
 
@@ -266,7 +277,7 @@ def supplement(
         key = student_service.store_supplement(session, get_storage(), user, syllabus, uploaded[0])
     except CreditBridgeError as exc:
         flash(request, str(exc), "error")
-        return RedirectResponse(request.headers.get("referer") or "/student", status_code=303)
+        return RedirectResponse(_back(request), status_code=303)
     tasks.add_supplement.delay(syllabus.id, key)
     send_notifications()
     flash(request, tr("보완 자료를 받았어요. 다시 분석한 뒤 결과를 갱신할게요. 이전 결과는 기록으로 남아요."))

@@ -4,8 +4,14 @@
 # 로컬용 docker-compose.yml과 달리 DB(RDS)와 파일 저장소(S3)는 AWS 것을 쓰고, Caddy가 https 인증서를 자동으로 붙인다.
 # EC2 t3.micro(메모리 1GB)에 맞춰 프로세스를 줄였다: 웹 1개, 작업 처리 1개(매일 알림 beat 포함), Redis 작게.
 
+# 로그는 컨테이너마다 10MB × 5개까지만 남긴다 (작은 디스크를 채우지 않고 오래된 기록은 지운다)
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+
 x-app: &app
   build: .
+  logging: *logging
   image: creditbridge-app:latest
   env_file: .env
   restart: unless-stopped
@@ -38,12 +44,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     command: ["redis-server", "--maxmemory", "64mb", "--save", "60", "1"]
     volumes: ["redis-data:/data"]
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *logging
     ports: ["80:80", "443:443"]
     environment:
       SITE_DOMAIN: "${SITE_DOMAIN:?.env에 SITE_DOMAIN을 적어 주세요}"

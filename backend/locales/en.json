@@ -82,6 +82,7 @@
  "PDF 또는 스캔 이미지(JPG·PNG), 여러 과목을 한 번에 (최대 30건, 파일당 20MB)": "PDF or scanned images (JPG, PNG), several courses at once (up to 30 files, 20 MB each)",
  "PDF 또는 스캔 이미지(JPG·PNG), 파일당 20MB": "PDF or scanned image (JPG, PNG), up to 20MB",
  "PDF·JPG·PNG. 주차별 강의 계획, 강의 노트, 과제·시험지, 교재 목차처럼 배운 내용을 보여 주는 자료가 좋아요. 이름·학번이 보이면 가리고 올려 주세요.": "PDF, JPG, PNG. Weekly plans, lecture notes, assignments or exams, and textbook contents that show what you learned work best. Cover any names or student IDs before uploading.",
+ "PDF가 {pages}쪽을 넘어요. 필요한 쪽만 남겨 올려 주세요.": "The PDF has more than {pages} pages. Keep only the pages you need and upload it again.",
  "PDF를 열 수 없어요. 손상되지 않은 파일인지 확인해 주세요.": "We couldn't open the PDF. Please check that the file isn't damaged.",
  "SIS CSV 내보내기": "SIS CSV export",
  "SIS 연동": "SIS integration",
@@ -562,6 +563,7 @@
  "로그인": "Sign in",
  "로그인 1분 잠금": "Sign-in locked for 1 minute",
  "로그인 · CreditBridge AI": "Sign in · CreditBridge AI",
+ "로그인 시도가 너무 많아요. 10분 뒤에 다시 시도해 주세요.": "Too many sign-in attempts. Please try again in 10 minutes.",
  "로그인 실패가 {n}번 이어져 보안을 위해 CreditBridge AI 비밀번호를 초기화했어요.": "After {n} failed sign-in attempts in a row, your CreditBridge AI password was reset for security.",
  "로그인 실패가 {n}번 이어져 보안을 위해 비밀번호를 초기화했어요. {how}": "After {n} failed sign-in attempts in a row, your password was reset for security. {how}",
  "로그인 실패로 비밀번호 초기화": "Password reset after failed sign-ins",
@@ -1057,6 +1059,7 @@
  "이미 판정된 건이에요. 보완 자료는 판정 전에만 요청할 수 있어요.": "This review has already been decided. Materials can only be requested before a decision.",
  "이미 판정된 건이에요. 이의 신청으로 재심사를 진행해 주세요.": "This review has already been decided. Use an appeal to request a re-review.",
  "이미 활성 상태인 계정이에요.": "This account is already active.",
+ "이미지 해상도가 너무 커요. 크기를 줄여서 올려 주세요.": "The image resolution is too large. Resize it and upload again.",
  "이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.": "We couldn't open the image. Please check that it is a JPG or PNG file.",
  "이번": "Now",
  "이의 사유": "Reason for appeal",
@@ -1368,6 +1371,10 @@
  "평균 소요일": "Average days",
  "평균 심사 소요 기간": "Average review time",
  "푸시 알림 받기": "Turn on push notifications",
+ "푸시 알림은 기기 {n}대까지 받을 수 있어요. 쓰지 않는 기기에서 먼저 꺼 주세요.": [
+  "Push notifications can be on for up to {n} device. Turn them off on a device you don't use first.",
+  "Push notifications can be on for up to {n} devices. Turn them off on a device you don't use first."
+ ],
  "푸시 알림을 받는 기기 {devices}대": [
   "{devices} device receives push notifications",
   "{devices} devices receive push notifications"
@@ -1380,6 +1387,7 @@
  "필요한 자료 (분석이 제안한 자료가 먼저 나와요)": "Materials needed (the analysis's suggestions come first)",
  "필터": "Filters",
  "하": "Low",
+ "하루에 올릴 수 있는 횟수({limit}건)를 넘었어요. 내일 다시 올려 주세요.": "You've reached today's upload limit ({limit}). Please try again tomorrow.",
  "학과": "Department",
  "학과 교수": "Faculty",
  "학과 교수 심사": "Faculty review",

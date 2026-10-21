@@ -13,4 +13,6 @@ fi
 if [ "${SEED_DEMO:-false}" = "true" ]; then
   uv run --no-group dev python -m scripts.seed_demo
 fi
-exec uv run --no-group dev fastapi run backend/main.py --host 0.0.0.0 --port 8000
+# 앞단 프록시(운영은 Caddy)가 넘긴 방문자 IP·https를 믿는다: 로그인 실패 제한이 IP마다 따로 센다.
+# 웹 컨테이너는 바깥에 직접 열지 않으므로(운영 expose만, 로컬 127.0.0.1) 이 머리말을 위조할 수 없다
+exec uv run --no-group dev fastapi run backend/main.py --host 0.0.0.0 --port 8000 --forwarded-allow-ips '*'

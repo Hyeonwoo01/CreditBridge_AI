@@ -24,7 +24,7 @@ AUTH = "tBHItJI5svbpez7KI4CCXg"
 
 
 def sub(n: int = 1) -> dict[str, Any]:
-    return {"endpoint": f"https://push.example.com/send/device-{n}", "keys": {"p256dh": P256DH, "auth": AUTH}}
+    return {"endpoint": f"https://fcm.googleapis.com/fcm/send/device-{n}", "keys": {"p256dh": P256DH, "auth": AUTH}}
 
 
 @pytest.fixture
@@ -78,6 +78,11 @@ def test_subscribe_requires_csrf_and_valid_body(
     assert client.post("/notifications/push/subscribe", json=sub()).status_code == 403
     bad = {"endpoint": "http://insecure.example.com/x", "keys": {"p256dh": P256DH, "auth": AUTH}}
     assert client.post("/notifications/push/subscribe", json=bad, headers={"X-CSRF-Token": token}).status_code == 422
+    # 브라우저 푸시 서비스가 아닌 주소는 받지 않는다 (서버가 아무 주소로나 요청을 보내지 않게)
+    internal = {"endpoint": "https://internal.example.com/hook", "keys": {"p256dh": P256DH, "auth": AUTH}}
+    assert (
+        client.post("/notifications/push/subscribe", json=internal, headers={"X-CSRF-Token": token}).status_code == 422
+    )
     r = client.post("/notifications/push/subscribe", json=sub(), headers={"X-CSRF-Token": token})
     assert r.status_code == 200 and r.json() == {"devices": 1}
     # 같은 브라우저 다시 구독 → 그대로 1대, 다른 계정으로 로그인해 구독하면 그 계정으로 옮겨 간다
@@ -103,7 +108,11 @@ def test_deliver_sends_translated_payload_and_drops_gone_devices(seeded: Session
         [
             PushSubscription(user_id=prof.id, endpoint=sub(1)["endpoint"], p256dh=P256DH, auth=AUTH, created_at=old),
             PushSubscription(
-                user_id=prof.id, endpoint="https://push.example.com/send/gone", p256dh=P256DH, auth=AUTH, created_at=old
+                user_id=prof.id,
+                endpoint="https://fcm.googleapis.com/fcm/send/gone",
+                p256dh=P256DH,
+                auth=AUTH,
+                created_at=old,
             ),
         ]
     )

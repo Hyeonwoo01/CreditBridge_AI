@@ -12,6 +12,15 @@ from backend.errors import CreditBridgeError
 from backend.i18n import gettext as tr
 
 MAX_BYTES = 5 * 1024 * 1024
+# 엑셀이 수식으로 읽는 첫 글자. 내려받는 CSV 칸이 이 글자로 시작하면 앞에 '를 붙여 글자로 둔다 (수식 주입 방지)
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def safe_cell(value: object) -> object:
+    """내려받는 CSV 칸: 학생 파일 이름·AI가 읽은 과목명 등이 엑셀 수식으로 실행되지 않게 한다."""
+    if isinstance(value, str) and value.startswith(FORMULA_PREFIXES):
+        return "'" + value
+    return value
 
 
 def _decode(data: bytes) -> str:

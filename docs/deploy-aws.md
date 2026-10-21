@@ -53,7 +53,7 @@
    - 인스턴스 유형: **t3.micro** (프리 티어 사용 가능 표시 확인. 없으면 t2.micro)
    - 키 페어: 새로 만들기 (브라우저 접속만 쓸 거면 없어도 됨)
    - 네트워크 설정 → 보안 그룹 생성 (`creditbridge-web`):
-     - SSH(22): **내 IP**
+     - SSH(22): 소스 **사용자 지정 → 접두사 목록 `com.amazonaws.<리전>.ec2-instance-connect`** (예: 시드니 `com.amazonaws.ap-southeast-2.ec2-instance-connect`). 브라우저의 EC2 Instance Connect는 AWS 주소에서 접속하므로 "내 IP"로 두면 연결이 안 되고, 0.0.0.0/0(전체 공개)은 피한다
      - HTTP(80): 위치 무관 0.0.0.0/0 (인증서 발급에 필요)
      - HTTPS(443): 위치 무관 0.0.0.0/0
    - 스토리지: **20 GiB gp3** (프리티어 30GB 안)
@@ -75,7 +75,8 @@
    - 스토리지: gp2 또는 gp3 **20GiB**, **스토리지 자동 조정 끄기**
    - 연결: **EC2 컴퓨팅 리소스에 연결 → creditbridge 인스턴스 선택** (보안 그룹이 자동으로 EC2에서만 5432를 열게 만들어진다). 퍼블릭 액세스: **아니요**
    - 추가 구성 → **초기 데이터베이스 이름: `creditbridge`**
-   - 자동 백업 보존 기간: 1일 (백업 저장 공간은 DB 크기까지 무료)
+   - 자동 백업 보존 기간: **7일** (백업 저장 공간은 DB 크기까지 무료. 무료 플랜이 막으면 1일로 두고 매주 수동 스냅샷)
+   - **삭제 방지 활성화** 체크 (실수로 DB를 지우지 않게)
    - 성능 개선 도우미·향상된 모니터링: 끄기
 2. 생성(5~10분) 후 **연결 및 보안 → 엔드포인트**를 적어 둔다 (예: `creditbridge-db.xxxx.ap-northeast-2.rds.amazonaws.com`).
 
@@ -145,10 +146,12 @@ docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python 
 | 할 일 | 명령 (EC2, `~/CreditBridge_AI`) |
 | --- | --- |
 | 새 코드 반영 | `git pull && docker compose -f docker-compose.prod.yml up -d --build` (마이그레이션은 web 시작 때 자동) |
+| 보안 업데이트 (한 달에 한 번) | `git pull && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml build --pull && docker compose -f docker-compose.prod.yml up -d && docker image prune -f` (기반 이미지·Redis·Caddy를 새로 받음). 서버 OS는 `sudo apt update && sudo apt upgrade -y`, `/var/run/reboot-required`가 있으면 `sudo reboot` |
 | 상태 | `docker compose -f docker-compose.prod.yml ps` / `docker stats --no-stream` (메모리) |
 | 로그 | `docker compose -f docker-compose.prod.yml logs --tail 100 web` (`worker`, `caddy`) |
 | 재시작 | `docker compose -f docker-compose.prod.yml restart` (EC2가 재부팅돼도 자동으로 다시 뜬다) |
-| DB 백업 | RDS 자동 백업(1일) + 필요하면 RDS 콘솔에서 수동 스냅샷 |
+| DB 백업 | RDS 자동 백업(7일) + 필요하면 RDS 콘솔에서 수동 스냅샷 (DB를 중지해 둔 동안은 자동 백업이 돌지 않는다) |
+| 로그 | 컨테이너마다 10MB × 5개까지만 남는다(`docker-compose.prod.yml`의 `x-logging`) |
 
 ## 막힐 때
 
@@ -161,6 +164,40 @@ docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python 
 | "AI 분석 설정이 아직 없어" | `.env`의 `LLM_PROVIDER`와 그 공급자의 키·모델(`ANTHROPIC_API_KEY`·`CLAUDE_MODEL` 또는 `OPENAI_API_KEY`·`OPENAI_MODEL`) 확인 후 `up -d` |
 | 빌드나 분석 중 서버가 멈춤 | 메모리 부족. `swapon --show`로 스왑 확인(setup-ec2.sh), `docker stats` |
 | 로그인 후 바로 다시 로그인 화면 | https가 아닌 주소로 접속함 (운영 모드는 https에서만 로그인 쿠키를 보낸다) |
+| web이 시작하자마자 꺼지고 로그에 `SESSION_SECRET must be a random value` | 운영에서는 `.env`의 `SESSION_SECRET`가 32자 이상 무작위 값이어야 한다. `openssl rand -hex 32` 결과로 바꾸고 `up -d` (바꾸면 모두 다시 로그인) |
+| "로그인 시도가 너무 많아요" | 같은 IP에서 10분에 30번 넘게 틀림. 10분 기다리거나 `docker compose -f docker-compose.prod.yml restart web` |
+
+## 보안 점검 (처음 한 번, 이후 분기마다)
+
+앱 쪽은 코드에 들어 있다: 보안 헤더(클릭재킹·형식 추측 차단, HSTS), 운영 비밀값 검사, 같은 IP 로그인 실패 제한, 학생별 하루 업로드 횟수, PDF 60쪽·이미지 해상도·스캔 전사 20쪽 상한, CSV 수식 주입 방지, root가 아닌 컨테이너, 로그 크기 제한. 아래는 AWS 콘솔에서 할 일이다.
+
+| 할 일 | 위치 | 왜 |
+| --- | --- | --- |
+| 루트 계정 MFA 켜기, 루트 액세스 키 삭제 | 오른쪽 위 계정 이름 → 보안 자격 증명 → MFA 디바이스 할당 | 계정을 뺏기면 모든 데이터·비용이 넘어간다 |
+| SSH(22)를 EC2 Instance Connect 주소로만 | EC2 → 보안 그룹 → `creditbridge-web` → 인바운드 규칙 편집 → SSH 소스를 접두사 목록 `com.amazonaws.<리전>.ec2-instance-connect`로 | 0.0.0.0/0이면 전 세계에서 접속을 시도한다 |
+| 메타데이터 IMDSv2 필수 | EC2 → 인스턴스 → 작업 → 인스턴스 설정 → 인스턴스 메타데이터 옵션 수정 → IMDSv2 **필수**, 홉 제한 2 | 위조 요청으로 IAM 역할 자격 증명을 빼가는 것을 막는다 |
+| RDS 공개 안 함·암호화 확인, 삭제 방지 | RDS → creditbridge-db → 연결 및 보안: 퍼블릭 액세스 **아니요**, 보안 그룹 5432는 EC2 보안 그룹에서만 / 구성: 암호화 **활성화됨** / 수정: 삭제 방지 | DB가 인터넷에 열리지 않게 |
+| S3 퍼블릭 차단·https만 | 버킷 → 권한: 퍼블릭 액세스 차단 4개 모두 켜짐, 객체 소유권 ACL 비활성화 / 버킷 정책에 아래 "https만" 정책 추가 | 성적표·강의계획서가 공개되지 않게 |
+| AI API 키 범위·한도 | OpenAI: 프로젝트 키(모델 호출 권한만) + Settings → Limits 월 예산 / Anthropic: 워크스페이스 키 + 지출 한도 | 키가 새도 피해를 한도 안으로 |
+| 도메인 계정 2단계 인증 | DuckDNS에 로그인하는 GitHub·Google 계정 | 그 계정을 뺏기면 도메인을 다른 곳으로 돌릴 수 있다 |
+| 비용 알림 | Billing → 예산(제로 지출 예산) + 결제 기본 설정 → 프리 티어 사용 알림 | 이상한 사용을 빨리 안다 |
+| Lambda 로그 보존 | CloudWatch → 로그 그룹 → `/aws/lambda/creditbridge-rds-autostop` → 보존 기간 14일 | 기본은 영구 보관 |
+
+S3 "https만" 버킷 정책 (`<버킷>`을 바꾼다):
+
+```json
+{"Version": "2012-10-17", "Statement": [{"Sid": "HttpsOnly", "Effect": "Deny", "Principal": "*", "Action": "s3:*",
+  "Resource": ["arn:aws:s3:::<버킷>", "arn:aws:s3:::<버킷>/*"], "Condition": {"Bool": {"aws:SecureTransport": "false"}}}]}
+```
+
+### (선택) 앱 전용 DB 계정 쓰기
+
+지금은 앱이 RDS 마스터 계정으로 접속한다. [db-grants.sql](db-grants.sql)의 앱 계정(`creditbridge_app`)을 쓰면 `decisions`·`audit_logs`를 DB 권한으로도 추가 전용으로 막을 수 있다.
+
+1. `docs/db-grants.sql` 4줄의 `'change-me'`를 새 비밀번호로 바꾼 사본을 EC2에 만든다(저장소에 올리지 않는다).
+2. EC2에서: `docker run --rm -i postgres:17 psql "host=<RDS 엔드포인트> user=creditbridge dbname=creditbridge sslmode=require" < db-grants-edited.sql` (마스터 비밀번호 입력)
+3. `.env`의 `DATABASE_URL`을 `creditbridge_app:<새 비밀번호>@…`로 바꾸고 `docker compose -f docker-compose.prod.yml up -d`.
+4. 이후 새 마이그레이션이 있는 코드를 받으면 web이 권한 부족으로 시작하지 못한다. 그때는 마스터 계정으로 한 번 실행한다: `docker compose -f docker-compose.prod.yml run --rm -e DATABASE_URL='<마스터 계정 URL>' web uv run --no-group dev alembic upgrade head` → 새 테이블이 있으면 db-grants.sql에 GRANT를 더해 다시 실행 → `up -d`.
 
 ## 그만 쓸 때 (과금 막기)
 

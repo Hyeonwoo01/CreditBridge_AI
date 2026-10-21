@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -70,6 +71,16 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @model_validator(mode="after")
+    def _production_secrets(self) -> "Settings":
+        """운영에서 예시 비밀값으로 뜨지 않게 막는다: 세션 서명 키가 약하면 누구나 로그인 쿠키를 위조할 수 있다."""
+        if self.is_production:
+            if len(self.session_secret) < 32 or "change-me" in self.session_secret:
+                raise ValueError("SESSION_SECRET must be a random value of 32+ characters in production")
+            if "change-me" in self.database_url:
+                raise ValueError("DATABASE_URL still has the example password in production")
+        return self
 
 
 @lru_cache

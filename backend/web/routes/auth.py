@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.i18n import COOKIE, get_locale, normalize, set_locale
+from backend.i18n import gettext as tr
 from backend.security import session as auth_session
 from backend.security.csrf import check_csrf
+from backend.security.throttle import LOGIN_FAILURES
 from backend.services import audit, notifications
 from backend.services.auth import login_attempt, remember_locale
 from backend.services.auth import set_locale as save_locale
@@ -40,11 +42,16 @@ def login(
     session: Session = Depends(get_db),
 ) -> Response:
     check_csrf(request, csrf_token)
+    ip = request.client.host if request.client else "unknown"
+    if LOGIN_FAILURES.blocked(ip):
+        error = tr("로그인 시도가 너무 많아요. 10분 뒤에 다시 시도해 주세요.")
+        return render(request, "login.html", status_code=429, error=error, email=email)
     attempt = login_attempt(session, email, password)
     if attempt.send_reset_to is not None and notifications.email_enabled():
         tasks.send_password_reset.delay(attempt.send_reset_to, kind="lockout")
     user = attempt.user
     if user is None:
+        LOGIN_FAILURES.add(ip)
         return render(request, "login.html", status_code=attempt.status_code, error=attempt.error, email=email)
     auth_session.login(request, user)
     audit.record(session, user, "auth.login", "user", str(user.id))

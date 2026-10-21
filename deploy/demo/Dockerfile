@@ -17,6 +17,8 @@ COPY . .
 RUN useradd -m -u 1000 demo 2>/dev/null || true; chown -R 1000:1000 /app /opt/venv
 USER 1000
 ENV DEMO_MODE=true \
+    MAX_UPLOAD_MB=5 \
+    MAX_SYLLABI_PER_REQUEST=5 \
     CELERY_TASK_ALWAYS_EAGER=true \
     CLAUDE_MODEL=demo-ai \
     APP_ENV=demo \

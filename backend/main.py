@@ -22,7 +22,12 @@ configure_logging()
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-app = FastAPI(title="CreditBridge AI", docs_url="/api/docs" if not settings.is_production else None, redoc_url=None)
+app = FastAPI(
+    title="CreditBridge AI",
+    docs_url="/api/docs" if not settings.is_production else None,
+    openapi_url="/openapi.json" if not settings.is_production else None,
+    redoc_url=None,
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.session_secret,
@@ -31,6 +36,27 @@ app.add_middleware(
     https_only=settings.is_production,
     max_age=60 * 60 * 8,
 )
+
+
+# 모든 응답의 보안 헤더: 다른 사이트가 화면을 iframe에 넣어 누르게 하는 공격(클릭재킹) 차단, 형식 추측 금지,
+# 다른 사이트로 주소 전체를 넘기지 않음, 플러그인·외부 폼 전송 금지. https 강제(HSTS)는 운영에서만
+SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    response = await call_next(request)
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    if settings.is_production:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
 
 
 @app.middleware("http")
