@@ -2,7 +2,7 @@
 
 **배포 사이트**: https://creditbridge-hw.duckdns.org
 
-배포 사이트에는 데모 계정이 없습니다. 기관 관리자가 만들어 준 계정으로만 로그인할 수 있고, 데모 계정(`demo1234`)은 [내 PC에서 실행](#데모-계정)했을 때만 씁니다.
+배포 사이트에는 데모 계정이 없습니다. 기관 관리자가 만들어 준 계정으로만 로그인할 수 있고, 데모 계정(`demo1234`)은 [내 PC에서 실행](#데모-계정)했을 때와 Render 공개 데모에서만 씁니다.
 
 강의계획서를 분석해 편입 대학의 어떤 과목으로 학점이 인정될지 **원문 근거와 함께 추천**하고, **학과 교수가 그 근거를 보고 최종 판정**하는 편입 학점 심사 플랫폼입니다. AI는 추천만 하고 확정 권한은 사람에게만 있습니다.
 
@@ -23,7 +23,7 @@
 
 분석에 쓰는 AI는 Claude(Anthropic)와 GPT(OpenAI) 중에서 고릅니다(`.env`의 `LLM_PROVIDER`). 배포 사이트는 GPT를 씁니다. 어느 쪽이든 아래 단계와 검증 규칙은 같습니다.
 
-1. **추출**: AI가 강의계획서에서 학습 목표·주차별 주제·교재·선수과목·평가 방식·학점과 학문 분야를 정형 스키마로 뽑습니다. 원문에 없는 값은 비워 둡니다. 같은 문서(내용 해시가 같은 파일)는 다시 분석하지 않고 저장된 결과를 씁니다.
+1. **추출**: (스캔 PDF·사진은 먼저 AI가 글자로 옮긴 뒤) AI가 강의계획서에서 학습 목표·주차별 주제·교재·선수과목·평가 방식·학점과 학문 분야를 정형 스키마로 뽑습니다. 원문에 없는 값은 비워 둡니다. 같은 문서(내용 해시가 같은 파일)는 다시 분석하지 않고 저장된 결과를 씁니다.
 2. **후보 선정**: 추출한 학문 분야로 대상 대학 카탈로그를 학과 단위로 걸러 최대 30개 과목을 후보로 고릅니다. MVP는 임베딩·벡터 검색을 쓰지 않습니다.
 3. **개념별 판단**: AI가 후보 과목의 필수 개념마다 실제로 가르쳤는지(다룸/부분/없음/판단 불가), 수준이 같은지 판단하고 양쪽 원문 구절을 인용합니다.
 4. **근거 검증**: 인용 구절이 원문에 그대로 있는지 코드로 확인하고, 없으면 버립니다. 근거 없이 매긴 커버리지는 40%를 넘지 못합니다.
@@ -35,7 +35,7 @@
 
 | 화면 | 주소 | 누가 | 내용 |
 | --- | --- | --- | --- |
-| 내 성적표 | `/student/transcript` | 학생 | 처음 로그인하면 이 화면부터: 성적표를 한 번 올리면 AI가 과목 줄을 읽고(이름·학번은 가림) 성적 C 이상 과목마다 편입 요청을 만들어요. C 미만(C- 이하)은 "성적 기준 미달"로만 보여요. 바꿔 올리면 아직 심사를 요청하지 않은 과목에만 반영 |
+| 내 성적표 | `/student/transcript` | 학생 | 처음 로그인하면 이 화면부터: 성적표를 한 번 올리면 AI가 과목 줄을 읽고(이름·학번은 가린 글로 과목을 뽑음, 스캔·사진 파일은 글자를 읽는 단계에서 AI가 원본 이미지를 봄) 성적 C 이상 과목마다 편입 요청을 만들어요. C 미만(C- 이하)은 "성적 기준 미달"로만 보여요. 바꿔 올리면 아직 심사를 요청하지 않은 과목에만 반영 |
 | 내 편입 요청(대시보드) | `/student` | 학생 | 성적표 과목마다 만들어진 요청 카드(과목·성적·학점·상태, 학생이 요청을 따로 만들지 않음), 전체 합계(예상 인정 학점·판정 확정·남은 학기, 편입 학점 상한을 넘으면 졸업 학점에 넣을 과목 고르기), 할 일(강의계획서 올리기 N과목·보완 자료 제출 등), 문서 삭제로 종료된 요청은 맨 아래 접힘 |
 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | 과목 요청은 그 과목의 강의계획서 한 건을 올리고 AI 결과를 본 뒤 "학사처에 심사 요청". "예상 인정 학점: 낮음~높음 / 이수 학점" 요약, 남은 학기·추가 비용·심사 진행 카드, 과목 필터, 정보 부족 진단과 보완 서류 제출, 심사 진행 4단계 |
 | 이의 신청 | `/student/appeals`, `/student/evaluations/{id}/appeal` | 학생 | 이의 신청할 수 있는 과목(그 수가 메뉴 배지로도 보임), 처리 상황(접수·재판정 중·기각 사유·재판정 결과). 작성 화면에서 원 판정 요약을 보며 사유와 근거 자료(PDF·JPG·PNG 최대 3개) 제출 |
@@ -45,7 +45,7 @@
 | 판정 화면 | `/professor/evaluations/{id}` | 학과 교수 | 좌우 근거 구절 비교(구절 옆 "원본 N쪽 ↗"은 원본 PDF를 그 쪽으로 새 탭에서 열기), 과거 판정 이력, 내부 메모(심사관과 공유, 학생 비공개), 하단 고정 판정 바, 불인정·판정 변경 사유 선택 창 |
 | 판정 근거 리포트 | `/evaluations/{id}/report` | 학생·심사관·교수 | 판정자·AI 추천·근거 구절(원본 쪽 번호)·이의 신청 경과. "PDF 내려받기"로 A4 PDF 저장(내부 메모 제외) |
 | 계정·과목 관리 | `/admin/data` | 기관 관리자 | ①~④ 순서로 과목 CSV(필수 개념 포함)·과목별 기준 강의계획서(바꾸기·빼기)·계정 CSV·출신 대학(대학별 목록, 쓰지 않는 대학은 지우기), 편입 학점 상한(기본 60학점), 비밀번호 초기화(메일 있으면 설정 링크 자동 발송, 없으면 임시 비밀번호 한 번 표시), 졸업·퇴직한 계정 비활성화. 메뉴 옆 숫자는 기준 강의계획서 없는 과목 + 교수가 없는 학과 수 |
-| 계정 목록 | `/admin/accounts` | 기관 관리자 | 이메일·역할·상태로 계정 찾기(학생 이름 비공개), 교직원 이름·학과·대리 심사자 수정, 비밀번호 초기화·비활성화 |
+| 계정 목록 | `/admin/accounts` | 기관 관리자 | 이메일·역할·상태로 계정 찾기(학생 이름 비공개), 교직원 이름·학과·대리 심사자, 학생 편입 전공·출신 대학 수정, 비밀번호 초기화·비활성화 |
 | 교수 배정 | `/admin/assignments` | 기관 관리자 | 판정 전 심사 건의 담당 교수 배정·바꾸기(학과 자동 배정 또는 교수 지정). AI 추천·커버리지·근거는 보이지 않음 |
 | 관리자 콘솔 | `/admin/stats` | 기관 관리자 | AI 추천 수용률, 개인정보 보호·SIS 연동 상태, 학과별 처리 지표, 최근 감사 로그, 데이터 보존 및 파기 정책 (심사관은 `/review/stats`에서 감사 로그를 뺀 운영 통계) |
 
@@ -53,7 +53,7 @@
 
   | 역할 | 메뉴 | 숫자 배지 |
   | --- | --- | --- |
-  | 학생 | 내 편입 요청 · 성적표 · 이의 신청 · 인정 사례 | 내 편입 요청: 채워야 할 서류 수(주황)·새 판정 결과 수(파랑) / 이의 신청: 신청할 수 있는 과목 수(회색)·새 이의 신청 결과 수(파랑). 결과 숫자는 그 화면을 열면 사라짐 |
+  | 학생 | 내 편입 요청 · 성적표 · 이의 신청 · 인정 사례 | 내 편입 요청: 채워야 할 서류 수(주황)·새 판정 결과 수(파랑) / 이의 신청: 신청할 수 있는 과목 수(회색)·새 이의 신청 결과 수(파랑). 새 판정 결과는 그 과목 결과를 열면, 새 이의 신청 결과는 이의 신청 화면을 열면 사라짐 |
   | 심사관 | 심사 큐 · 이의 신청 · 삭제 요청 · 동등 과목표 · 통계 · CSV 내보내기 | 심사 큐: 교수 배정이 필요한 과목 수 / 이의 신청: 처리할 건수 / 삭제 요청: 처리할 건수 |
   | 학과 교수 | 배정된 심사 | 판정할 건수(이의 신청 재판정 포함) |
   | 기관 관리자 | 운영 통계 · 계정·과목 · 계정 목록 · 교수 배정 · 삭제 승인 · 학사정보 연동 · 감사 로그 | 계정·과목: 준비가 필요한 항목 수(기준 강의계획서 없는 과목·교수가 없는 학과) / 계정 목록: 확인이 필요한 계정 수(로그인 실패로 비밀번호가 초기화된 계정, 출신 대학·편입 전공이 빈 학생) / 교수 배정: 교수 배정이 필요한 과목 수 / 삭제 승인: 승인할 건수 |
@@ -61,7 +61,7 @@
   알림·판정 근거 리포트·비밀번호 변경처럼 여러 역할이 함께 쓰는 화면에도 같은 메뉴와 숫자가 나오고, 모바일에서는 햄버거 메뉴 안에 들어갑니다. 첫 로그인 비밀번호 변경 중과 오류 화면에는 역할 메뉴가 없습니다.
 - 화면은 [DESIGN.md](docs/DESIGN.md)(단일 Action Blue, 1px 헤어라인, 그림자 없음)를 따릅니다. 폭은 기본 1280px이고, 정보가 많은 심사 대기열과 원문 대조 화면만 1440px입니다.
 - 화면에 판정 확률(%)은 없습니다. 커버리지, 3단계 추천, 신뢰도만 보여 줍니다. 교수·관리자 화면에는 학생 이름이 나오지 않습니다.
-- 모든 화면 아래에 "AI 분석 결과는 참고 자료이며 최종 인정은 학과 교수 승인으로 확정된다"는 Human-in-the-Loop 고지가 있습니다.
+- 모든 화면 아래에 "본 시스템의 AI 분석 결과는 심사 참고용 근거 자료이며, 최종 학점 인정 여부는 해당 학과 교수의 승인으로 확정됩니다."라는 Human-in-the-Loop 고지가 있습니다.
 
 ## 실행
 
@@ -75,7 +75,7 @@ Docker Desktop을 먼저 실행하고, 창 왼쪽 아래에 **Engine running**�
 git clone https://github.com/Hyeonwoo01/CreditBridge_AI.git
 cd CreditBridge_AI
 cp .env.example .env                      # (선택) Windows PowerShell: copy .env.example .env
-# .env에 ANTHROPIC_API_KEY와 CLAUDE_MODEL을 넣으면 실제 AI 분석(GPT는 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL). .env가 없어도 실행은 되고, AI 분석만 "설정이 없어 분석하지 못했어요"로 실패 표시
+# .env에 ANTHROPIC_API_KEY만 넣으면 실제 AI 분석(CLAUDE_MODEL은 예시 값이 들어 있음. GPT는 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL). .env가 없어도 실행은 되고, AI 분석만 "AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요"로 실패 표시
 docker compose up -d --build              # 프론트엔드·백엔드·DB·작업 큐·파일 저장소를 한 번에
 ```
 
@@ -99,7 +99,7 @@ docker compose up -d --build              # 프론트엔드·백엔드·DB·작�
 2. `email,name,role,department,source_institution` 형식으로 적고 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장 (role은 student·evaluator·professor·admin, 교수는 과목에 있는 학과명 필수, 학생은 department에 편입 전공·source_institution에 출신 대학)
 3. 올리면 새 계정마다 임시 비밀번호가 화면에 한 번만 나옵니다. 그 비밀번호로 로그인하면 새 비밀번호로 바꾸는 화면이 먼저 나옵니다.
 
-메일 발송(`SMTP_HOST`)을 설정하지 않았으면 메일은 보내지 않으므로 실제로 없는 주소여도 됩니다. 이미 만든 계정의 이메일은 바꿀 수 없고(이름·학과만 수정), 바꾸려면 새 계정을 만들고 이전 계정을 비활성화합니다.
+메일 발송(`SMTP_HOST`)을 설정하지 않았으면 메일은 보내지 않으므로 실제로 없는 주소여도 됩니다. 이미 만든 계정의 이메일은 바꿀 수 없고(교직원은 이름·학과, 학생은 편입 전공·출신 대학만 수정), 바꾸려면 새 계정을 만들고 이전 계정을 비활성화합니다.
 
 #### 막힐 때
 
@@ -130,7 +130,7 @@ EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 AI 
 
 ```bash
 uv sync                                   # Python 3.12와 의존성 설치
-cp .env.example .env                      # ANTHROPIC_API_KEY, CLAUDE_MODEL 입력 (GPT면 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL)
+cp .env.example .env                      # ANTHROPIC_API_KEY 입력(CLAUDE_MODEL은 예시 값 있음. GPT면 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL)
 docker compose up -d db redis s3          # PostgreSQL 17(db/init.sql·data.sql로 초기화), Redis 7, S3 호환 저장소(SeaweedFS)
 uv run alembic upgrade head               # init.sql로 이미 최신이면 아무것도 안 함
 uv run python -m scripts.create_bucket
@@ -153,7 +153,7 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
 | 학생(선배) | senior@student.example | 작년에 선형대수가 직접 인정된 이력이 있는 학생(일관성 경보 시연용). 로그인하면 이 계정도 성적표부터 올려야 함 |
 | 심사관 | rachel@msu.example | 심사 대기열, 교수 배정, 보완 자료 요청 |
 | 수학과 교수 | dkim@msu.example, lchen@msu.example | 미적분학·선형대수 판정 |
-| CS 교수 | oali@msu.example, spark@msu.example | C프로그래밍·자료구조 판정 |
+| CS 교수 | oali@msu.example, spark@msu.example | 자료구조 판정 (C프로그래밍은 데모 성적표에서 D라 요청이 생기지 않음) |
 | 물리·화학·영어·역사 교수 | mbrown@msu.example, ewong@msu.example, alopez@msu.example, jreed@msu.example, twhite@msu.example | 해당 학과 과목 판정 |
 | 관리자 | admin@msu.example | 계정·과목 관리, 삭제 승인, 운영 통계, 감사 로그 |
 
@@ -186,8 +186,8 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
    임시 비밀번호가 한 번만 출력됩니다. 첫 로그인 때 새 비밀번호(10자 이상)로 바꿔야 다른 화면을 쓸 수 있습니다.
 2. **과목 CSV** (`/admin/data`): `code,title,credits,department,level,concepts`. `concepts`는 학과가 정한 필수 개념을 `;`로 구분해 적습니다. 과목 코드가 이미 있으면 새 값으로 고칩니다.
 3. **과목별 기준 강의계획서**: 같은 화면의 과목 목록에서 PDF·JPG·PNG를 올립니다. **기준 강의계획서가 없는 과목은 AI 비교 후보에서 빠집니다.**
-4. **계정 CSV**: `email,name,role,department,source_institution`. 학생은 `department`에 편입 전공(과목 CSV의 학과명), `source_institution`에 출신 대학(5번에서 등록한 이름)을 적습니다. 학생이 처음 로그인해 성적표를 올리면 이 두 값으로 성적 C 이상 과목마다 편입 요청이 만들어지고(학생이 직접 고르지 않음), 비워 두면 계정 목록에서 나중에 정할 수 있습니다(관리자 메뉴 '계정 목록' 숫자 배지에 표시). role은 student·evaluator·professor·admin(또는 학생·심사관·교수·관리자). 교수의 department는 과목 CSV의 학과명과 똑같아야 그 학과 과목이 배정됩니다. 메일 발송이 설정돼 있으면 새 계정마다 본인 메일로 비밀번호 설정 링크(72시간)를 자동으로 보내고, 없으면 임시 비밀번호를 만들어 가져온 직후 한 번만 보여 줍니다(CSV로 받기 가능, 저장하지 않음). 이미 있는 이메일은 건너뜁니다.
-5. **출신 대학 등록**: 학생 계정에 정해 두는 출신 대학 목록입니다. 대학마다 자기가 등록한 출신 대학만 보이고, 쓰지 않는 대학은 지울 수 있습니다. 계정 CSV의 `source_institution`과 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 합니다.
+4. **출신 대학 등록**: 학생 계정에 정해 두는 출신 대학 목록입니다. 학생 계정을 가져오기 전에 먼저 등록하세요. 대학마다 자기가 등록한 출신 대학만 보이고, 쓰지 않는 대학은 지울 수 있습니다. 계정 CSV의 `source_institution`과 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 합니다.
+5. **계정 CSV**: `email,name,role,department,source_institution`. 학생은 `department`에 편입 전공(과목 CSV의 학과명), `source_institution`에 출신 대학(4번에서 등록한 이름, 등록하지 않은 대학이면 가져오기가 거절됨)을 적습니다. 학생이 처음 로그인해 성적표를 올리면 이 두 값으로 성적 C 이상 과목마다 편입 요청이 만들어지고(학생이 직접 고르지 않음), 비워 두면 계정 목록에서 나중에 정할 수 있습니다(관리자 메뉴 '계정 목록' 숫자 배지에 표시). role은 student·evaluator·professor·admin(또는 학생·심사관·교수·관리자). 교수의 department는 과목 CSV의 학과명과 똑같아야 그 학과 과목이 배정됩니다. 메일 발송이 설정돼 있으면 새 계정마다 본인 메일로 비밀번호 설정 링크(72시간)를 자동으로 보내고, 없으면 임시 비밀번호를 만들어 가져온 직후 한 번만 보여 줍니다(CSV로 받기 가능, 저장하지 않음). 이미 있는 이메일은 건너뜁니다.
 
 비밀번호를 잊은 사용자는 로그인 화면의 "비밀번호를 잊으셨나요?"에서 메일로 재설정 링크(30분 동안, 한 번만 사용)를 받습니다. 관리자가 `/admin/data`의 "비밀번호 초기화"를 쓰면 사용자 메일로 설정 링크(72시간)가 자동으로 갑니다. 메일 발송(`SMTP_HOST`)이 설정되지 않은 서버에서는 대신 임시 비밀번호를 화면에 한 번만 보여 줍니다. **운영에서는 메일 발송을 설정하는 것을 권장합니다.** 그래야 관리자 없이 계정 만들기·비밀번호 찾기·잠금 해제가 모두 메일로 처리됩니다. 비밀번호가 바뀌면 다른 기기의 로그인은 끊깁니다.
 
@@ -210,28 +210,32 @@ uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 AI API(�
 
 ## 구조
 
+주요 폴더와 파일만 적었습니다.
+
 ```
 backend/         ← 백엔드 (Python, import 이름도 backend)
   main.py        FastAPI 앱, /static 마운트(frontend/static)
-  ai/            llm_client.py(SDK 단일 진입점) · prompts/*.md · extraction · candidates · matching · evidence · injection
-  documents/     PyMuPDF 텍스트 추출(PDF·JPG·PNG), S3 저장
+  config.py      환경변수(Settings) · i18n.py · locales/(영어 번역) · db/(세션·공통 타입) · schemas/(AI 출력 스키마)
+  ai/            llm_client.py(SDK 단일 진입점) · prompts/*.md · extraction · candidates · matching · evidence · injection · demo_llm(예시 AI)
+  documents/     PyMuPDF 텍스트 추출(PDF·JPG·PNG, 스캔 페이지·이미지는 AI 전사), S3 저장
   services/      analysis(파이프라인) · scoring(추천 규칙) · student · review(심사 대기열) · decisions(판정·경보)
                  materials · appeals(이의 신청·근거 자료) · privacy · notifications · sis · equivalencies · precedents(학생 인정 사례)
                  stats(통계·관리자 콘솔) · views(화면 조회·학생 대시보드·역할별 메뉴 배지 nav_badges)
                  push(웹 푸시 구독·발송) · calibration(추천 기준값 보정 계산)
-                 institution_data(계정·과목 CSV, 기준 강의계획서, 출신 대학, 첫 관리자) · csv_import(CSV 공통)
+                 institution_data(계정·과목 CSV, 기준 강의계획서, 출신 대학, 편입 학점 상한, 첫 관리자) · csv_import(CSV 공통)
+                 accounts · auth · audit · notes(내부 메모) · originals(원본 열람) · reminders(기한 알림) · versions(버전 비교)
   repositories/  SQL은 여기만
   models/        SQLAlchemy 2.0, 테이블당 1파일
   workers/       Celery 작업
   security/      세션·권한·CSRF·개인정보 마스킹
   web/           라우트(routes/), JSON API(api/), 템플릿 렌더링(templating.py: frontend/templates 사용), 역할별 메뉴 숫자 배지(nav.py)
 frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
-  templates/     Jinja2 + HTMX 템플릿: base · student · review · professor · admin · partials · stats · report
+  templates/     Jinja2 + HTMX 템플릿: base · login · account · student · review · professor · admin · partials · notifications · stats · report
   static/        css/app.css(빌드 결과) · js/app.js · img/(로고·아이콘) · samples/(CSV 예시)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (PostgreSQL 17, 기준점 0001에 이전 MariaDB 마이그레이션을 합침)
 db/              init.sql(스키마, alembic --sql로 생성) · data.sql(데모 초기 데이터, pg_dump로 생성) — scripts/export_db_sql.sh로 다시 만듦
-scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · demo_data/
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
 tests/           unit · integration(PostgreSQL) · eval(골든셋)
 ```
 
@@ -246,7 +250,7 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋)
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.
-- 기한 알림은 `beat` 서비스(개발 환경은 `celery beat`)가 매일 `REMINDER_HOUR_UTC`시(기본 13시 UTC = 미국 동부 오전 9시)에 보내요. 판정 기한이 지났거나 하루 남은 심사(교수·심사관), 교수 배정이 밀린 과목(심사관), 처리 기한이 다가온 삭제 요청(심사관·관리자), 답이 없는 보완 자료 요청(학생)을 알려요. beat는 반드시 하나만 띄우세요(여러 개면 알림이 겹쳐 쌓여요). 오늘 대상 건수는 운영 통계의 "기한 알림" 카드에서 볼 수 있어요.
+- 기한 알림은 `beat` 서비스(개발 환경은 `celery beat`)가 매일 `REMINDER_HOUR_UTC`시(기본 13시 UTC = 미국 동부 오전 9시)에 보내요. 판정 기한이 지났거나 하루 남은 심사(교수), 기한이 지난 심사(심사관), 교수 배정이 밀린 과목(심사관), 처리 기한이 다가온 삭제 요청(심사관·관리자), 답이 없는 보완 자료 요청(학생)을 알려요. beat는 반드시 하나만 띄우세요(여러 개면 알림이 겹쳐 쌓여요). 오늘 대상 건수는 운영 통계의 "기한 알림" 카드에서 볼 수 있어요.
 - 알림 메일과 비밀번호 재설정 메일을 보내려면 `SMTP_HOST` 등과 `APP_BASE_URL`(메일 속 링크 주소)을 설정하세요. 비워 두면 화면 알림만 쓰고, 비밀번호는 관리자가 초기화합니다.
 - 휴대폰·컴퓨터 브라우저 푸시 알림을 켜려면 `uv run python -m scripts.generate_vapid_keys`로 만든 `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`를 `.env`에 넣고 `VAPID_SUBJECT`를 관리자 메일(`mailto:...`)로 바꾸세요. 각 사용자가 알림 화면에서 "푸시 알림 받기"를 누르면 그 기기로 와요. https 주소(또는 localhost)에서만 동작하고, iPhone·iPad는 홈 화면에 추가한 앱으로 열어야 해요. 개인 키를 바꾸면 모두 다시 구독해야 해요.
 - JSON API는 `/api/v1/...`입니다. 버전 없는 옛 경로(`/api/sis/decisions` 등)도 당분간 같은 응답을 주지만 폐기 예정이니 연동 시스템 주소를 바꿔 주세요.
