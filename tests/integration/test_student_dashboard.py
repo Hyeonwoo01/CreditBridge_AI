@@ -5,8 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.models import Appeal
-from scripts.make_demo_pdfs import text_to_pdf
-from tests.conftest import login
+from tests.conftest import login, send_transcript
 from tests.integration.test_pipeline import latest, new_request, upload
 from tests.integration.test_review_extras import approve, reject
 from tests.integration.test_workflow import assign, professor_for, reviewer_of, submitted_request
@@ -21,17 +20,14 @@ def test_dashboard_lists_todos_and_readiness(client: TestClient, seeded: Session
     token = login(client, "jiwon@student.example")
     rid = new_request(client, seeded, token)
     home = client.get("/student").text
-    assert "할 일" in home and "성적표 올리기" in home and "강의계획서 올리기" in home
-    assert '서류 준비 <strong class="tabular-nums">0%</strong>' in home
-    assert "채워야 할 서류 2건" in home  # 메뉴 배지(앰버)와 카드
-    assert "채워야 할 서류 2건 </span>2</span>" in home and "!2" not in home  # 배지는 숫자만
+    # 계정 성적표는 처음 들어올 때 이미 올렸으니(요청에 복사됨) 강의계획서만 남는다
+    assert "할 일" in home and "강의계획서 올리기" in home and "성적표 올리기" not in home
+    assert '서류 준비 <strong class="tabular-nums">50%</strong>' in home
+    assert "채워야 할 서류 1건" in home  # 메뉴 배지(앰버)와 카드
+    assert "채워야 할 서류 1건 </span>1</span>" in home and "!1" not in home  # 배지는 숫자만
 
     upload(client, rid, token, "calculus.txt", "data_structures.txt")
-    client.post(
-        f"/student/requests/{rid}/transcript",
-        files={"file": ("transcript.pdf", text_to_pdf(TRANSCRIPT), "application/pdf")},
-        data={"csrf_token": token},
-    )
+    send_transcript(client, token, TRANSCRIPT)
     home = client.get("/student").text
     assert "성적표 올리기" not in home
     assert "성적표 과목 연결 확인 1건" in home or "강의계획서 미등록 1건" in home  # Academic Writing
@@ -52,7 +48,8 @@ def test_dashboard_lists_todos_and_readiness(client: TestClient, seeded: Session
     home = client.get("/student").text
     assert "100%" in home and "제출할 준비가 됐어요" in home
     assert f'href="/student/requests/{rid}#submit"' in home and "학사처에 심사 요청하기" in home
-    assert "채워야 할 서류" not in home
+    # 성적표를 올리면 C 이상 과목마다 요청이 따로 생겨 그 과목들의 강의계획서가 할 일로 남는다
+    assert "MATH 101 강의계획서 올리기" in home and "강의계획서 미등록" not in home
 
 
 def test_nav_badges_for_new_results_clear_when_viewed(client: TestClient, seeded: Session) -> None:

@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- |
 | P00 | 공통 레이아웃 | 모든 화면 | 전체 | 글로벌 내비게이션, 언어 전환(한/영), 기관 보조 바·집계 칩, 알림, Human-in-the-Loop 푸터, 화면 폭 | [00-common-layout.md](pages/00-common-layout.md) |
 | P01 | 로그인 | `/login` | 비로그인 | 역할별 홈으로 이동, 비밀번호 찾기 링크, 실패 5회 1분 잠금·10회 비밀번호 초기화 | [01-login.md](pages/01-login.md) |
-| P02 | 학생 홈(대시보드) | `/student` | 학생 | 편입 요청 만들기, 할 일, 요청별 예상 인정 학점·서류 준비율 | [02-student-home.md](pages/02-student-home.md) |
+| P02 | 학생 홈(대시보드) | `/student` | 학생 | 성적표 C 이상 과목마다 자동으로 만든 요청 목록, 전체 합계(편입 학점 상한·졸업 학점 과목 고르기), 할 일 | [02-student-home.md](pages/02-student-home.md) |
 | P03 | 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | 학생 | FR-01·02·15·21 다크 히어로 예상치, 과목 필터, 정보 부족 진단, 심사 진행 단계 | [03-student-request.md](pages/03-student-request.md) |
 | P04 | 과목 분석 결과(학생) | `/student/evaluations/{id}` | 학생 | FR-05~08 추천·근거, 버전 비교, FR-25 원본 PDF 쪽 링크, FR-22 보완 제출, FR-23 이의 신청 작성(P22)으로 이동 | [04-student-evaluation.md](pages/04-student-evaluation.md) |
 | P05 | 심사 큐 | `/review` | 심사관 | FR-17 검색·신뢰도·일관성 경보·학과 필터, FR-18 일괄 배정, 커버리지 링, 경보 행 | [05-review-queue.md](pages/05-review-queue.md) |
@@ -37,6 +37,7 @@
 | P22 | 이의 신청 작성(학생) | `/student/evaluations/{id}/appeal` | 학생 | FR-23 원 판정 요약·근거가 약한 개념, 사유(20~3000자), 근거 자료 PDF·JPG·PNG 최대 3개 | [22-student-appeal-form.md](pages/22-student-appeal-form.md) |
 | P23 | 선배 인정 사례(학생) | `/student/precedents` | 학생 | FR-26 기관 동등 과목표 검색(다른 학생의 판정은 보이지 않음) | [23-student-precedents.md](pages/23-student-precedents.md) |
 | P24 | 계정 목록·계정 수정 | `/admin/accounts`, `/admin/accounts/{id}` | 관리자 | 이메일·역할·상태로 계정 찾기(학생 이름 비공개), 교직원 이름·학과·대리 심사자 수정, 비밀번호 초기화·비활성화 | [24-admin-accounts.md](pages/24-admin-accounts.md) |
+| P26 | 내 성적표(학생) | `/student/transcript` | 학생 | 처음 들어오면 먼저 올리는 계정 성적표, 과목 줄·성적 기준 미달 표시, 바꿔 올리기 | [26-student-transcript.md](pages/26-student-transcript.md) |
 | P25 | 교수 배정(관리자) | `/admin/assignments` | 관리자 | 판정 전 심사 건 담당 교수 자동 배정·지정·바꾸기(AI 결과 비공개) | [25-admin-assignments.md](pages/25-admin-assignments.md) |
 
 ## 역할별 흐름
@@ -68,6 +69,7 @@
 
 | 날짜 | 내용 |
 | --- | --- |
+| 2026-10-21 | 성적표 먼저: P26 내 성적표 추가(처음 들어오면 P02 대신 이 화면, 학생 메뉴 "성적표"), 성적 C 이상 과목마다 요청 자동 생성 — P02 "새 요청 만들기" 없앰·과목 카드·편입 학점 상한을 넘을 때 졸업 학점 과목 고르기, P03 과목 요청은 강의계획서 한 건·성적표 연결 표 없음·성적표 카드(P26 링크), 제출한 요청은 성적표 연결을 바꿀 수 없음, P18 "편입 학점 상한" 카드 |
 | 2026-10-21 | P02 문서 삭제로 종료된 요청은 맨 아래 "문서 삭제로 종료된 요청 N건"으로 접음. 성적표 성적이 C 미만(C- 이하)인 과목은 교수 심사 없이 제외: P03 "성적 기준 미달" 배지·안내, P04·P06 안내 상자, P05·P25 큐·배정에서 빠짐(제출 뒤 미달이 되면 배정 해제 알림) |
 | 2026-10-21 | 문서 삭제 승인 때 이의 신청도 함께 정리: P21 학생 이의 신청 목록·P04 과목 화면에서 사라지고 다시 낼 수 없음(사유도 지움), P07 처리 목록·배지에서 빠짐 |
 | 2026-10-21 | P02 맨 위 "전체 합계": 요청을 합친 예상 인정 학점·판정 확정·남은 학기(같은 과목은 한 번만, 문서 삭제로 종료된 요청은 제외), 요청 카드의 "남은 학기(예상)"는 뺌. 문서 삭제로 종료된 요청 카드는 수치 대신 "전체 합계에서 빠진 요청" 안내 |

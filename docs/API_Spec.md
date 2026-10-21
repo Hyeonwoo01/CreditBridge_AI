@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 81개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 83개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -68,13 +68,13 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 | # | 메서드 | 경로 | 역할 | 입력 | 응답 | 화면 | FR |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1 | GET | `/student` | 학생 | – | HTML | P02 | FR-15·21 |
-| S2 | POST | `/student/requests` | 학생 | `csrf_token` (출신 대학·편입 전공은 계정 값, 폼으로 받지 않음) | 303→`/student/requests/{id}` (서류 없는 초안이 있으면 그 요청 + 플래시) / 400(계정에 출신 대학·편입 전공 없음) | P02 | FR-15 |
+| S1 | GET | `/student` | 학생 | – | HTML / 303→S2(계정 성적표가 없으면) | P02 | FR-15·21 |
+| S2 | GET | `/student/transcript` | 학생 | – | HTML (계정 성적표 상태·과목 줄·C 미만 표시) | P26 | FR-02 |
 | S2-1 | POST | `/student/requests/{id}/delete` | 학생(본인) | `csrf_token` | 303→`/student` / 303→S3 + 빨강 플래시(서류가 있거나 제출한 요청) | P02·P03 | FR-15 |
 | S3 | GET | `/student/requests/{id}` | 학생(본인) | `show`(all·approved·supplement·review), `tuition`, `degree` | HTML | P03 | FR-01·02·15·21 |
 | S4 | POST | `/student/requests/{id}/syllabi` | 학생(본인) | `files[]`(최대 30), `csrf_token` | 303→S3 | P03 | FR-01 |
-| S5 | POST | `/student/requests/{id}/transcript` | 학생(본인) | `file`, `csrf_token` | 303→S3 | P03 | FR-02·13 |
-| S6 | POST | `/student/requests/{id}/entries/{entry_id}` | 학생(본인) | `syllabus_id`(빈 값=연결 안 함), `csrf_token` | 303→S3`#transcript` | P03 | FR-02 |
+| S5 | POST | `/student/transcript` | 학생 | `file`, `csrf_token` | 303→S1(처음) 또는 S2. 작업 큐가 과목 줄을 뽑아 성적 C 이상 과목마다 요청을 만들고(이미 있으면 아직 제출하지 않은 요청만 새 값으로), 예전 방식 초안에는 과목 목록을 복사 | P26 | FR-02·13 |
+| S6 | POST | `/student/requests/{id}/entries/{entry_id}` | 학생(본인) | `syllabus_id`(빈 값=연결 안 함), `csrf_token` | 303→S3`#transcript` (예전 방식 여러 과목 요청, 제출 뒤에는 바꿀 수 없음) | P03 | FR-02 |
 | S7 | POST | `/student/requests/{id}/submit` | 학생(본인) | `csrf_token` | 303→S3. 정보가 충분한 과목(분석 완료·정보 부족 아님·대응 과목 있음·열린 보완 요청 없음)은 이때 학과 교수에게 자동 배정 | P03 | FR-18·21 |
 | S8 | POST | `/student/requests/{id}/delete-documents` | 학생(본인) | `csrf_token` | 303→S3 | P03 | FR-13 |
 | S9 | GET | `/student/syllabi/{id}` | 학생(본인) | – | 303→그 강의계획서의 최신 분석(S10) | P03 | – |
@@ -84,6 +84,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | S13 | POST | `/student/evaluations/{id}/appeal` | 학생(본인) | `reason`(20~3000자), `files[]`(최대 3), `csrf_token` | 303→S14 / 422 | P22 | FR-23 |
 | S14 | GET | `/student/appeals` | 학생 | – | HTML (새 이의 결과 읽음 처리) | P21 | FR-23 |
 | S15 | GET | `/student/precedents` | 학생 | `q`, `source` | HTML | P23 | FR-26 |
+| S16 | POST | `/student/requests/{id}/counted` | 학생(본인) | `counted`(1·0), `csrf_token` | 303→S1`#total-title` (편입 학점 상한을 넘을 때 졸업 학점에 넣을지) / 403(남의 요청) | P02 | FR-15 |
 
 ### 2.3 심사관 (학사처)
 
@@ -137,6 +138,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M7 | POST | `/admin/data/accounts/active` | 관리자 | `email`, `action`(deactivate·reactivate), `next`(선택, `/admin/accounts/{id}`만), `csrf_token` | 303→M2`#account-active` 또는 M15 | P18 | FR-12 |
 | M8 | POST | `/admin/data/institutions` | 관리자 | `name`, `country`, `csrf_token` | 303→M2`#institutions` (우리 대학 목록에 추가. 다른 대학이 만든 같은 이름 행은 함께 씀) | P18 | – |
 | M20 | POST | `/admin/data/courses/{id}/reference/remove` | 관리자 | `csrf_token` | 303→M2`#courses` + 플래시 (과목 연결만 끊음, 강의계획서 행은 남김) | P18 | FR-05 |
+| M22 | POST | `/admin/data/transfer-cap` | 관리자 | `cap`(1~300, 빈 값=기본 60), `csrf_token` | 303→M2`#transfer-cap` + 플래시 | P18 | FR-15 |
 | M21 | POST | `/admin/data/institutions/{id}/delete` | 관리자 | `csrf_token` | 303→M2`#institutions` + 플래시 (우리 대학 목록에서 지움. 우리 학생 계정·편입 요청·동등 과목표가 가리키면 거절, 다른 대학도 안 쓰면 행까지 삭제) | P18 | – |
 | M9 | GET | `/admin/privacy` | 관리자 | – | HTML | P08 | FR-13 |
 | M10 | POST | `/admin/privacy/{id}` | 관리자 | `csrf_token` | 303→M9 | P08 | FR-13 |
@@ -237,11 +239,13 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 | 화면 | 버튼·링크 | API |
 | --- | --- | --- |
-| P02 | 새 요청 만들기 | S2 `POST /student/requests` |
+| P02 | 내 성적표 › | S2 |
+| P02 | 졸업 학점에서 빼기 · 다시 넣기 (상한을 넘을 때) | S16 |
 | P02 | 요청 카드 · 할 일 항목 | S3 (할 일은 S3 `#upload`·`#transcript`·`#submit` 또는 S10) |
 | P02 | 새 판정 결과 확인 | A12 |
 | P03 | 분석 시작 (강의계획서 업로드) | S4 |
-| P03 | 성적표 등록 | S5 |
+| P03 | 성적표 보기·바꾸기 | S2 |
+| P26 | 성적표 등록 (올리기·바꾸기) | S5 |
 | P03 | 성적표 과목 연결 [확인] | S6 |
 | P03 | 학사처에 심사 요청 | S7 |
 | P03 | 내 문서 삭제 요청 (확인창) | S8 |
@@ -311,6 +315,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P18 | 계정 가져오기 | M5 |
 | P18 | 설정 링크 메일 보내기 / 임시 비밀번호 발급 (확인창) | M6 |
 | P18 | 비활성화 (확인창) · 다시 활성화 | M7 `action=deactivate` · `action=reactivate` |
+| P18 | 편입 학점 상한 저장 | M22 |
 | P18 | 출신 대학 추가 | M8 |
 | P18 | 출신 대학 지우기 (확인창, 쓰지 않는 대학만) | M21 |
 | P18 | 이메일을 모르면 계정 목록에서 찾기 | M14 |
@@ -337,7 +342,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- |
 | P00 | A13 · A14 · 각 화면 | `notifications.unread_count`, `stats.workspace_counts`, `views.nav_badges` | 안 읽은 알림 수, 기관 집계 칩, 메뉴 숫자 배지 |
 | P01·P19·P20 | A2 · A6 · A8 · A10 | – | 폼만 (P20 재설정은 토큰 유효성) |
-| P02 | S1 | `views.student_home` | 할 일, 전체 합계(요청을 합친 예상 인정 학점·판정 확정 수·남은 학기), 요청 목록, 요청별 예상 인정 학점·판정 확정 수·서류 준비율, 소속 대학·출신 대학·전공 선택지 |
+| P02 | S1 | `views.student_home` | 할 일, 전체 합계(요청을 합친 예상 인정 학점·판정 확정 수·남은 학기, 편입 학점 상한으로 자름, 졸업 학점에 넣을 과목 선택), 성적표 과목 요청 목록(과목·성적·학점), 요청별 예상 인정 학점·판정 확정 수·서류 준비율, 계정 성적표 상태, 소속 대학·출신 대학·전공 |
+| P26 | S2 | `student.account_transcript` | 계정 성적표 상태·올린 날·마스킹 이름·과목 줄(성적 기준 미달 표시) |
 | P03 | S3 | `views.request_view` (+ `student.simulate`) | 예상 학점·학기·비용, 과목 카드(추천·커버리지·대응 과목·판정 교수·담당 교수·심사 단계·보완 요청), 성적표 과목 연결, 진행 단계, 삭제 요청 상태 |
 | P04·P06·P12 | S10 · R4 · F3 | `views.evaluation_view` | 추천·신뢰도·커버리지·후보 과목, 판정·이의 신청·보완 요청 경과, 이전 분석과 비교, 경고, 정보 부족 진단, 개념별 근거(원본 쪽), 원문, 추출 정보, 과거 판정 이력, 내부 메모(교직원), 처리 기록(심사관), 대상 과목 목록(교수) |
 | P05 | R1 | `review.queue`, `stats.institution_stats` | 지표 카드 4개, 탭·학과별 건수, 행(접수 번호·학생·출신 대학·과목·후보·커버리지·추천·신뢰도·담당 교수·상태·경보), 페이지 |

@@ -1,6 +1,8 @@
 {% from "partials/macros.html" import nav_link with context %}
 {% set path = request.url.path %}
 {% set in_appeals = path.startswith("/student/appeals") or path.endswith("/appeal") %}
-{{ nav_link("/student", _("내 편입 요청"), current=false if (in_appeals or path.startswith("/student/precedents")) else none) }}
+{% set in_transcript = path.startswith("/student/transcript") %}
+{{ nav_link("/student", _("내 편입 요청"), current=false if (in_appeals or in_transcript or path.startswith("/student/precedents")) else none) }}
+{{ nav_link("/student/transcript", _("성적표"), current=in_transcript) }}
 {{ nav_link("/student/appeals", _("이의 신청"), current=in_appeals) }}
 {{ nav_link("/student/precedents", _("인정 사례")) }}

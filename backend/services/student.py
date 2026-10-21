@@ -1,7 +1,7 @@
 """학생 서비스: 편입 요청, 문서 업로드, 성적표 연결, 보완 자료, 심사 제출, 진행 상황 (FR-01, 02, 08, 15, 21)."""
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
@@ -17,14 +17,16 @@ from backend.models import (
     Appeal,
     CourseEvaluation,
     Decision,
+    Institution,
     MaterialRequest,
+    StudentTranscript,
     SupplementFile,
     Syllabus,
     TranscriptEntry,
     TransferRequest,
     User,
 )
-from backend.models.enums import PASSING_GRADES, RequestStatus, Role, SyllabusStatus
+from backend.models.enums import PASSING_GRADES, RequestStatus, Role, SyllabusStatus, TranscriptStatus
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -32,6 +34,7 @@ from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
+from backend.repositories import transcripts as transcript_repo
 from backend.repositories import users as user_repo
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import analysis, audit, materials, notifications
@@ -52,10 +55,17 @@ def get_own_request(session: Session, student: User, request_id: int) -> Transfe
     return request
 
 
+def has_transcript(request: TransferRequest) -> bool:
+    """요청에 성적표가 있는지: 계정 성적표를 복사했거나, 예전처럼 이 요청에 따로 올렸거나."""
+    return bool(request.transcript_copied_at or request.transcript_file_key)
+
+
 def is_empty_draft(session: Session, request: TransferRequest) -> bool:
-    """아직 아무 서류(성적표·강의계획서)도 올리지 않은 초안. 잘못 눌러 만든 요청은 이 상태로 남는다."""
+    """아직 아무 서류도 올리지 않은 초안 (계정 성적표에서 복사한 과목 목록은 서류로 치지 않는다).
+    잘못 눌러 만든 요청은 이 상태로 남는다."""
     return (
         request.status == RequestStatus.DRAFT
+        and not request.course_key  # 성적표 과목 요청은 모두 내야 하므로 지우지 않는다
         and not request.transcript_file_key
         and not syllabus_repo.of_request(session, request.id)
     )
@@ -74,6 +84,9 @@ def create_request(session: Session, student: User) -> tuple[TransferRequest, bo
         raise CreditBridgeError(
             tr("계정에 출신 대학·편입 전공이 아직 없어요. 학사처(기관 관리자)에 등록을 요청해 주세요.")
         )
+    transcript = transcript_repo.for_student(session, student.id)
+    if transcript is None:
+        raise CreditBridgeError(tr(TRANSCRIPT_REQUIRED))
     # 빈 초안이 이미 있으면 새로 만들지 않고 그 요청을 쓴다 (버튼을 잘못 눌러 빈 요청이 쌓이지 않게)
     for existing in request_repo.of_student(session, student.id):
         if is_empty_draft(session, existing):
@@ -84,9 +97,125 @@ def create_request(session: Session, student: User) -> tuple[TransferRequest, bo
             student_id=student.id, source_institution_id=source.id, target_institution_id=target.id, major=major
         ),
     )
+    analysis.copy_account_transcript(session, transcript, request)  # 아직 분석 중이면 끝난 뒤 복사된다
     audit.record(session, student, "request.create", "transfer_request", str(request.id), target=target.id, major=major)
     session.commit()
     return request, True
+
+
+# ---------- 계정 성적표: 처음 들어오면 먼저 올리고, 모든 요청이 함께 쓴다 ----------
+
+TRANSCRIPT_REQUIRED = N_("성적표를 먼저 올려 주세요. 한 번 올리면 모든 편입 요청에 함께 쓰여요.")
+
+
+def account_transcript(session: Session, student: User) -> StudentTranscript | None:
+    return transcript_repo.for_student(session, student.id)
+
+
+def course_key(code: str | None, title: str | None) -> str:
+    """성적표 과목을 알아보는 키: 과목 코드(공백 없이 대문자), 없으면 과목명."""
+    normalized = "".join((code or "").split()).upper()
+    if normalized:
+        return f"code:{normalized}"[:300]
+    name = " ".join((title or "").split()).lower()
+    return f"title:{name}"[:300] if name else ""
+
+
+def sync_course_requests(session: Session, student: User, transcript: StudentTranscript | None) -> int:
+    """성적이 C 이상인 성적표 과목마다 편입 요청을 만든다 (학생이 '새 요청'을 누르지 않는다). 만든 수를 돌려준다.
+
+    이미 있는 과목 요청은 다시 만들지 않고, 아직 제출하지 않았으면 성적표 줄(성적·학점)을 새 값으로 바꾼다.
+    새 성적표에서 빠졌거나 C 미만이 된 과목은 강의계획서를 올리기 전이면 요청을 지운다."""
+    if transcript is None or transcript.status != TranscriptStatus.READY:
+        return 0
+    target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None
+    source = student.source_institution
+    major = student.department_name
+    if target is None or not target.is_target or source is None or source.is_target or not major:
+        return 0  # 계정에 소속·출신 대학·편입 전공이 생기면 다음에 성적표를 올릴 때 만든다
+    # 문서 삭제로 끝난 과목은 성적표를 다시 올리면 새 요청으로 만든다
+    existing = {
+        r.course_key: r
+        for r in request_repo.of_student(session, student.id)
+        if r.course_key and r.status != RequestStatus.CLOSED
+    }
+    seen: set[str] = set()
+    created = 0
+    for line in transcript.lines or []:
+        key = course_key(line.get("code"), line.get("title"))
+        if not key or key in seen or grade_failed(line.get("grade")):
+            continue
+        seen.add(key)
+        request = existing.get(key)
+        if request is None:
+            request = request_repo.add(
+                session,
+                TransferRequest(
+                    student_id=student.id,
+                    source_institution_id=source.id,
+                    target_institution_id=target.id,
+                    major=major,
+                    course_key=key,
+                ),
+            )
+            created += 1
+            audit.record(
+                session, student, "request.create", "transfer_request", str(request.id), target=target.id, auto=True
+            )
+        if request.status == RequestStatus.DRAFT:
+            _copy_course_line(session, transcript, request, line)
+    for key, request in existing.items():
+        if (
+            key not in seen
+            and request.status == RequestStatus.DRAFT
+            and not syllabus_repo.of_request(session, request.id)
+        ):
+            request_repo.delete(session, request)
+    return created
+
+
+def _copy_course_line(session: Session, transcript: StudentTranscript, request: TransferRequest, line: dict) -> None:
+    """과목 요청의 성적표 줄 하나를 새 성적표 값으로 맞춘다 (강의계획서 연결은 그대로)."""
+    entries = request_repo.transcript_entries(session, request.id)
+    entry = entries[0] if entries else TranscriptEntry(transfer_request_id=request.id, title="")
+    entry.title = str(line.get("title") or "")[:255]
+    entry.code = line.get("code") or None
+    entry.credits = line.get("credits")
+    entry.grade = line.get("grade") or None
+    entry.term = line.get("term") or None
+    if not entries:
+        session.add(entry)
+    request.transcript_masked_name = transcript.masked_name
+    request.transcript_copied_at = utcnow()
+    session.flush()
+
+
+def needs_transcript(session: Session, student: User) -> bool:
+    """학생이 아직 성적표를 올리지 않았는지 (학생 홈·요청 만들기 앞에서 성적표 화면으로 보낸다)."""
+    return student.role == Role.STUDENT and transcript_repo.for_student(session, student.id) is None
+
+
+def upload_account_transcript(
+    session: Session, storage: ObjectStorage, student: User, file: UploadedFile
+) -> StudentTranscript:
+    """계정 성적표를 올리거나 바꾼다. 과목 목록은 작업 큐에서 뽑고(analysis.process_student_transcript),
+    끝나면 아직 제출하지 않은 요청에만 복사한다. 제출한 요청은 그때의 목록을 그대로 쓴다."""
+    ensure_student(student)
+    ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
+    transcript = transcript_repo.for_student(session, student.id)
+    if transcript is None:
+        transcript = transcript_repo.add(session, StudentTranscript(student_id=student.id, uploaded_at=utcnow()))
+    elif transcript.file_key:
+        storage.delete(transcript.file_key)
+    key = storage.new_key("transcripts", file.filename)
+    storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
+    transcript.file_key = key
+    transcript.status = TranscriptStatus.PROCESSING
+    transcript.error_message = None
+    transcript.uploaded_at = utcnow()
+    audit.record(session, student, "transcript.upload", "user", str(student.id))
+    session.commit()
+    return transcript
 
 
 def delete_empty_request(session: Session, student: User, request_id: int) -> None:
@@ -118,7 +247,19 @@ def add_syllabi(
         raise CreditBridgeError(tr("문서를 삭제해 종료된 요청이에요. 새 요청을 만들어 주세요."))
     if request.status != RequestStatus.DRAFT:
         raise CreditBridgeError(tr("심사에 제출한 요청에는 과목을 추가할 수 없어요."))
-    if syllabus_repo.count_of_request(session, request.id) + len(files) > settings.max_syllabi_per_request:
+    if request.course_key:
+        # 성적표 과목 하나로 만든 요청: 그 과목의 강의계획서 한 건만 (분석에 실패한 것은 세지 않음)
+        kept = [s for s in syllabus_repo.of_request(session, request.id) if s.status != SyllabusStatus.FAILED]
+        fresh = [
+            f
+            for f in files
+            if syllabus_repo.in_request_with_hash(session, request.id, analysis.content_hash(f.data)) is None
+        ]
+        if len(kept) + len(fresh) > 1:
+            raise UploadRejectedError(
+                tr("이 과목에는 강의계획서를 한 건만 올려요. 자료가 더 있으면 과목 화면에서 보완 자료로 내 주세요.")
+            )
+    elif syllabus_repo.count_of_request(session, request.id) + len(files) > settings.max_syllabi_per_request:
         raise UploadRejectedError(
             tr(
                 "강의계획서는 요청당 최대 {max_syllabi_per_request}건까지 올릴 수 있어요.",
@@ -159,21 +300,12 @@ def add_syllabi(
         )
         result.created.append(syllabus)
         audit.record(session, student, "syllabus.upload", "syllabus", str(syllabus.id), request=request.id)
+    if request.course_key and result.created:
+        # 어느 과목의 강의계획서인지 이미 알므로 성적표 줄을 바로 연결한다
+        for entry in request_repo.transcript_entries(session, request.id):
+            entry.syllabus_id, entry.link_confirmed = result.created[0].id, True
     session.commit()
     return result
-
-
-def set_transcript(
-    session: Session, storage: ObjectStorage, student: User, request: TransferRequest, file: UploadedFile
-) -> None:
-    ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
-    if request.transcript_file_key:
-        storage.delete(request.transcript_file_key)
-    key = storage.new_key("transcripts", file.filename)
-    storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
-    request.transcript_file_key = key
-    audit.record(session, student, "transcript.upload", "transfer_request", str(request.id))
-    session.commit()
 
 
 def confirm_link(
@@ -182,6 +314,8 @@ def confirm_link(
     entry = request_repo.get_entry(session, entry_id)
     if entry is None or entry.transfer_request_id != request.id:
         raise NotFoundError(tr("성적표 항목을 찾을 수 없어요."))
+    if request.status != RequestStatus.DRAFT:
+        raise CreditBridgeError(tr("심사에 제출한 요청은 성적표 연결을 바꿀 수 없어요."))
     if syllabus_id:
         syllabus = syllabus_repo.get(session, syllabus_id)
         if syllabus is None or syllabus.transfer_request_id != request.id:
@@ -299,6 +433,11 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
         raise CreditBridgeError(tr("강의계획서를 한 건 이상 올려 주세요."))
     if any(s.status in (SyllabusStatus.UPLOADED, SyllabusStatus.PROCESSING) for s in syllabi):
         raise CreditBridgeError(tr("분석이 끝난 뒤에 제출할 수 있어요."))
+    if not has_transcript(request):
+        transcript = transcript_repo.for_student(session, student.id)
+        if transcript is not None and transcript.status == TranscriptStatus.PROCESSING:
+            raise CreditBridgeError(tr("성적표 분석이 끝난 뒤에 제출할 수 있어요."))
+        raise CreditBridgeError(tr(TRANSCRIPT_REQUIRED))
     request.status = RequestStatus.SUBMITTED
     request.submitted_at = utcnow()
     audit.record(session, student, "request.submit", "transfer_request", str(request.id), courses=len(syllabi))
@@ -483,6 +622,37 @@ def merged_rows(groups: list[list[CourseRow]]) -> list[CourseRow]:
     return list(chosen.values())
 
 
+DEFAULT_TRANSFER_CAP = 60  # 대학이 편입 학점 상한을 정하지 않았을 때
+
+
+def transfer_cap(institution: Institution) -> int:
+    return institution.max_transfer_credits or DEFAULT_TRANSFER_CAP
+
+
+def cap_simulation(sim: Simulation, cap: int, credits_per_semester: int = 15) -> Simulation:
+    """편입 학점 상한을 넘는 인정 학점은 졸업 학점에 넣지 않는다: 예상 인정 학점·남은 학기를 상한으로 자른다."""
+    low, high = min(sim.credits_low, float(cap)), min(sim.credits_high, float(cap))
+    return replace(
+        sim,
+        credits_low=low,
+        credits_high=high,
+        semesters_low=math.ceil(max(sim.degree_credits - high, 0) / credits_per_semester),
+        semesters_high=math.ceil(max(sim.degree_credits - low, 0) / credits_per_semester),
+    )
+
+
+def set_counted(session: Session, student: User, request_id: int, counted: bool) -> TransferRequest:
+    """편입 학점 상한을 넘을 때 이 과목(요청)을 졸업 학점에 넣을지 학생이 고른다.
+    지도교수와 상의해 전공 필수·핵심 교양처럼 유리한 과목을 먼저 넣는다."""
+    request = get_own_request(session, student, request_id)
+    if request.status == RequestStatus.CLOSED:
+        raise CreditBridgeError(tr("문서를 삭제해 종료된 요청이에요. 새 요청을 만들어 주세요."))
+    request.counted = counted
+    audit.record(session, student, "request.count", "transfer_request", str(request.id), counted=counted)
+    session.commit()
+    return request
+
+
 def ensure_student(user: User) -> None:
     if user.role != Role.STUDENT:
         raise PermissionDeniedError(tr("학생 계정으로 로그인해 주세요."))
@@ -530,17 +700,20 @@ def readiness(session: Session, request: TransferRequest) -> Readiness:
     if request.status == RequestStatus.DRAFT:
         entries = request_repo.transcript_entries(session, request.id)
         total += 1
-        if request.transcript_file_key:
+        if has_transcript(request):
             done += 1
         else:
-            todos.append(Todo("missing", tr("성적표 올리기"), f"{base}#transcript"))
+            todos.append(Todo("missing", tr("성적표 올리기"), "/student/transcript"))
         if entries:
             # 강의계획서 없이 확인한 과목(인정 신청하지 않는 과목)은 준비된 것으로 본다
             unlinked = sum(1 for e in entries if e.syllabus_id is None and not e.link_confirmed)
             unconfirmed = sum(1 for e in entries if e.syllabus_id is not None and not e.link_confirmed)
             total += len(entries)
             done += len(entries) - unlinked - unconfirmed
-            if unlinked:
+            if unlinked and request.course_key:
+                course = (entries[0].code or entries[0].title).strip()
+                todos.append(Todo("missing", tr("{course} 강의계획서 올리기", course=course), f"{base}#upload"))
+            elif unlinked:
                 todos.append(Todo("missing", tr("강의계획서 미등록 {unlinked}건", unlinked=unlinked), f"{base}#upload"))
             if unconfirmed:
                 todos.append(

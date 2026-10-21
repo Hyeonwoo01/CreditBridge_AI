@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import time %}
+{% block nav %}{% include "student/_nav.html" %}{% endblock %}
+{% block content %}
+<header class="grid gap-2">
+  <h1 class="page-title">{{ _("내 성적표") }}</h1>
+  <p class="text-muted">{{ _("다니던 대학의 성적표를 한 번 올리면 모든 편입 요청에 함께 쓰여요. 성적이 C 미만(C- 이하)인 과목은 인정 대상이 아니에요.") }}</p>
+</header>
+
+{% if transcript is none %}
+<p class="mt-6 rounded-md bg-pearl p-4 text-sm text-ink-80" role="status">{{ _("편입 요청을 만들기 전에 성적표를 먼저 올려 주세요.") }}</p>
+{% else %}
+<section class="card mt-6 grid gap-3" aria-labelledby="current-title">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 id="current-title" class="section-title">{{ _("올린 성적표") }}</h2>
+    {% if transcript.status == 'processing' %}
+    <span class="badge"><span class="size-3 animate-spin rounded-full border-2 border-primary/20 border-t-primary"></span>{{ _("과목 정리 중") }}</span>
+    {% elif transcript.status == 'failed' %}
+    <span class="badge text-reject">{{ _("읽지 못함") }}</span>
+    {% else %}
+    <span class="badge-approve">{{ _("과목 {n}개", n=(transcript.lines | length if transcript.lines else 0)) }}</span>
+    {% endif %}
+  </div>
+  <p class="text-sm text-muted">{{ _("올린 날 {time}", time=(time(transcript.uploaded_at))) }}{% if transcript.masked_name %} · {{ _("등록됨: {transcript_masked_name}", transcript_masked_name=(transcript.masked_name)) }}{% endif %}</p>
+  {% if transcript.status == 'failed' %}<p class="text-sm text-reject">{{ transcript.error_message | t }}</p>{% endif %}
+  {% if transcript.status == 'processing' %}<p class="text-sm text-muted">{{ _("과목 목록을 정리하고 있어요. 잠시 뒤 새로고침해 주세요. 그동안에도 편입 요청을 만들고 강의계획서를 올릴 수 있어요.") }}</p>{% endif %}
+  {% if transcript.lines %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-left text-muted"><tr><th class="py-2 pr-3 font-normal">{{ _("성적표 과목") }}</th><th class="py-2 pr-3 font-normal">{{ _("학점·성적") }}</th><th class="py-2 font-normal">{{ _("학기") }}</th></tr></thead>
+      <tbody>
+      {% for line in transcript.lines %}
+        <tr class="border-t border-divider">
+          <td class="py-3 pr-3">{{ line.title }}{% if line.code %} <span class="text-muted">({{ line.code }})</span>{% endif %}</td>
+          <td class="py-3 pr-3 whitespace-nowrap">{{ line.credits if line.credits is not none else '–' }} · {% if grade_failed(line.grade) %}<span class="text-reject">{{ line.grade }} · {{ _("성적 기준 미달") }}</span>{% else %}{{ line.grade or '–' }}{% endif %}</td>
+          <td class="py-3 text-muted">{{ line.term or '–' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<form method="post" action="/student/transcript" enctype="multipart/form-data" class="mt-6 grid gap-3 dropzone">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <span class="font-semibold">{{ _("성적표 올리기") if transcript is none else _("성적표 바꾸기") }}</span>
+  <span class="text-sm text-muted">{{ _("이름·학번은 가려서 분석하고 원본은 암호화해 보관해요.") }} {{ _("PDF 또는 스캔 이미지(JPG·PNG)") }}</span>
+  {% if transcript is not none %}<span class="text-sm text-muted">{{ _("새 성적표는 아직 심사를 요청하지 않은 요청에만 반영돼요. 이미 심사를 요청한 요청은 제출할 때의 성적표로 심사해요.") }}</span>{% endif %}
+  <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" class="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-parchment file:text-primary file:px-4 file:py-2 file:font-normal">
+  <button class="btn-primary justify-self-start">{{ _("성적표 등록") }}</button>
+</form>
+{% endblock %}

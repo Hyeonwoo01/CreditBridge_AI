@@ -4,13 +4,12 @@
 {% block content %}
 <header class="grid gap-2">
   <h1 class="page-title">{{ _("내 편입 요청") }}</h1>
-  <p class="text-muted">{{ _("강의계획서를 올리면 수강 신청 전에 과목별 예상 인정 결과와 근거를 볼 수 있어요.") }}</p>
+  <p class="text-muted">{{ _("성적표에서 성적이 C 이상인 과목마다 요청이 만들어져 있어요. 과목마다 강의계획서를 올리면 수강 신청 전에 예상 인정 결과와 근거를 볼 수 있어요.") }}</p>
 </header>
 
 {% if home.target %}
 {# 출신 대학·편입 전공은 학교가 계정을 만들 때 정한 값이라 학생이 고르지 않는다 #}
-<form method="post" action="/student/requests" class="mt-6 flex flex-col gap-3 rounded-lg border border-hairline bg-white p-4 md:flex-row md:items-center md:rounded-full md:py-2 md:pr-2 md:pl-7">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div class="mt-6 flex flex-col gap-3 rounded-lg border border-hairline bg-white p-4 md:flex-row md:items-center md:rounded-full md:py-2 md:pr-2 md:pl-7">
   <div class="grid flex-1 gap-0.5 px-3 md:px-0">
     <span class="text-xs font-semibold">{{ _("다니던 대학") }}</span>
     <span class="text-sm text-ink-80">{{ home.source.name if home.source else '–' }}</span>
@@ -25,10 +24,9 @@
     <span class="text-xs font-semibold">{{ _("전공") }}</span>
     <span class="text-sm text-ink-80">{{ home.major or '–' }}</span>
   </div>
-  {% if home.source and home.major %}
-  <button class="btn-primary px-7 text-[18px] font-light">{{ _("새 요청 만들기") }}</button>
-  {% endif %}
-</form>
+  <span class="hidden h-8 w-px bg-hairline md:block"></span>
+  <a href="/student/transcript" class="btn-text px-3 text-sm md:px-5">{{ _("내 성적표") }} ›</a>
+</div>
 {% if home.source and home.major %}
 <p class="mt-2 px-1 text-xs text-muted">{{ _("다니던 대학과 편입 전공은 학사처가 등록한 정보예요. 다르면 학사처에 수정을 요청해 주세요.") }}</p>
 {% else %}
@@ -38,19 +36,51 @@
 <p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">{{ _("입학이 확정된 대학에 소속된 계정만 편입 요청을 만들 수 있어요. 학사처에 계정 연결을 요청해 주세요.") }}</p>
 {% endif %}
 
+{% if home.transcript and home.transcript.status == 'processing' %}
+<p class="mt-4 flex items-center gap-3 rounded-md bg-parchment p-4 text-sm text-ink-80" role="status"><span class="size-4 animate-spin rounded-full border-2 border-primary/20 border-t-primary"></span>{{ _("성적표를 읽고 있어요. 성적이 C 이상인 과목이 곧 아래에 나와요. 잠시 뒤 새로고침해 주세요.") }}</p>
+{% elif home.transcript and home.transcript.status == 'failed' %}
+<p class="mt-4 rounded-md bg-pearl p-4 text-sm text-reject" role="alert">{{ home.transcript.error_message | t }} <a href="/student/transcript" class="underline">{{ _("성적표 다시 올리기") }}</a></p>
+{% endif %}
+
 {% if home.total %}
 {% set tot = home.total %}
 {% set ts = tot.simulation %}
 <section class="mt-10 grid gap-3" aria-labelledby="total-title">
   <div class="grid gap-1">
     <h2 id="total-title" class="section-title">{{ _("전체 합계") }}</h2>
-    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 세고, 문서 삭제로 종료된 요청은 넣지 않았어요.", requests=(tot.requests)) }}</p>
+    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 세고, 문서 삭제로 종료된 요청은 넣지 않았어요.", requests=(tot.requests)) }} {{ _("편입 학점 상한 {cap}학점까지만 졸업 학점에 넣어요.", cap=(tot.cap)) }}</p>
   </div>
   <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ ts.credits_low | round(1) }}{% if ts.credits_high != ts.credits_low %}~{{ ts.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(ts.source_credits | round(1))) }}</span></dd></div>
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("판정 확정") }}</dt><dd class="font-semibold tabular-nums">{{ tot.decided }} <span class="text-sm font-normal text-muted">{{ _("/ {courses}과목", courses=(tot.courses)) }}</span></dd></div>
     <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">{{ _("남은 학기(예상)") }}</dt><dd class="font-semibold tabular-nums">{{ ts.semesters_low }}{% if ts.semesters_high != ts.semesters_low %}~{{ ts.semesters_high }}{% endif %}{{ _("학기") }}</dd></div>
   </dl>
+  {% if tot.over_cap or tot.left_out %}
+  {# 편입 학점 상한을 넘으면 학생이 졸업 학점에 넣을 과목을 고른다 (지도교수와 상의해 전공 필수·핵심 교양 우선) #}
+  <div class="grid gap-3 rounded-md border border-elective/40 bg-elective-subtle p-4 text-sm">
+    {% if tot.over_cap %}
+    <p class="font-semibold text-elective">{{ _("인정 가능 학점({credits}학점)이 편입 학점 상한({cap}학점)을 넘어요.", credits=(tot.raw_high | round(1)), cap=(tot.cap)) }}</p>
+    {% endif %}
+    <p class="text-ink-80">{{ _("지도교수와 상의해 전공 필수·핵심 교양처럼 나에게 유리한 과목을 졸업 학점에 넣고, 나머지는 빼 주세요. 뺀 과목도 심사는 그대로 받아요.") }}</p>
+    <ul class="grid divide-y divide-hairline rounded-md border border-hairline bg-white">
+      {% for sm in tot.choices %}
+      <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+        <span class="min-w-0">{% if sm.course %}{{ sm.course.code or '' }} {{ sm.course.title }}{% else %}{{ sm.request.source_institution.name }} · {{ _("과목 {n}개", n=(sm.courses)) }}{% endif %} <span class="text-muted tabular-nums">· {{ _("예상 {credits}학점", credits=(sm.simulation.credits_high | round(1))) }}</span></span>
+        <form method="post" action="/student/requests/{{ sm.request.id }}/counted" class="flex items-center gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          {% if sm.request.counted %}
+          <span class="badge-approve">{{ _("졸업 학점에 넣음") }}</span>
+          <input type="hidden" name="counted" value="0"><button class="btn-text btn-sm text-xs">{{ _("빼기") }}</button>
+          {% else %}
+          <span class="badge">{{ _("졸업 학점에서 뺌") }}</span>
+          <input type="hidden" name="counted" value="1"><button class="btn-text btn-sm text-xs">{{ _("다시 넣기") }}</button>
+          {% endif %}
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
 </section>
 {% endif %}
 
@@ -64,7 +94,7 @@
     {% for r, t in home.todos %}
     <li><a href="{{ t.href }}" class="flex items-center gap-3 px-5 py-3.5 hover:text-primary">
       <span class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold {{ 'bg-elective-subtle text-elective' if t.kind == 'missing' else 'bg-hl-target text-primary' }}" aria-hidden="true">{{ '!' if t.kind == 'missing' else '→' }}</span>
-      <span class="grid flex-1 gap-0.5"><span>{{ t.label }}</span>{% if home.requests | length > 1 %}<span class="text-xs text-muted">{{ r.source_institution.name }} → {{ r.target_institution.name }}</span>{% endif %}</span>
+      <span class="grid flex-1 gap-0.5"><span>{{ t.label }}</span>{% if home.requests | length > 1 and not r.course_key %}<span class="text-xs text-muted">{{ r.source_institution.name }} → {{ r.target_institution.name }}</span>{% endif %}</span>
       <span aria-hidden="true" class="text-muted">›</span>
     </a></li>
     {% endfor %}
@@ -80,13 +110,21 @@
   <a href="/student/requests/{{ r.id }}" class="card grid gap-4 hover:border-primary/40">
     <div class="flex items-start justify-between gap-4">
       <div class="grid gap-1">
+        {% set state = {"draft": _("준비 중 (사전 시뮬레이션)"), "submitted": _("학사처 심사 중"), "decided": _("판정 완료"), "closed": _("문서 삭제로 종료")}[r.status] %}
+        {% if sm.course %}
+        <span class="font-semibold">{{ sm.course.code or '' }} {{ sm.course.title }}{% if not r.counted %} <span class="badge ml-1 align-middle font-normal">{{ _("졸업 학점에서 뺌") }}</span>{% endif %}</span>
+        <span class="text-sm text-muted">{{ _("성적 {grade}", grade=(sm.course.grade or '–')) }}{% if sm.course.credits is not none %} {{ _("· {credits}학점", credits=(sm.course.credits | round(1))) }}{% endif %} · {{ state }}</span>
+        {% else %}
         <span class="font-semibold">{{ r.source_institution.name }} → {{ r.target_institution.name }}{% if r.major %} · {{ r.major }}{% endif %}</span>
-        <span class="text-sm text-muted">{{ _("만든 날 {time} · {draft}", time=(time(r.created_at, "date")), draft=({"draft": _("준비 중 (사전 시뮬레이션)"), "submitted": _("학사처 심사 중"), "decided": _("판정 완료"), "closed": _("문서 삭제로 종료")}[r.status])) }}</span>
+        <span class="text-sm text-muted">{{ _("만든 날 {time} · {draft}", time=(time(r.created_at, "date")), draft=state) }}</span>
+        {% endif %}
       </div>
       <span aria-hidden="true">›</span>
     </div>
     {% if r.status == "closed" %}
     <p class="text-sm text-muted">{{ _("문서가 삭제돼 전체 합계에서 빠진 요청이에요. 판정 기록은 요청을 열어 볼 수 있어요.") }}</p>
+    {% elif sm.course and not sm.courses %}
+    <p class="text-sm text-elective">{{ _("이 과목의 강의계획서를 올려 주세요.") }} ›</p>
     {% elif sm.courses %}
     <dl class="grid grid-cols-2 gap-3">
       <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ sim.credits_low | round(1) }}{% if sim.credits_high != sim.credits_low %}~{{ sim.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(sim.source_credits | round(1))) }}</span></dd></div>
@@ -117,9 +155,9 @@
 {{ request_card(sm) }}
   {% else %}
   {% if not closed_summaries %}
-  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("아직 편입 요청이 없어요. 위에서 대학을 골라 시작해 보세요.") }}</p>
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("성적표에서 인정 대상 과목(성적 C 이상)을 아직 찾지 못했어요. 성적표 화면에서 과목 목록을 확인해 주세요.") if home.transcript and home.transcript.status == 'ready' else _("성적표를 읽으면 과목이 여기에 나와요.") }}</p>
   {% else %}
-  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("진행 중인 편입 요청이 없어요. 새 요청을 만들어 시작해 보세요.") }}</p>
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("진행 중인 편입 요청이 없어요.") }}</p>
   {% endif %}
   {% endfor %}
   {% if closed_summaries %}

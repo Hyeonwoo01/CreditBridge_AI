@@ -15,6 +15,12 @@ class RequestStatus(StrEnum):
     CLOSED = "closed"  # 문서 삭제 승인으로 종료 (더 올리거나 심사하지 않는다. 판정 기록은 남는다)
 
 
+class TranscriptStatus(StrEnum):
+    PROCESSING = "processing"  # 올림, 과목 목록 추출 중
+    READY = "ready"
+    FAILED = "failed"
+
+
 class SyllabusStatus(StrEnum):
     UPLOADED = "uploaded"
     PROCESSING = "processing"

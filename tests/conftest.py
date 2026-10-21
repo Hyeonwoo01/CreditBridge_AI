@@ -13,6 +13,7 @@ os.environ["CLAUDE_MODEL"] = "fake-claude"
 os.environ["SESSION_SECRET"] = "test-secret"
 os.environ["APP_ENV"] = "test"
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -68,7 +69,21 @@ def seeded(db: Session) -> Session:
     from scripts.seed_demo import seed
 
     seed(db)
+    give_transcripts(db)
     return db
+
+
+def give_transcripts(db: Session) -> None:
+    """학생은 처음 들어오면 성적표부터 올린다. 다른 흐름을 시험할 수 있게 데모 학생에게 과목 줄이 없는
+    계정 성적표를 미리 붙여 둔다 (성적표 흐름 자체는 test_account_transcript.py에서 시험)."""
+    from sqlalchemy import select
+
+    from backend.db.base import utcnow
+    from backend.models import StudentTranscript, User
+
+    for student in db.scalars(select(User).where(User.role == "student")):
+        db.add(StudentTranscript(student_id=student.id, status="ready", lines=[], uploaded_at=utcnow()))
+    db.commit()
 
 
 @pytest.fixture
@@ -113,6 +128,18 @@ def login(client: TestClient, email: str, password: str = "demo1234") -> str:
 
 def demo_text(name: str) -> str:
     return (DEMO / name).read_text(encoding="utf-8")
+
+
+def send_transcript(client: TestClient, token: str, text: str) -> httpx.Response:
+    """계정 성적표 올리기 (글을 PDF로 바꿔서)."""
+    from scripts.make_demo_pdfs import text_to_pdf
+
+    return client.post(
+        "/student/transcript",
+        files={"file": ("transcript.pdf", text_to_pdf(text), "application/pdf")},
+        data={"csrf_token": token},
+        follow_redirects=False,
+    )
 
 
 def demo_pdf(name: str, extra: str = "") -> bytes:

@@ -54,17 +54,17 @@ def evaluate_syllabus(syllabus_id: int) -> None:
         _deliver(session)
 
 
-@celery_app.task(name="transcript.process")
-def process_transcript(request_id: int) -> None:
+@celery_app.task(name="transcript.process_student")
+def process_student_transcript(student_id: int) -> None:
     with SessionLocal() as session:
         try:
-            analysis.process_transcript(session, request_id, llm=get_llm(), storage=get_storage())
+            analysis.process_student_transcript(session, student_id, llm=get_llm(), storage=get_storage())
         except SoftTimeLimitExceeded:
-            session.rollback()
-            logger.warning("transcript processing timed out", extra={"request_id": request_id})
+            analysis.mark_transcript_timed_out(session, student_id)
+            logger.warning("transcript processing timed out", extra={"student_id": student_id})
         except LLMError as exc:
             logger.warning(
-                "transcript processing failed", extra={"request_id": request_id, "error": type(exc).__name__}
+                "transcript processing failed", extra={"student_id": student_id, "error": type(exc).__name__}
             )
 
 

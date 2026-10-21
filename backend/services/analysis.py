@@ -16,17 +16,28 @@ from backend.ai import injection, matching
 from backend.ai.extraction import build_chunks, extract_syllabus
 from backend.ai.llm_client import LLMClient
 from backend.ai.prompts_loader import load_prompt
+from backend.db.base import utcnow
 from backend.documents import text as doc_text
 from backend.documents.storage import ObjectStorage
 from backend.errors import LLMError, LLMNotConfiguredError
 from backend.i18n import N_
-from backend.models import CourseEvaluation, EvidenceSpan, Syllabus, SyllabusChunk, TranscriptEntry, TransferRequest
-from backend.models.enums import EvaluationStatus, Recommendation, RequestStatus, SyllabusStatus
+from backend.models import (
+    CourseEvaluation,
+    EvidenceSpan,
+    StudentTranscript,
+    Syllabus,
+    SyllabusChunk,
+    TranscriptEntry,
+    TransferRequest,
+)
+from backend.models.enums import EvaluationStatus, Recommendation, RequestStatus, SyllabusStatus, TranscriptStatus
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
+from backend.repositories import transcripts as transcript_repo
+from backend.repositories import users as user_repo
 from backend.schemas.extraction import SyllabusExtraction
 from backend.schemas.results import CandidateResult, EvaluationResult
 from backend.schemas.transcript import TranscriptExtraction
@@ -544,29 +555,84 @@ def relink_transcript(session: Session, request_id: int) -> None:
         review.release_grade_failed(session, request)
 
 
-def process_transcript(session: Session, request_id: int, *, llm: LLMClient, storage: ObjectStorage) -> None:
-    request = request_repo.get(session, request_id)
-    if request is None or not request.transcript_file_key:
-        return
-    filename = request.transcript_file_key.rsplit("/", 1)[-1]
-    text = document_to_text(llm, storage.get(request.transcript_file_key), filename).text
-    masked = mask_pii(text)
-    request.transcript_masked_name = masked.masked_name
-    result = llm.parse(load_prompt("transcript").render(transcript=masked.text), TranscriptExtraction, effort="low")
+# 계정 성적표를 읽지 못했을 때 (학생 성적표 화면에 표시)
+TRANSCRIPT_FAILED = N_("성적표를 읽지 못했어요. 글자가 잘 보이는 PDF나 사진으로 다시 올려 주세요.")
+
+
+def copy_account_transcript(session: Session, transcript: StudentTranscript | None, request: TransferRequest) -> bool:
+    """계정 성적표의 과목 목록을 아직 제출하지 않은 요청에 복사한다 (기존 목록은 바꾼다). 복사했으면 True.
+    연결은 relink_transcript가 강의계획서 분석이 끝날 때마다 다시 맞춘다."""
+    if transcript is None or transcript.status != TranscriptStatus.READY or request.status != RequestStatus.DRAFT:
+        return False
     request_repo.replace_transcript_entries(
         session,
         request.id,
         [
             TranscriptEntry(
                 transfer_request_id=request.id,
-                title=line.title[:255],
-                code=(line.code or None) and line.code[:50],
-                credits=line.credits,
-                grade=(line.grade or None) and line.grade[:10],
-                term=(line.term or None) and line.term[:50],
+                title=str(line.get("title") or "")[:255],
+                code=line.get("code") or None,
+                credits=line.get("credits"),
+                grade=line.get("grade") or None,
+                term=line.get("term") or None,
             )
-            for line in result.output.entries
+            for line in transcript.lines or []
         ],
     )
+    request.transcript_masked_name = transcript.masked_name
+    request.transcript_copied_at = utcnow()
+    return True
+
+
+def process_student_transcript(session: Session, student_id: int, *, llm: LLMClient, storage: ObjectStorage) -> None:
+    """학생 계정 성적표: 이름·학번을 가리고 과목 줄을 뽑아 저장한 뒤, 아직 제출하지 않은 요청에 복사해 연결한다."""
+    transcript = transcript_repo.for_student(session, student_id)
+    if transcript is None or not transcript.file_key:
+        return
+    try:
+        filename = transcript.file_key.rsplit("/", 1)[-1]
+        text = document_to_text(llm, storage.get(transcript.file_key), filename).text
+        masked = mask_pii(text)
+        result = llm.parse(load_prompt("transcript").render(transcript=masked.text), TranscriptExtraction, effort="low")
+    except LLMError as exc:
+        session.rollback()
+        transcript.status = TranscriptStatus.FAILED
+        transcript.error_message = NOT_CONFIGURED if _not_configured(exc) else TRANSCRIPT_FAILED
+        session.commit()
+        raise
+    transcript.masked_name = masked.masked_name
+    transcript.lines = [
+        {
+            "title": line.title[:255],
+            "code": (line.code or None) and line.code[:50],
+            "credits": line.credits,
+            "grade": (line.grade or None) and line.grade[:10],
+            "term": (line.term or None) and line.term[:50],
+        }
+        for line in result.output.entries
+    ]
+    transcript.status = TranscriptStatus.READY
+    transcript.error_message = None
+    # 성적이 C 이상인 과목마다 요청을 만들고(과목 요청), 예전처럼 직접 만든 초안에는 과목 목록을 복사한다
+    from backend.services import student as student_service  # student → analysis 순환을 피해 여기서
+
+    student = user_repo.get_by_id(session, student_id)
+    if student is not None:
+        student_service.sync_course_requests(session, student, transcript)
+    drafts = [
+        r for r in request_repo.drafts_of_student(session, student_id) if not r.transcript_file_key and not r.course_key
+    ]
+    for request in drafts:
+        copy_account_transcript(session, transcript, request)
     session.commit()
-    relink_transcript(session, request.id)
+    for request in drafts:
+        relink_transcript(session, request.id)
+
+
+def mark_transcript_timed_out(session: Session, student_id: int) -> None:
+    session.rollback()
+    transcript = transcript_repo.for_student(session, student_id)
+    if transcript is not None and transcript.status == TranscriptStatus.PROCESSING:
+        transcript.status = TranscriptStatus.FAILED
+        transcript.error_message = TRANSCRIPT_FAILED
+        session.commit()

@@ -54,8 +54,8 @@
 | 보완 요청 띠 | 알림 띠 | "학사처·교수가 보완 자료를 요청한 과목이 N개 있어요. 아래 보완 필요 과목에서…" | `{colors.surface-elective-subtle}`, 테두리 `{colors.status-elective}` 40% |
 | 필터 | `filter-chip` (링크) | 전체 · 승인 완료 · 보완 필요 · 심사 중 + 건수. 계산 조건(tuition·degree)을 바꿨으면 링크에 유지. 오른쪽에 "개념 커버리지 75% 이상이면 직접 인정 추천" | 높이 36px, `{rounded.pill}`, 선택 시 `{colors.ink}` 채움 + 흰 글자 |
 | 과목 카드 | `evaluation-utility-card` | 아래 "과목 카드" 참고 | `{rounded.lg}`, 패딩 20px, 1px `{colors.hairline}` (보완 필요는 `{colors.status-elective}` 50% 테두리) |
-| 업로드 | `upload-dropzone-card` ×2 (`#upload`) | 초안일 때만. 강의계획서: PDF·JPG·PNG, 여러 파일, 최대 30건·20MB, [분석 시작] / 성적표: 선택 항목, 마스킹 안내, 등록된 마스킹 이름, [성적표 등록] | 점선 `{colors.ink-muted-48}`, `{rounded.lg}`, 버튼 `button-primary` / `button-secondary-pill` |
-| 성적표 연결 | 표 | 성적표 과목 / 학점·성적 / 연결할 강의계획서 select + [확인] / "확인 필요" | "확인 필요" `{colors.status-reject}` |
+| 업로드 | `upload-dropzone-card` + 성적표 카드 (`#upload`) | 초안일 때만. 과목 요청(성적표 C 이상 과목마다 자동 생성)은 "이 과목의 강의계획서 올리기" 한 건(PDF·JPG·PNG, 20MB), 올리면 그 과목의 성적표 줄에 바로 연결하고 업로드 칸·[새 강의계획서 추가 업로드]가 사라짐(두 번째 파일은 "이 과목에는 강의계획서를 한 건만 올려요…"). 예전 방식 요청은 여러 파일·최대 30건. 성적표 카드: "계정에 올린 성적표를 이 요청에 쓰고 있어요." + 마스킹 이름 + [성적표 보기·바꾸기](P26). 제목 아래 과목 요청은 과목 코드·이름·성적·학점 | 점선 `{colors.ink-muted-48}`, `{rounded.lg}`, 버튼 `button-primary` / `button-secondary-pill` |
+| 성적표 연결 | 표 | 예전 방식(여러 과목) 요청에만. 성적표 과목 / 학점·성적 / 연결할 강의계획서 select + [확인] / "확인 필요". 심사를 요청한 뒤에는 고를 수 없고 연결된 과목 이름만("심사를 요청할 때의 성적표와 연결로 심사해요.") | "확인 필요" `{colors.status-reject}` |
 | 진행 현황 | `progress-stepper` | 아래 "심사 진행 현황" 참고 + 초안이면 [학사처에 심사 요청](분석 중이거나 과목 없으면 비활성) | 카드 패딩 20px |
 | 계산 조건 | `evaluation-utility-card` | 학점당 등록금($), 졸업 학점 → GET으로 다시 계산(필터 유지) | 입력 44px |
 | 삭제 요청 | 텍스트 링크 | 확인창 후 POST `/student/requests/{id}/delete-documents`. 처리 중이면 "요청됨 · 기한", 완료면 완료일 | 14px `{colors.ink-muted-48}` 밑줄 |

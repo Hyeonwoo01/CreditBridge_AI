@@ -182,4 +182,5 @@ def render(request: Request, name: str, status_code: int = 200, **context: Any) 
 
 
 def flash(request: Request, message: str, kind: str = "info") -> None:
-    request.session.setdefault("flash", []).append({"message": message, "kind": kind})
+    # 목록을 새로 넣어야 이미 문구가 있을 때도 세션에 남는다
+    request.session["flash"] = [*request.session.get("flash", []), {"message": message, "kind": kind}]

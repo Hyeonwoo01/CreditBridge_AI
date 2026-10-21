@@ -24,6 +24,7 @@ from backend.services import privacy as privacy_service
 from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
+from backend.services.student import DEFAULT_TRANSFER_CAP
 from backend.web.nav import nav_badges
 from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
@@ -332,6 +333,25 @@ def import_courses(
         tr("과목 {created}건을 새로 만들고 {updated}건을 고쳤어요.", created=result.created, updated=result.updated),
     )
     return RedirectResponse("/admin/data#courses", status_code=303)
+
+
+@router.post("/data/transfer-cap")
+def transfer_cap(
+    request: Request,
+    cap: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        saved = institution_data.set_transfer_cap(session, user, cap)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        flash(request, tr("편입 학점 상한을 {cap}학점으로 정했어요.", cap=saved or DEFAULT_TRANSFER_CAP))
+    return RedirectResponse("/admin/data#transfer-cap", status_code=303)
 
 
 @router.post("/data/institutions")

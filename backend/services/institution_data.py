@@ -438,6 +438,28 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
 # ---------- 출신 대학 ----------
 
 
+def set_transfer_cap(session: Session, admin: User, value: str) -> int | None:
+    """편입 학점 상한을 정한다 (비우면 기본 60학점). 넘으면 학생이 졸업 학점에 넣을 과목을 고른다."""
+    institution_id = ensure_admin(admin)
+    institution = catalog_repo.get_institution(session, institution_id)
+    if institution is None:
+        raise NotFoundError(tr("소속 대학을 찾을 수 없어요."))
+    value = value.strip()
+    if value and not (value.isdigit() and 1 <= int(value) <= 300):
+        raise CreditBridgeError(tr("편입 학점 상한은 1~300 사이 숫자로 적어 주세요."))
+    institution.max_transfer_credits = int(value) if value else None
+    audit.record(
+        session,
+        admin,
+        "institution.transfer_cap",
+        "institution",
+        str(institution_id),
+        cap=institution.max_transfer_credits,
+    )
+    session.commit()
+    return institution.max_transfer_credits
+
+
 def add_source_institution(session: Session, admin: User, name: str, country: str) -> Institution:
     """④ 출신 대학 목록에 올린다. 다른 대학이 같은 이름으로 먼저 만든 행이 있으면 그 행을 함께 쓴다."""
     institution_id = ensure_admin(admin)

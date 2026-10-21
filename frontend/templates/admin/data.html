@@ -197,6 +197,16 @@
   </div>
 </section>
 
+<section id="transfer-cap" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="cap-title">
+  <h2 id="cap-title" class="section-title">{{ _("편입 학점 상한") }}</h2>
+  <p class="text-sm text-muted">{{ _("편입으로 인정받을 수 있는 최대 학점이에요. 학생의 인정 학점이 이보다 많으면 학생이 지도교수와 상의해 졸업 학점에 넣을 과목을 골라요. 비우면 60학점으로 봐요.") }}</p>
+  <form method="post" action="/admin/data/transfer-cap" class="card flex flex-wrap items-end gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="field"><span>{{ _("최대 학점") }}</span><input class="input h-11" type="number" name="cap" min="1" max="300" value="{{ o.institution.max_transfer_credits or '' }}" placeholder="60"></label>
+    <button class="btn-primary h-11">{{ _("저장") }}</button>
+  </form>
+</section>
+
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
   <div class="grid gap-3">
     <h2 class="section-title">{{ _("④ 출신 대학") }}</h2>

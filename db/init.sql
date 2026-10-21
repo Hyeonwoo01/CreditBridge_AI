@@ -577,5 +577,64 @@ UPDATE appeals SET reason = ''
 
 UPDATE alembic_version SET version_num='0006' WHERE alembic_version.version_num = '0005';
 
+-- Running upgrade 0006 -> 0007
+
+CREATE TABLE student_transcripts (
+    student_id BIGINT NOT NULL, 
+    file_key VARCHAR(255), 
+    masked_name VARCHAR(100), 
+    lines JSONB, 
+    status VARCHAR(20) NOT NULL, 
+    error_message VARCHAR(500), 
+    uploaded_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_student_transcripts PRIMARY KEY (id), 
+    CONSTRAINT ck_student_transcripts_status_valid CHECK (status IN ('processing', 'ready', 'failed')), 
+    CONSTRAINT fk_student_transcripts_student_id_users FOREIGN KEY(student_id) REFERENCES users (id), 
+    CONSTRAINT uq_student_transcripts_student_id UNIQUE (student_id)
+);
+
+ALTER TABLE transfer_requests ADD COLUMN transcript_copied_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE transfer_requests ADD COLUMN course_key VARCHAR(300);
+
+ALTER TABLE transfer_requests ADD COLUMN counted BOOLEAN DEFAULT true NOT NULL;
+
+ALTER TABLE institutions ADD COLUMN max_transfer_credits INTEGER;
+
+INSERT INTO student_transcripts (student_id, file_key, masked_name, lines, status, uploaded_at, created_at)
+        SELECT DISTINCT ON (r.student_id)
+            r.student_id, r.transcript_file_key, r.transcript_masked_name,
+            (SELECT jsonb_agg(jsonb_build_object(
+                    'title', e.title, 'code', e.code, 'credits', e.credits, 'grade', e.grade, 'term', e.term
+                ) ORDER BY e.id)
+             FROM transcript_entries AS e WHERE e.transfer_request_id = r.id),
+            'ready', r.created_at, now() AT TIME ZONE 'utc'
+        FROM transfer_requests AS r
+        WHERE r.transcript_file_key IS NOT NULL
+        ORDER BY r.student_id, r.created_at DESC, r.id DESC;
+
+UPDATE transfer_requests AS r
+        SET transcript_file_key = NULL, transcript_copied_at = now() AT TIME ZONE 'utc'
+        FROM student_transcripts AS t
+        WHERE t.file_key = r.transcript_file_key;
+
+INSERT INTO transcript_entries (transfer_request_id, title, code, credits, grade, term, link_confirmed, created_at)
+        SELECT r.id, line->>'title', line->>'code', (line->>'credits')::numeric, line->>'grade', line->>'term',
+            false, now() AT TIME ZONE 'utc'
+        FROM transfer_requests AS r
+        JOIN student_transcripts AS t ON t.student_id = r.student_id
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(t.lines, '[]'::jsonb)) AS line
+        WHERE r.status = 'draft' AND r.transcript_file_key IS NULL AND r.transcript_copied_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM transcript_entries AS e WHERE e.transfer_request_id = r.id);
+
+UPDATE transfer_requests AS r SET transcript_copied_at = now() AT TIME ZONE 'utc'
+        FROM student_transcripts AS t
+        WHERE t.student_id = r.student_id AND r.status = 'draft'
+            AND r.transcript_file_key IS NULL AND r.transcript_copied_at IS NULL;
+
+UPDATE alembic_version SET version_num='0007' WHERE alembic_version.version_num = '0006';
+
 COMMIT;
 

@@ -14,15 +14,19 @@ from backend.models import (
     User,
 )
 from scripts.make_demo_pdfs import text_to_pdf
-from tests.conftest import demo_pdf, demo_text, login
+from tests.conftest import demo_pdf, demo_text, login, send_transcript
 from tests.fakes import FABRICATED_QUOTE, FakeLLM, FakeStorage
 
 
-def new_request(client: TestClient, db: Session, token: str) -> int:
-    """출신 대학·편입 전공은 계정에 정해진 값으로 (데모 학생: Hankuk University, Computer Science and Engineering)."""
-    r = client.post("/student/requests", data={"csrf_token": token}, follow_redirects=False)
-    assert r.status_code == 303, r.text
-    return int(r.headers["location"].rsplit("/", 1)[-1])
+def new_request(client: TestClient, db: Session, token: str, email: str = "jiwon@student.example") -> int:
+    """여러 과목을 담는 요청을 바로 만든다 (예전 방식, 화면에는 버튼이 없다). 학생 화면은 성적표의 C 이상 과목마다
+    요청을 자동으로 만들지만(test_course_requests.py), 여러 과목을 한 번에 다루는 흐름 시험에는 이 요청을 쓴다.
+    출신 대학·편입 전공은 계정에 정해진 값으로 (데모 학생: Hankuk University, Computer Science and Engineering)."""
+    from backend.services import student as student_service
+
+    student = db.scalars(select(User).where(User.email == email)).one()
+    request, _ = student_service.create_request(db, student)
+    return request.id
 
 
 def upload(client: TestClient, request_id: int, token: str, *names: str, extra: str = "") -> str:
@@ -232,12 +236,7 @@ def test_transcript_is_masked_before_llm_and_linked(client: TestClient, seeded: 
         "Hankuk University Official Transcript\nName: Lee Jiwon\nStudent ID: 2022104455\nDate of Birth: 2003-05-01\n"
         "MATH 101 | Calculus I | 3 | A\nCSE 204 | Data Structures | 3 | B+\n | Academic Writing | 2 | A\n"
     )
-    r = client.post(
-        f"/student/requests/{rid}/transcript",
-        files={"file": ("transcript.pdf", text_to_pdf(transcript), "application/pdf")},
-        data={"csrf_token": token},
-        follow_redirects=False,
-    )
+    r = send_transcript(client, token, transcript)  # 계정 성적표를 바꾸면 아직 제출하지 않은 요청에 복사된다
     assert r.status_code == 303
     prompt = fake_llm.prompts("TranscriptExtraction")[-1]
     assert "Jiwon" not in prompt and "2022104455" not in prompt and "2003-05-01" not in prompt
@@ -258,16 +257,11 @@ def test_transcript_is_masked_before_llm_and_linked(client: TestClient, seeded: 
 def test_request_uses_source_and_major_from_account(client: TestClient, seeded: Session) -> None:
     token = login(client, "jiwon@student.example")
     home = client.get("/student").text
-    assert "Hankuk University" in home and 'name="major"' not in home and 'name="source_institution_id"' not in home
-    # 폼에 다른 값을 넣어 보내도 계정 값을 쓴다
-    r = client.post(
-        "/student/requests",
-        data={"source_institution_id": 999, "major": "Astrology", "csrf_token": token},
-        follow_redirects=False,
-    )
-    rid = int(r.headers["location"].rsplit("/", 1)[-1])
-    request = seeded.get(TransferRequest, rid)
-    assert request is not None and request.major == "Computer Science and Engineering"
+    assert "Hankuk University" in home and 'name="major"' not in home and "새 요청 만들기" not in home
+    # 성적표의 C 이상 과목마다 요청이 생기고, 출신 대학·편입 전공·편입 대학은 계정 값을 쓴다
+    send_transcript(client, token, "Hankuk University Official Transcript\nMATH 101 | Calculus I | 3 | A\n")
+    request = seeded.scalars(select(TransferRequest).where(TransferRequest.course_key == "code:MATH101")).one()
+    assert request.major == "Computer Science and Engineering"
     assert request.source_institution.name.startswith("Hankuk University")
     assert request.target_institution.name == "Midwest State University"  # 소속 대학이 대상 대학
 
@@ -276,23 +270,17 @@ def test_request_uses_source_and_major_from_account(client: TestClient, seeded: 
     student.department_id = None
     seeded.commit()
     home = client.get("/student").text
-    assert "학사처(기관 관리자)에 등록을 요청해 주세요" in home and "새 요청 만들기" not in home
-    r = client.post("/student/requests", data={"csrf_token": token})
-    assert r.status_code == 400 and "출신 대학·편입 전공" in r.text
+    assert "학사처(기관 관리자)에 등록을 요청해 주세요" in home
     seeded.expire_all()
-    request = seeded.get(TransferRequest, rid)
-    assert request is not None and request.major == "Computer Science and Engineering"
+    assert seeded.get(TransferRequest, request.id).major == "Computer Science and Engineering"  # type: ignore[union-attr]
 
 
 def test_empty_draft_is_reused_and_can_be_deleted(client: TestClient, seeded: Session) -> None:
+    """여러 과목을 담는 예전 방식 요청: 서류 없는 초안은 다시 만들지 않고, 학생이 지울 수 있다."""
     token = login(client, "jiwon@student.example")
     first = new_request(client, seeded, token)
-    # 서류 없이 또 누르면 새로 만들지 않고 그 요청을 연다
-    r = client.post("/student/requests", data={"csrf_token": token})
-    assert r.url.path == f"/student/requests/{first}" and "그 요청을 열었어요" in r.text
-    assert "빈 요청 지우기" in r.text
-    student = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
-    assert len(seeded.scalars(select(TransferRequest).where(TransferRequest.student_id == student.id)).all()) == 1
+    assert new_request(client, seeded, token) == first  # 서류 없는 초안이 있으면 그 요청을 쓴다
+    assert "빈 요청 지우기" in client.get(f"/student/requests/{first}").text
 
     # 서류를 올린 요청은 지울 수 없고, 다음 요청은 새로 만든다
     upload(client, first, token, "calculus.txt")

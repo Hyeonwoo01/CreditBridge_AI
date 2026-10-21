@@ -21,6 +21,7 @@ from backend.models import (
     Institution,
     MaterialRequest,
     PrivacyRequest,
+    StudentTranscript,
     Syllabus,
     TranscriptEntry,
     TransferRequest,
@@ -299,6 +300,7 @@ class RequestSummary:
     courses: int
     decided: int
     empty: bool = False  # 서류를 하나도 올리지 않은 초안 (지울 수 있음)
+    course: TranscriptEntry | None = None  # 성적표 과목 하나로 만든 요청이면 그 과목 줄
 
 
 @dataclass(frozen=True)
@@ -306,10 +308,15 @@ class StudentTotal:
     """학생 홈 맨 위 전체 합계: 같은 편입 대학 요청을 합친 예상 인정 학점·판정 확정 수·남은 학기.
     문서 삭제로 종료된 요청은 넣지 않는다."""
 
-    simulation: student_service.Simulation
+    simulation: student_service.Simulation  # 편입 학점 상한으로 자른 값
     courses: int
     decided: int
     requests: int  # 합친 요청 수
+    cap: int = student_service.DEFAULT_TRANSFER_CAP  # 편입 학점 상한
+    over_cap: bool = False  # 졸업 학점에 넣기로 한 과목의 인정 학점(많이 인정될 때)이 상한을 넘음
+    raw_high: float = 0.0  # 상한으로 자르기 전 많이 인정될 때의 학점
+    choices: list[RequestSummary] = field(default_factory=list)  # 졸업 학점에 넣을지 고를 수 있는 과목
+    left_out: int = 0  # 졸업 학점에서 뺀 과목 수
 
 
 @dataclass
@@ -321,6 +328,7 @@ class StudentHome:
     summaries: list[RequestSummary] = field(default_factory=list)
     unread_results: int = 0  # 아직 열어 보지 않은 판정 결과 알림
     total: StudentTotal | None = None  # 과목이 하나도 없으면 None
+    transcript: StudentTranscript | None = None  # 계정 성적표 (과목 요청을 만드는 근거)
 
     @property
     def todos(self) -> list[tuple[TransferRequest, student_service.Todo]]:
@@ -334,14 +342,18 @@ def student_home(session: Session, student: User) -> StudentHome:
     requests = request_repo.of_student(session, student.id)
     summaries = []
     groups: list[list[student_service.CourseRow]] = []
+    pending = 0  # 아직 강의계획서를 올리지 않은 과목 요청
     # 합계는 한 편입 대학 기준 (졸업 학점이 대학마다 달라서): 소속 대학, 없으면 가장 최근 요청의 대학.
-    # 문서 삭제로 종료된 요청은 합계에서 뺀다
+    # 문서 삭제로 종료된 요청과 학생이 졸업 학점에서 뺀 과목은 합계에서 뺀다
     total_inst = target or (requests[0].target_institution if requests else None)
     for r in requests:
         rows = student_service.course_rows(session, r)
         inst = r.target_institution
-        if total_inst is not None and inst.id == total_inst.id and r.status != RequestStatus.CLOSED:
+        in_total = total_inst is not None and inst.id == total_inst.id and r.status != RequestStatus.CLOSED
+        if in_total and r.counted:
             groups.append(rows)
+            pending += bool(r.course_key and not rows)
+        entries = request_repo.transcript_entries(session, r.id) if r.course_key else []
         summaries.append(
             RequestSummary(
                 r,
@@ -350,16 +362,34 @@ def student_home(session: Session, student: User) -> StudentHome:
                 len(rows),
                 sum(1 for row in rows if row.decision is not None),
                 student_service.is_empty_draft(session, r),
+                entries[0] if entries else None,
             )
         )
+    # 과목 요청은 심사 단계 순(올릴 것 → 심사 중 → 판정 완료), 같은 단계는 성적표 순서대로
+    rank = {RequestStatus.DRAFT: 0, RequestStatus.SUBMITTED: 1, RequestStatus.DECIDED: 2, RequestStatus.CLOSED: 3}
+    summaries.sort(key=lambda sm: (rank.get(RequestStatus(sm.request.status), 4), sm.request.id))
     total = None
     merged = student_service.merged_rows(groups)
-    if total_inst is not None and merged:
+    if total_inst is not None and (merged or pending):
+        cap = student_service.transfer_cap(total_inst)
+        raw = student_service.simulate(merged, total_inst.degree_credits or 120, total_inst.tuition_per_credit or 1000)
+        choices = [
+            sm
+            for sm in summaries
+            if sm.request.target_institution_id == total_inst.id
+            and sm.request.status != RequestStatus.CLOSED
+            and (sm.courses or sm.course)
+        ]
         total = StudentTotal(
-            student_service.simulate(merged, total_inst.degree_credits or 120, total_inst.tuition_per_credit or 1000),
-            len(merged),
+            student_service.cap_simulation(raw, cap),
+            len(merged) + pending,
             sum(1 for row in merged if row.decision is not None),
-            sum(1 for rows in groups if rows),
+            sum(1 for rows in groups if rows) + pending,
+            cap=cap,
+            over_cap=raw.credits_high > cap,
+            raw_high=raw.credits_high,
+            choices=choices,
+            left_out=sum(1 for sm in choices if not sm.request.counted),
         )
     return StudentHome(
         requests=requests,
@@ -369,6 +399,7 @@ def student_home(session: Session, student: User) -> StudentHome:
         summaries=summaries,
         unread_results=notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
         total=total,
+        transcript=student_service.account_transcript(session, student),
     )
 
 

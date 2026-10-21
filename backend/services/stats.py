@@ -180,7 +180,8 @@ def institution_stats(session: Session, user: User) -> Stats:
         key=lambda d: -d.received,
     )
 
-    stats.transcripts_masked = sum(1 for r in requests if r.transcript_masked_name)
+    # 성적표는 학생 계정에 하나이고 요청마다 복사되므로 학생 수로 센다
+    stats.transcripts_masked = len({r.student_id for r in requests if r.transcript_masked_name})
     done = [p for p in privacy if p.status == "completed" and p.completed_at is not None]
     stats.privacy_completed = len(done)
     stats.privacy_on_time = sum(1 for p in done if p.completed_at and p.completed_at <= p.due_at)
@@ -194,6 +195,9 @@ ACTION_LABELS = {
     "decision.create": (N_("판정 확정"), "decision"),
     "assignment.create": (N_("교수 배정"), "neutral"),
     "assignment.release": (N_("성적 기준 미달로 배정 해제"), "reject"),
+    "transcript.upload": (N_("성적표 업로드"), "neutral"),
+    "request.count": (N_("졸업 학점 반영 과목 변경"), "neutral"),
+    "institution.transfer_cap": (N_("편입 학점 상한 변경"), "neutral"),
     "material.request": (N_("보완 서류 요청"), "elective"),
     "material.fulfilled": (N_("보완 서류 제출"), "neutral"),
     "appeal.submit": (N_("이의 신청 접수"), "elective"),

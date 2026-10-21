@@ -33,22 +33,66 @@ def _read(files: list[UploadFile]) -> list[student_service.UploadedFile]:
 
 @router.get("")
 def index(request: Request, user: User = Student, session: Session = Depends(get_db)) -> Response:
+    if student_service.needs_transcript(session, user):  # 처음 들어오면 성적표부터
+        return RedirectResponse("/student/transcript", status_code=303)
     return render(request, "student/index.html", user=user, home=views.student_home(session, user))
 
 
-@router.post("/requests")
-def create_request(
+@router.get("/transcript")
+def transcript_page(request: Request, user: User = Student, session: Session = Depends(get_db)) -> Response:
+    return render(
+        request,
+        "student/transcript.html",
+        user=user,
+        transcript=student_service.account_transcript(session, user),
+        grade_failed=student_service.grade_failed,
+    )
+
+
+@router.post("/transcript")
+def upload_transcript(
     request: Request,
+    file: UploadFile = File(...),
     csrf_token: str = Form(""),
     user: User = Student,
     session: Session = Depends(get_db),
 ) -> Response:
-    """새 편입 요청. 출신 대학·편입 전공은 계정에 등록된 값을 쓴다."""
+    """계정 성적표 올리기·바꾸기. 과목 목록은 작업 큐에서 뽑아 아직 제출하지 않은 요청에 복사한다."""
     check_csrf(request, csrf_token)
-    created, is_new = student_service.create_request(session, user)
-    if not is_new:
-        flash(request, tr("아직 서류를 올리지 않은 요청이 있어 그 요청을 열었어요. 여기에 서류를 올려 주세요."))
-    return RedirectResponse(f"/student/requests/{created.id}", status_code=303)
+    first = student_service.needs_transcript(session, user)
+    uploaded = _read([file])
+    try:
+        if not uploaded:
+            raise CreditBridgeError(tr("성적표 파일을 선택해 주세요."))
+        student_service.upload_account_transcript(session, get_storage(), user, uploaded[0])
+    except CreditBridgeError as exc:
+        flash(request, str(exc), "error")
+        return RedirectResponse("/student/transcript", status_code=303)
+    tasks.process_student_transcript.delay(user.id)
+    if first:
+        flash(request, tr("성적표를 받았어요. 이제 편입 요청을 만들 수 있어요. 과목 목록은 곧 정리돼요."))
+        return RedirectResponse("/student", status_code=303)
+    flash(request, tr("새 성적표를 받았어요. 아직 심사를 요청하지 않은 요청에 반영돼요."))
+    return RedirectResponse("/student/transcript", status_code=303)
+
+
+@router.post("/requests/{request_id}/counted")
+def set_counted(
+    request: Request,
+    request_id: int,
+    counted: str = Form("1"),
+    csrf_token: str = Form(""),
+    user: User = Student,
+    session: Session = Depends(get_db),
+) -> Response:
+    """편입 학점 상한을 넘을 때 이 과목을 졸업 학점에 넣을지 고른다."""
+    check_csrf(request, csrf_token)
+    student_service.get_own_request(session, user, request_id)  # 남의 요청이면 403
+    try:
+        student_service.set_counted(session, user, request_id, counted == "1")
+    except CreditBridgeError as exc:
+        flash(request, str(exc), "error")
+    return RedirectResponse("/student#total-title", status_code=303)
 
 
 @router.post("/requests/{request_id}/delete")
@@ -118,30 +162,6 @@ def upload_syllabi(
     return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
 
 
-@router.post("/requests/{request_id}/transcript")
-def upload_transcript(
-    request: Request,
-    request_id: int,
-    file: UploadFile = File(...),
-    csrf_token: str = Form(""),
-    user: User = Student,
-    session: Session = Depends(get_db),
-) -> Response:
-    check_csrf(request, csrf_token)
-    transfer = student_service.get_own_request(session, user, request_id)
-    uploaded = _read([file])
-    try:
-        if not uploaded:
-            raise CreditBridgeError(tr("성적표 파일을 선택해 주세요."))
-        student_service.set_transcript(session, get_storage(), user, transfer, uploaded[0])
-    except CreditBridgeError as exc:
-        flash(request, str(exc), "error")
-    else:
-        tasks.process_transcript.delay(transfer.id)
-        flash(request, tr("성적표를 받았어요. 과목과 강의계획서를 자동으로 연결할게요."))
-    return RedirectResponse(f"/student/requests/{request_id}", status_code=303)
-
-
 @router.post("/requests/{request_id}/entries/{entry_id}")
 def link_entry(
     request: Request,
@@ -154,7 +174,12 @@ def link_entry(
 ) -> Response:
     check_csrf(request, csrf_token)
     transfer = student_service.get_own_request(session, user, request_id)
-    student_service.confirm_link(session, user, transfer, entry_id, int(syllabus_id) if syllabus_id.isdigit() else None)
+    try:
+        student_service.confirm_link(
+            session, user, transfer, entry_id, int(syllabus_id) if syllabus_id.isdigit() else None
+        )
+    except CreditBridgeError as exc:
+        flash(request, str(exc), "error")
     return RedirectResponse(f"/student/requests/{request_id}#transcript", status_code=303)
 
 

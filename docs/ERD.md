@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (24개)
+## 1. 엔티티 한눈에 보기 (25개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -15,7 +15,8 @@
 | | `departments` | 대상 대학의 학과 (과목·교수 배정 기준) | FR-05·18 |
 | | `users` | 학생·심사관·교수·관리자 계정 | FR-12·19 |
 | | `courses` | 대상 대학 카탈로그 과목과 필수 개념 | FR-05 |
-| 편입 요청·문서 | `transfer_requests` | 학생의 편입 학점 심사 요청 묶음 | FR-15·21 |
+| 편입 요청·문서 | `student_transcripts` | 학생 계정의 성적표 (학생당 하나, 처음 들어오면 먼저 올림) | FR-02·13 |
+| | `transfer_requests` | 편입 학점 심사 요청 (성적표의 C 이상 과목마다 하나, 예전 방식은 여러 과목 묶음) | FR-15·21 |
 | | `syllabi` | 강의계획서(학생 업로드·대상 과목 기준)와 추출 결과 | FR-01·03·04·14·25 |
 | | `syllabus_chunks` | 주차·개념 단위로 나눈 강의계획서 글 | FR-03 |
 | | `transcript_entries` | 성적표에서 뽑은 과목과 강의계획서 연결 | FR-02 |
@@ -54,6 +55,7 @@ erDiagram
     institutions ||--o{ equivalencies : "대상·출신 대학"
     users |o--o{ users : "대리 심사자"
     users ||--o{ transfer_requests : "학생"
+    users ||--o| student_transcripts : "계정 성적표"
     transfer_requests ||--o{ syllabi : "올린 강의계획서"
     transfer_requests ||--o{ transcript_entries : "성적표 과목"
     syllabi |o--o{ transcript_entries : "연결"
@@ -130,6 +132,18 @@ erDiagram
         varchar status
         timestamp submitted_at
         varchar transcript_file_key
+        timestamp transcript_copied_at
+        varchar course_key
+        boolean counted
+    }
+    student_transcripts {
+        bigint id PK
+        bigint student_id FK "UNIQUE"
+        varchar file_key
+        varchar masked_name
+        jsonb lines
+        varchar status
+        timestamp uploaded_at
     }
     syllabi {
         bigint id PK
@@ -286,6 +300,7 @@ erDiagram
 | is_target | BOOLEAN | NN | 대상 대학 여부 |
 | tuition_per_credit | INT | null | 학점당 등록금 (FR-15 시뮬레이션 기본값) |
 | degree_credits | INT | null | 졸업 학점 (FR-15) |
+| max_transfer_credits | INT | null | 편입 학점 상한 (비우면 60). 넘으면 학생이 졸업 학점에 넣을 과목을 고른다 (P18에서 관리자가 정함, Alembic 0007) |
 | sis_token_hash | VARCHAR(64) | null | 학사정보시스템 연동 토큰의 해시 (원문은 저장하지 않음, FR-24) |
 
 **institution_sources** — 대상 대학이 ④ 출신 대학 목록에 올린 출신 대학(Alembic 0004). `(institution_id, source_institution_id)` UNIQUE. 출신 대학 행(`institutions`, `is_target=false`)은 같은 이름이면 한 줄을 함께 쓰고, 이 표가 대학별 목록을 정한다. 계정 CSV·계정 수정·동등 과목표 CSV·학생 과목 검색은 자기 대학 목록의 출신 대학만 쓴다. 목록에서 지우면 연결만 지우고, 다른 대학도 어떤 행도 가리키지 않으면 출신 대학 행까지 지운다(그 대학 학생 계정·편입 요청·동등 과목표가 가리키면 지우지 않음).
@@ -337,7 +352,19 @@ erDiagram
 
 ### 3.2 편입 요청·문서
 
-**transfer_requests** — 학생 한 명이 대상 대학 한 곳에 내는 요청 묶음.
+**student_transcripts** — 학생 계정의 성적표 (학생당 하나, Alembic 0007). 처음 들어오면 먼저 올리고, 과목 줄을 뽑으면 성적이 C 이상인 과목마다 편입 요청을 만든다. 요청 문서를 삭제해도 계정 성적표는 남는다.
+
+| 속성 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| student_id | BIGINT | FK→users, NN, UQ | 학생 |
+| file_key | VARCHAR(255) | null | 성적표 원본 파일 키 (객체 스토리지) |
+| masked_name | VARCHAR(100) | null | 가린 이름 `L** J****` (FR-13) |
+| lines | JSONB | null | 뽑은 과목 줄 [{title, code, credits, grade, term}] (이름·학번 없음) |
+| status | VARCHAR(20) | NN, CHECK | processing · ready · failed |
+| error_message | VARCHAR(500) | null | 읽지 못했을 때 화면 문구 (한국어 원문, 화면에서 번역) |
+| uploaded_at | TIMESTAMP | NN | 올린 시각 |
+
+**transfer_requests** — 편입 학점 심사 요청. 성적표의 C 이상 과목마다 하나씩 자동으로 만들고(`course_key`), 예전 방식(학생이 직접 만든 여러 과목 묶음)도 그대로 읽는다.
 
 | 속성 | 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
@@ -349,6 +376,9 @@ erDiagram
 | submitted_at | TIMESTAMP | null | 학사처에 심사 요청한 시각 |
 | transcript_file_key | VARCHAR(255) | null | 성적표 원본 파일 키 (삭제 승인 후 null) |
 | transcript_masked_name | VARCHAR(100) | null | 가린 이름 `L** J****` (FR-13) |
+| transcript_copied_at | TIMESTAMP | null | 계정 성적표의 과목 줄을 이 요청에 복사한 시각 (`transcript_file_key`는 예전에 요청마다 올린 파일에만) |
+| course_key | VARCHAR(300) | null | 성적표 과목 하나로 만든 요청이면 그 과목 키(`code:MATH101`, 코드가 없으면 `title:…`). 성적표를 다시 올려도 같은 과목 요청을 또 만들지 않음 |
+| counted | BOOLEAN | NN, 기본 true | 편입 학점 상한을 넘을 때 졸업 학점에 넣을 과목인지 (학생이 고름) |
 
 **syllabi** — 학생이 올린 강의계획서와, 대상 과목의 기준 강의계획서를 함께 담는다(기준은 `transfer_request_id`가 null).
 

@@ -8,26 +8,22 @@ from sqlalchemy.orm import Session
 from backend.models import Decision, TransferRequest
 from backend.repositories import evaluations as evaluation_repo
 from backend.services.student import grade_failed
-from scripts.make_demo_pdfs import text_to_pdf
-from tests.conftest import login
+from tests.conftest import login, send_transcript
 from tests.integration.test_pipeline import latest, new_request, upload
 from tests.integration.test_review_extras import notes_for
 from tests.integration.test_workflow import reviewer_of
 
 
-def transcript(calculus_grade: str) -> bytes:
-    return text_to_pdf(
+def transcript(calculus_grade: str) -> str:
+    return (
         "Hankuk University Official Transcript\nName: Lee Jiwon\nStudent ID: 2022104455\n"
         f"MATH 101 | Calculus I | 3 | {calculus_grade}\nCSE 204 | Data Structures | 3 | B+\n"
     )
 
 
-def send_transcript(client: TestClient, rid: int, token: str, calculus_grade: str) -> None:
-    client.post(
-        f"/student/requests/{rid}/transcript",
-        files={"file": ("transcript.pdf", transcript(calculus_grade), "application/pdf")},
-        data={"csrf_token": token},
-    )
+def set_grade(client: TestClient, token: str, calculus_grade: str) -> None:
+    """계정 성적표를 (다시) 올린다. 아직 제출하지 않은 요청에 복사된다."""
+    send_transcript(client, token, transcript(calculus_grade))
 
 
 def test_grade_rule_passes_c_and_above() -> None:
@@ -40,7 +36,7 @@ def test_failing_course_is_excluded_from_review(client: TestClient, seeded: Sess
     token = login(client, "jiwon@student.example")
     rid = new_request(client, seeded, token)
     upload(client, rid, token, "calculus.txt", "data_structures.txt")
-    send_transcript(client, rid, token, "C-")
+    set_grade(client, token, "C-")
     calc = latest(seeded, "calculus.txt", rid)
 
     page = client.get(f"/student/requests/{rid}").text
@@ -65,14 +61,14 @@ def test_request_is_decided_when_only_failing_courses_remain(client: TestClient,
     token = login(client, "jiwon@student.example")
     rid = new_request(client, seeded, token)
     upload(client, rid, token, "calculus.txt")
-    send_transcript(client, rid, token, "F")
+    set_grade(client, token, "F")
     client.post(f"/student/requests/{rid}/submit", data={"csrf_token": token})
     seeded.expire_all()
     assert seeded.get(TransferRequest, rid).status == "decided"  # type: ignore[union-attr]
 
 
-def test_transcript_after_submit_releases_assignment(client: TestClient, seeded: Session) -> None:
-    """성적표를 심사 요청 뒤에 올려 미달이 되면 이미 된 배정을 풀고 담당 교수에게 알린다."""
+def test_new_transcript_after_submit_keeps_submitted_request(client: TestClient, seeded: Session) -> None:
+    """심사를 요청한 요청은 제출할 때의 성적표로 심사한다: 나중에 미달 성적표를 올려도 배정은 그대로다."""
     token = login(client, "jiwon@student.example")
     rid = new_request(client, seeded, token)
     upload(client, rid, token, "calculus.txt", "data_structures.txt")
@@ -80,11 +76,8 @@ def test_transcript_after_submit_releases_assignment(client: TestClient, seeded:
     calc = latest(seeded, "calculus.txt", rid)
     prof = reviewer_of(seeded, calc)
 
-    send_transcript(client, rid, token, "D")
+    set_grade(client, token, "D")
     seeded.expire_all()
-    assert evaluation_repo.active_assignment(seeded, calc.id) is None
-    assert any("성적 기준 미달로 심사 대상에서 빠져" in m for m in notes_for(seeded, prof.email))
-    login(client, prof.email)
-    assert f"/professor/evaluations/{calc.id}" not in client.get("/professor").text
-    structures = latest(seeded, "data_structures.txt", rid)
-    assert evaluation_repo.active_assignment(seeded, structures.id) is not None  # B+ 과목은 그대로
+    assert evaluation_repo.active_assignment(seeded, calc.id) is not None
+    assert not any("성적 기준 미달로 심사 대상에서 빠져" in m for m in notes_for(seeded, prof.email))
+    assert "성적 기준 미달" not in client.get(f"/student/requests/{rid}").text

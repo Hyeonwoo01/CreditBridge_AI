@@ -25,9 +25,16 @@ def add(session: Session, request: TransferRequest) -> TransferRequest:
 
 
 def delete(session: Session, request: TransferRequest) -> None:
-    """서류가 하나도 없는 초안만 지운다 (호출하는 서비스가 확인). 딸린 행이 없어 이 행만 지우면 된다."""
+    """서류가 하나도 없는 초안만 지운다 (호출하는 서비스가 확인). 딸린 행은 계정 성적표에서 복사한 과목 목록뿐이다."""
+    for entry in transcript_entries(session, request.id):
+        session.delete(entry)
     session.delete(request)
     session.flush()
+
+
+def drafts_of_student(session: Session, student_id: int) -> list[TransferRequest]:
+    stmt = select(TransferRequest).where(TransferRequest.student_id == student_id, TransferRequest.status == "draft")
+    return list(session.scalars(stmt.order_by(TransferRequest.id)))
 
 
 def transcript_entries(session: Session, request_id: int) -> list[TranscriptEntry]:
