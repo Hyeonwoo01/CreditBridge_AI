@@ -501,13 +501,6 @@ def reminder_preview(session: Session, user: User) -> reminder_service.Plan:
     return reminder_service.plan(session, user.institution_id)
 
 
-def recent_audit(session: Session, admin: User) -> list[AuditLog]:
-    """전체 감사 로그 화면: 관리자 소속 기관 사용자의 기록만 (다른 기관 기록은 보이지 않는다)."""
-    if admin.role != Role.ADMIN or admin.institution_id is None:
-        raise PermissionDeniedError(tr("기관 관리자만 볼 수 있어요."))
-    return audit_repo.recent_for_institution(session, admin.institution_id)
-
-
 def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:
     """확정 판정 CSV 내보내기 (FR-24, 모의 SIS 연동)."""
     return sis_service.export_rows(session, evaluator.institution_id or 0)

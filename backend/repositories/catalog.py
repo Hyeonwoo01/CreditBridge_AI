@@ -78,10 +78,6 @@ def department_by_name(session: Session, institution_id: int, name: str) -> Depa
     return session.scalars(stmt).first()
 
 
-def get_department(session: Session, department_id: int) -> Department | None:
-    return session.get(Department, department_id)
-
-
 def add_department(session: Session, department: Department) -> Department:
     session.add(department)
     session.flush()

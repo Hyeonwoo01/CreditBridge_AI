@@ -94,7 +94,8 @@ def test_deactivating_professor_hands_over_reviews(client: TestClient, seeded: S
 
 def test_audit_log_page_shows_only_own_institution(client: TestClient, seeded: Session) -> None:
     """여러 대학이 함께 쓰므로 전체 감사 로그도 관리자 소속 기관 사용자의 기록만 보여 준다."""
-    from backend.services import audit, views
+    from backend.repositories import audit as audit_repo
+    from backend.services import audit
     from backend.services.institution_data import bootstrap_admin
 
     bootstrap_admin(seeded, "Other State University", "US", "admin@osu.edu", "OSU 관리자")
@@ -104,12 +105,12 @@ def test_audit_log_page_shows_only_own_institution(client: TestClient, seeded: S
     seeded.commit()
     login(client, "rachel@msu.example")  # MSU 기록 하나 (로그인)
 
-    mine = views.recent_audit(seeded, msu)
+    mine = audit_repo.recent_for_institution(seeded, msu.institution_id)  # type: ignore[arg-type]
     assert mine and all(log.actor_id is not None for log in mine)
     actors = {u.id: u for u in seeded.scalars(select(User).where(User.id.in_({log.actor_id for log in mine})))}
     assert all(a.institution_id == msu.institution_id for a in actors.values())
     assert not any(log.actor_id == osu.id for log in mine)
-    assert {log.actor_id for log in views.recent_audit(seeded, osu)} == {osu.id}
+    assert {log.actor_id for log in audit_repo.recent_for_institution(seeded, osu.institution_id)} == {osu.id}  # type: ignore[arg-type]
 
     login(client, msu.email)
     page = client.get("/admin/audit").text

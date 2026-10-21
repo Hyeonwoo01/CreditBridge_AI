@@ -3,8 +3,6 @@
 학생이 보완 자료를 올리면 요청은 처리됨으로 바뀌고, 다시 분석한 결과에 진행 중인 교수 배정이 그대로 이어진다.
 """
 
-from dataclasses import dataclass
-
 from sqlalchemy.orm import Session
 
 from backend.db.base import utcnow
@@ -31,12 +29,6 @@ STANDARD_ITEMS = [
     N_("학점·시수 확인 서류"),
 ]
 MAX_ITEMS = 10
-
-
-@dataclass(frozen=True)
-class OpenRequest:
-    request: MaterialRequest
-    syllabus: Syllabus
 
 
 def request_materials(
