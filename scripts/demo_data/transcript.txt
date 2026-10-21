@@ -1,0 +1,11 @@
+Hankuk University Official Transcript (demo, not a real record)
+Name: Lee Jiwon
+Student ID: 2022104455
+Code | Course Title | Credits | Grade
+MATH 101 | Calculus I | 3 | A
+MATH 201 | Linear Algebra | 3 | B+
+CSE 204 | Data Structures | 3 | A-
+PHY 101 | General Physics I | 4 | B0
+HIS 110 | Understanding Korean History | 2 | A
+CHEM 101 | General Chemistry I | 3 | C+
+CSE 103 | C Programming | 3 | D

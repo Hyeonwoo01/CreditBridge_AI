@@ -26,17 +26,9 @@ from scripts.seed_demo import seed
 
 DEMO = Path(__file__).parent / "demo_data"
 PASSWORD = "demo1234"
-# 예시 성적표 (예시 AI는 "코드 | 과목명 | 학점 | 성적" 줄을 읽는다). 과목 코드는 demo_data 강의계획서와 같다
-TRANSCRIPT = (
-    "Hankuk University Official Transcript (demo)\n"
-    "MATH 101 | Calculus I | 3 | A\n"
-    "MATH 201 | Linear Algebra | 3 | B+\n"
-    "CSE 204 | Data Structures | 3 | A-\n"
-    "PHY 101 | General Physics I | 4 | B0\n"
-    "HIS 110 | Understanding Korean History | 2 | A\n"
-    "CHEM 101 | General Chemistry I | 3 | C+\n"
-    "CSE 103 | C Programming | 3 | D\n"
-)
+# 예시 성적표 (demo_data/transcript.txt, 예시 AI는 "코드 | 과목명 | 학점 | 성적" 줄을 읽는다).
+# 과목 코드는 demo_data 강의계획서와 같고, C프로그래밍은 D라 요청이 생기지 않는다
+TRANSCRIPT = (DEMO / "transcript.txt").read_text(encoding="utf-8")
 # 과목 요청 키 → 올릴 강의계획서 (demo_data/*.pdf)
 COURSES = {
     "code:MATH101": "calculus",
