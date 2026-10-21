@@ -68,7 +68,7 @@
 | 심사 건 내부 메모 | ✅ | 심사관·담당 교수가 심사 건마다 남기는 메모(예: "학과장 확인 중"). `evaluation_notes`(Alembic 0007, 강의계획서 단위로 모아 재분석해도 이어짐), `POST /evaluations/{id}/notes`(`services/notes.py`, 1000자, 고치지 않고 새로 남김). 학생 화면·판정 근거 리포트(화면·PDF)에는 나오지 않음. 감사 로그 `note.create`는 id만(내용 없음). 개인정보 삭제 승인 때 함께 삭제. DB 권한 SELECT·INSERT·DELETE(`docs/db-grants.sql`) | `test_internal_notes_for_staff_only` |
 | 로그인 실패 잠금 | ✅ | 연속 5번 실패 → 1분 잠금, 연속 10번 → 비밀번호 무효화 + 재설정 메일 자동 발송(메일 미설정 시 관리자 재발급 안내), 성공·재설정 시 초기화. `users.failed_logins`·`locked_until`(Alembic 0004), `services/auth.py::login_attempt`, `repositories/users.py::add_failed_login` | `test_login_lockout.py` 전체 |
 | 과목 CSV 가져오기 | ✅ | `institution_data.import_courses` (과목 코드 기준 생성·수정, 학과가 정한 필수 개념 `courses.concepts` → AI 비교 프롬프트에 사용) | `test_course_import_and_reference_upload_feed_ai_comparison` |
-| 과목별 기준 강의계획서 | ✅ | `institution_data.upload_reference` → Celery `reference.process`(스캔은 Claude 전사, 실패 시 이전 것 유지). 없으면 AI 비교 후보에서 빠짐 | 같은 테스트 |
+| 과목별 기준 강의계획서 | ✅ | `institution_data.upload_reference` → Celery `reference.process`(스캔은 AI 전사, 실패 시 이전 것 유지). 없으면 AI 비교 후보에서 빠짐 | 같은 테스트 |
 | 출신 대학 등록 | ✅ | `institution_data.add_source_institution` | `test_source_institution_registration` |
 | CSV 공통 처리 | ✅ | `services/csv_import.py` (UTF-8·cp949, 5MB, 실제 줄 번호) — 동등 과목표 가져오기도 사용 | `unit/test_institution_data_units.py` |
 

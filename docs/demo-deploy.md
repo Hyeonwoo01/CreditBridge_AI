@@ -8,7 +8,7 @@ CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입�
 
 | 항목 | 데모 모드 | 운영 |
 | --- | --- | --- |
-| AI 분석 | 예시 AI(`backend/ai/demo_llm.py`): Claude를 부르지 않고 강의계획서의 "Week N:" 줄과 기준 개념의 낱말 겹침으로 결과를 만든다. 비용 없음 | Claude 또는 GPT API (`LLM_PROVIDER`와 그 키) |
+| AI 분석 | 예시 AI(`backend/ai/demo_llm.py`): 실제 AI(Claude·GPT)를 부르지 않고 강의계획서의 "Week N:" 줄과 기준 개념의 낱말 겹침으로 결과를 만든다. 비용 없음 | Claude 또는 GPT API (`LLM_PROVIDER`와 그 키) |
 | 파일 저장 | 컨테이너 안 폴더(`DEMO_STORAGE_DIR`, `DiskStorage`) | S3 |
 | 작업 큐 | 요청 안에서 바로 실행(`CELERY_TASK_ALWAYS_EAGER=true`), Redis·worker·beat 없음 | Celery + Redis |
 | DB | 컨테이너 안 PostgreSQL 17. 이미지를 빌드할 때 미리 만들어 두고(`deploy/demo/build_db.sh`, 메모리를 작게 쓰는 설정 포함) 시작할 때 그대로 띄움 | 별도 PostgreSQL 17 |
@@ -33,7 +33,7 @@ CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입�
 
 Render 무료 웹 서비스 참고:
 - 15분 동안 접속이 없으면 잠든다. 다시 열면 깨어나는 데 1~2분 걸리고(무료 CPU 0.1개 기준 데모 준비 약 30초 + Render 기동), 이때 데이터가 처음 상태로 돌아간다. 깨어나는 동안 "502 Bad Gateway"가 보이면 1~2분 뒤 새로 고침한다.
-- 메모리 512MB. 데모 컨테이너는 PostgreSQL 버퍼·연결 수를 줄이고(`shared_buffers=16MB`, `max_connections=15`) Claude SDK·boto3를 불러오지 않아, 파일 캐시까지 포함해 평소 약 200MB, 네 역할로 화면 80여 개를 거쳐도 최대 약 270MB를 쓴다(512MB·CPU 0.1개 제한으로 확인함). MariaDB를 쓰던 처음 버전은 최대 약 420MB까지 올라 Render에서 메모리 초과로 다시 시작된 적이 있다.
+- 메모리 512MB. 데모 컨테이너는 PostgreSQL 버퍼·연결 수를 줄이고(`shared_buffers=16MB`, `max_connections=15`) AI SDK·boto3를 불러오지 않아, 파일 캐시까지 포함해 평소 약 200MB, 네 역할로 화면 80여 개를 거쳐도 최대 약 270MB를 쓴다(512MB·CPU 0.1개 제한으로 확인함). MariaDB를 쓰던 처음 버전은 최대 약 420MB까지 올라 Render에서 메모리 초과로 다시 시작된 적이 있다.
 - 무료 사용 시간은 한 달 단위로 정해져 있다. 데모 하나는 보통 넉넉하다.
 
 ## Hugging Face Spaces에 올리기 (대안)

@@ -19,7 +19,7 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 ## 모델 입력과 로그
 
-- 성적표는 `backend/security/masking.py`가 이름·학번·생년월일을 가린 뒤에만 Claude에 보낸다 (NF-01, `tests/unit/test_injection_and_masking.py`, `test_transcript_is_masked_before_llm_and_linked`).
+- 성적표는 `backend/security/masking.py`가 이름·학번·생년월일을 가린 뒤에만 AI(Claude 또는 GPT)에 보낸다 (NF-01, `tests/unit/test_injection_and_masking.py`, `test_transcript_is_masked_before_llm_and_linked`).
 - 애플리케이션 로그와 예외 메시지에는 이름·학번·성적을 쓰지 않는다. 로그에는 id와 오류 종류만 남긴다.
 - 웹 서버(uvicorn) 접근 로그는 쿼리 문자열을 지우고 경로만 남긴다. 심사 큐 검색어(`/review?q=`)에 학생 이름이 들어갈 수 있기 때문이다 (`backend/logging_setup.py::DropQueryString`, `test_access_log_drops_query_string`). 리버스 프록시를 앞에 둘 때도 접근 로그 형식에서 쿼리 문자열을 빼거나 `q` 값을 가린다.
 - 전송 구간은 TLS로 보호한다. 운영 배포 시 리버스 프록시에서 TLS 1.2 이상만 허용한다 (NF-02).

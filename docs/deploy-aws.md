@@ -1,6 +1,6 @@
 # AWS 프리티어 배포 (EC2 한 대 + RDS + S3)
 
-실제 Claude 분석을 쓰는 사이트를 AWS 프리티어 범위에서 띄우는 절차다. 예시용 공개 데모(Render, 예시 AI)는 [demo-deploy.md](demo-deploy.md).
+실제 AI 분석(Claude 또는 GPT, `LLM_PROVIDER`로 선택)을 쓰는 사이트를 AWS 프리티어 범위에서 띄우는 절차다. 예시용 공개 데모(Render, 예시 AI)는 [demo-deploy.md](demo-deploy.md).
 
 ```
 사용자 ─https─▶ EC2 t3.micro (Ubuntu 24.04, docker compose)

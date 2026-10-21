@@ -19,7 +19,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - Alembic으로만 스키마 변경 (db/init.sql·db/data.sql은 scripts/export_db_sql.sh로 다시 만든다)
 - Celery 5 + Redis 7: 오래 걸리는 작업은 모두 Celery로
 - LLM은 Anthropic 공식 SDK(Claude) 또는 OpenAI 공식 SDK(GPT)만 사용 (Settings.llm_provider로 선택), LangChain/LlamaIndex 금지
-- 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 Claude가 직접 비교)
+- 임베딩·벡터 검색은 MVP에서 쓰지 않음 (후보 과목은 학과 필터 후 AI(Claude 또는 GPT)가 직접 비교)
 - PDF: PyMuPDF만 사용
 - 웹 푸시: pywebpush만 사용 (서버 발송은 backend/services/push.py 한 곳, 무거운 의존성이라 보낼 때만 import)
 - 화면: Jinja2 + HTMX + Tailwind, React/Vue 금지

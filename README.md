@@ -21,9 +21,11 @@
 
 ## AI가 판정을 추천하는 방식
 
-1. **추출**: Claude가 강의계획서에서 학습 목표·주차별 주제·교재·선수과목·평가 방식·학점과 학문 분야를 정형 스키마로 뽑습니다. 원문에 없는 값은 비워 둡니다. 같은 문서(내용 해시가 같은 파일)는 다시 분석하지 않고 저장된 결과를 씁니다.
+분석에 쓰는 AI는 Claude(Anthropic)와 GPT(OpenAI) 중에서 고릅니다(`.env`의 `LLM_PROVIDER`). 배포 사이트는 GPT를 씁니다. 어느 쪽이든 아래 단계와 검증 규칙은 같습니다.
+
+1. **추출**: AI가 강의계획서에서 학습 목표·주차별 주제·교재·선수과목·평가 방식·학점과 학문 분야를 정형 스키마로 뽑습니다. 원문에 없는 값은 비워 둡니다. 같은 문서(내용 해시가 같은 파일)는 다시 분석하지 않고 저장된 결과를 씁니다.
 2. **후보 선정**: 추출한 학문 분야로 대상 대학 카탈로그를 학과 단위로 걸러 최대 30개 과목을 후보로 고릅니다. MVP는 임베딩·벡터 검색을 쓰지 않습니다.
-3. **개념별 판단**: Claude가 후보 과목의 필수 개념마다 실제로 가르쳤는지(다룸/부분/없음/판단 불가), 수준이 같은지 판단하고 양쪽 원문 구절을 인용합니다.
+3. **개념별 판단**: AI가 후보 과목의 필수 개념마다 실제로 가르쳤는지(다룸/부분/없음/판단 불가), 수준이 같은지 판단하고 양쪽 원문 구절을 인용합니다.
 4. **근거 검증**: 인용 구절이 원문에 그대로 있는지 코드로 확인하고, 없으면 버립니다. 근거 없이 매긴 커버리지는 40%를 넘지 못합니다.
 5. **추천 계산**: 개념 커버리지, 추천 등급(직접 인정/선택 인정/불인정, 근거가 모자라면 정보 부족), 신뢰도(상·중·하)를 `backend/services/scoring.py`의 고정 규칙으로 계산합니다. 판정 확률(%)은 MVP에서 계산하지 않습니다. 같은 입력은 저장된 결과를 재사용해 반복 실행해도 결과가 같습니다.
 
@@ -116,11 +118,11 @@ docker compose up -d --build              # 프론트엔드·백엔드·DB·작�
 
 ### 실제 서비스로 올리기 (AWS 프리티어)
 
-EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 Claude 분석을 쓰는 사이트를 띄워요. `docker-compose.prod.yml`과 `deploy/aws/`를 쓰고, AWS 콘솔에서 누를 순서와 프리티어 설정은 [docs/deploy-aws.md](docs/deploy-aws.md)에 있어요.
+EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 AI 분석(Claude 또는 GPT)을 쓰는 사이트를 띄워요. `docker-compose.prod.yml`과 `deploy/aws/`를 쓰고, AWS 콘솔에서 누를 순서와 프리티어 설정은 [docs/deploy-aws.md](docs/deploy-aws.md)에 있어요.
 
 ### 예시용 공개 데모로 올리기 (Render 무료)
 
-컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(Claude 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
+컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(실제 AI API 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
 
 ### 개발용: 인프라만 Docker, 앱은 uv로
 
@@ -201,10 +203,10 @@ CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니�
 uv run ruff check . && uv run ruff format --check .
 uv run mypy backend
 uv run pytest tests/unit tests/integration   # 통합 테스트는 PostgreSQL 필요 (TEST_DATABASE_URL, 기본 creditbridge_test)
-uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 Claude API 호출, 비용 발생
+uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 AI API(설정한 Claude 또는 GPT) 호출, 비용 발생
 ```
 
-테스트에서는 Claude·S3를 대역(`tests/fakes.py`)으로 바꿉니다. 대역 Claude는 일부러 원문에 없는 구절을 섞어 내보내고, 테스트는 그 구절이 저장되지 않는지 확인합니다.
+테스트에서는 AI·S3를 대역(`tests/fakes.py`)으로 바꿉니다. 대역 AI는 일부러 원문에 없는 구절을 섞어 내보내고, 테스트는 그 구절이 저장되지 않는지 확인합니다.
 
 ## 구조
 
@@ -239,7 +241,7 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋)
 
 ## 운영 시 확인할 것
 
-- 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 Claude 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
+- 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 실제 AI 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
 - 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
