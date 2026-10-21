@@ -1286,9 +1286,9 @@
   "{n} transfer request",
   "{n} transfer requests"
  ],
- "편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 셌어요.": [
-  "Estimate across {requests} transfer request. A course uploaded to more than one request is counted once.",
-  "Estimate across {requests} transfer requests. A course uploaded to more than one request is counted once."
+ "편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 세고, 문서 삭제로 종료된 요청은 넣지 않았어요.": [
+  "Estimate across {requests} transfer request. A course uploaded to more than one request is counted once, and requests closed by document deletion are left out.",
+  "Estimate across {requests} transfer requests. A course uploaded to more than one request is counted once, and requests closed by document deletion are left out."
  ],
  "편입 요청 목록": "Transfer requests",
  "편입 요청을 찾을 수 없어요.": "We couldn't find the transfer request.",

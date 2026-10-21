@@ -176,19 +176,33 @@ def test_progress_marks_only_the_next_step_as_current(client: TestClient, seeded
 
 
 def test_total_merges_requests_and_counts_same_course_once(client: TestClient, seeded: Session) -> None:
-    """맨 위 전체 합계: 요청을 합치되 같은 과목은 한 번만. 남은 학기는 합계에만 (요청 카드에는 없음)."""
+    """맨 위 전체 합계: 요청을 합치되 같은 과목은 한 번만, 문서 삭제로 종료된 요청은 빼고.
+    남은 학기는 합계에만 (요청 카드에는 없음)."""
+    from backend.models import TransferRequest
+
     token = login(client, "jiwon@student.example")
     assert "전체 합계" not in client.get("/student").text  # 과목이 없으면 숨김
 
     first = new_request(client, seeded, token)
-    upload(client, first, token, "calculus.txt")
+    upload(client, first, token, "calculus.txt", "korean_history.txt")
     second = new_request(client, seeded, token)
     assert second != first
     upload(client, second, token, "calculus.txt", "data_structures.txt")
 
-    home = client.get("/student").text
-    total = home[home.index('id="total-title"') : home.index('aria-label="편입 요청 목록"')]
+    def total_and_cards() -> tuple[str, str]:
+        home = client.get("/student").text
+        split = home.index('aria-label="편입 요청 목록"')
+        return home[home.index('id="total-title"') : split], home[split:]
+
+    total, cards = total_and_cards()
     assert "편입 요청 2건을 합친 예상치예요" in total
-    assert "/ 2과목" in total and "남은 학기(예상)" in total  # 미적분학은 두 요청에 있어도 한 번
-    cards = home[home.index('aria-label="편입 요청 목록"') :]
+    assert "/ 3과목" in total and "남은 학기(예상)" in total  # 미적분학은 두 요청에 있어도 한 번
     assert "예상 인정 학점" in cards and "판정 확정" in cards and "남은 학기" not in cards
+
+    request = seeded.get(TransferRequest, first)
+    assert request is not None
+    request.status = "closed"  # 문서 삭제 승인으로 종료된 요청 (절차는 test_privacy_close)
+    seeded.commit()
+    total, cards = total_and_cards()
+    assert "편입 요청 1건을 합친 예상치예요" in total and "/ 2과목" in total  # 한국사는 빠진다
+    assert "문서 삭제로 종료" in cards  # 카드는 그대로 보인다

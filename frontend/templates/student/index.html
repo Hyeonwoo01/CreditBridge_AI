@@ -44,7 +44,7 @@
 <section class="mt-10 grid gap-3" aria-labelledby="total-title">
   <div class="grid gap-1">
     <h2 id="total-title" class="section-title">{{ _("전체 합계") }}</h2>
-    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 셌어요.", requests=(tot.requests)) }}</p>
+    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 세고, 문서 삭제로 종료된 요청은 넣지 않았어요.", requests=(tot.requests)) }}</p>
   </div>
   <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ ts.credits_low | round(1) }}{% if ts.credits_high != ts.credits_low %}~{{ ts.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(ts.source_credits | round(1))) }}</span></dd></div>

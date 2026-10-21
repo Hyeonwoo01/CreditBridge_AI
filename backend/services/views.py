@@ -26,7 +26,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import EvaluationStatus, Role
+from backend.models.enums import EvaluationStatus, RequestStatus, Role
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -294,7 +294,8 @@ class RequestSummary:
 
 @dataclass(frozen=True)
 class StudentTotal:
-    """학생 홈 맨 위 전체 합계: 같은 편입 대학 요청을 합친 예상 인정 학점·판정 확정 수·남은 학기."""
+    """학생 홈 맨 위 전체 합계: 같은 편입 대학 요청을 합친 예상 인정 학점·판정 확정 수·남은 학기.
+    문서 삭제로 종료된 요청은 넣지 않는다."""
 
     simulation: student_service.Simulation
     courses: int
@@ -324,12 +325,13 @@ def student_home(session: Session, student: User) -> StudentHome:
     requests = request_repo.of_student(session, student.id)
     summaries = []
     groups: list[list[student_service.CourseRow]] = []
-    # 합계는 한 편입 대학 기준 (졸업 학점이 대학마다 달라서): 소속 대학, 없으면 가장 최근 요청의 대학
+    # 합계는 한 편입 대학 기준 (졸업 학점이 대학마다 달라서): 소속 대학, 없으면 가장 최근 요청의 대학.
+    # 문서 삭제로 종료된 요청은 합계에서 뺀다
     total_inst = target or (requests[0].target_institution if requests else None)
     for r in requests:
         rows = student_service.course_rows(session, r)
         inst = r.target_institution
-        if total_inst is not None and inst.id == total_inst.id:
+        if total_inst is not None and inst.id == total_inst.id and r.status != RequestStatus.CLOSED:
             groups.append(rows)
         summaries.append(
             RequestSummary(
