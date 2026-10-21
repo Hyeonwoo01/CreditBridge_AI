@@ -1,8 +1,9 @@
 """공개 데모용 예시 시나리오 (DEMO_MODE=true에서만). 실행: uv run python -m scripts.demo_scenario
 
 데모 카탈로그·계정(scripts.seed_demo)을 넣은 뒤, 화면을 실제로 눌러 진행한 것처럼 앱 경로를 차례로 부른다.
-- 학생 이지원(출신 대학·편입 전공은 계정에 정해 둠): 심사 요청 1건(미적분·선형대수(자료 부족)·자료구조·일반물리·한국사)
-  + 사전 시뮬레이션 초안 1건
+- 학생 이지원(출신 대학·편입 전공은 계정에 정해 둠): 성적표를 올리면 성적 C 이상 과목마다 요청이 생긴다
+  (C프로그래밍은 D라 제외). 미적분·선형대수(자료 부족)·자료구조·일반물리·한국사는 강의계획서를 올려 심사 요청,
+  일반화학은 올리기만 한 사전 시뮬레이션
 - 제출 때 정보가 충분한 과목(미적분·자료구조·일반물리)은 학과 교수에게 자동 배정, 심사관은 일괄 배정(남은 건만)과
   정보가 부족한 선형대수에 보완 자료 요청
 - 교수: 미적분 승인, 자료구조는 선택 인정으로 수정 → 학생이 자료구조 판정에 이의 신청
@@ -20,10 +21,31 @@ from sqlalchemy import select
 from backend.config import get_settings
 from backend.db.session import SessionLocal
 from backend.models import Assignment, CourseEvaluation, Syllabus, TransferRequest, User
+from scripts.make_demo_pdfs import text_to_pdf
 from scripts.seed_demo import seed
 
 DEMO = Path(__file__).parent / "demo_data"
 PASSWORD = "demo1234"
+# 예시 성적표 (예시 AI는 "코드 | 과목명 | 학점 | 성적" 줄을 읽는다). 과목 코드는 demo_data 강의계획서와 같다
+TRANSCRIPT = (
+    "Hankuk University Official Transcript (demo)\n"
+    "MATH 101 | Calculus I | 3 | A\n"
+    "MATH 201 | Linear Algebra | 3 | B+\n"
+    "CSE 204 | Data Structures | 3 | A-\n"
+    "PHY 101 | General Physics I | 4 | B0\n"
+    "HIS 110 | Understanding Korean History | 2 | A\n"
+    "CHEM 101 | General Chemistry I | 3 | C+\n"
+    "CSE 103 | C Programming | 3 | D\n"
+)
+# 과목 요청 키 → 올릴 강의계획서 (demo_data/*.pdf)
+COURSES = {
+    "code:MATH101": "calculus",
+    "code:MATH201": "linear_algebra_sparse",
+    "code:CSE204": "data_structures",
+    "code:PHY101": "general_physics",
+    "code:HIS110": "korean_history",
+    "code:CHEM101": "general_chemistry",
+}
 
 
 def _token(html: str) -> str:
@@ -47,18 +69,23 @@ def _ok(response_status: int, step: str) -> None:
         raise RuntimeError(f"demo step failed ({response_status}): {step}")
 
 
-def _request(client: TestClient, token: str, files: list[str], submit: bool) -> int:
-    # 출신 대학·편입 전공은 계정에 정해진 값(Hankuk University, Computer Science and Engineering)을 쓴다
-    r = client.post("/student/requests", data={"csrf_token": token}, follow_redirects=False)
-    _ok(r.status_code, "create request")
-    rid = int(r.headers["location"].rsplit("/", 1)[-1])
-    uploads = [("files", (f"{name}.pdf", (DEMO / f"{name}.pdf").read_bytes(), "application/pdf")) for name in files]
-    _ok(
-        client.post(f"/student/requests/{rid}/syllabi", files=uploads, data={"csrf_token": token}).status_code, "upload"
-    )
+def _course_requests(email: str) -> dict[str, int]:
+    """성적표를 올려 자동으로 생긴 과목 요청: 과목 키 → 요청 id."""
+    with SessionLocal() as session:
+        student = session.scalars(select(User.id).where(User.email == email)).one()
+        rows = session.scalars(
+            select(TransferRequest).where(
+                TransferRequest.student_id == student, TransferRequest.course_key.is_not(None)
+            )
+        )
+        return {r.course_key or "": r.id for r in rows}
+
+
+def _upload(client: TestClient, token: str, rid: int, name: str, submit: bool) -> None:
+    upload = [("files", (f"{name}.pdf", (DEMO / f"{name}.pdf").read_bytes(), "application/pdf"))]
+    _ok(client.post(f"/student/requests/{rid}/syllabi", files=upload, data={"csrf_token": token}).status_code, name)
     if submit:
-        _ok(client.post(f"/student/requests/{rid}/submit", data={"csrf_token": token}).status_code, "submit")
-    return rid
+        _ok(client.post(f"/student/requests/{rid}/submit", data={"csrf_token": token}).status_code, f"submit {name}")
 
 
 def _latest(rid: int, filename: str) -> CourseEvaluation:
@@ -96,12 +123,16 @@ def run() -> None:
     from backend.main import app
 
     with TestClient(app) as client:
-        token = _login(client, "jiwon@student.example")
-        courses = ["calculus", "linear_algebra_sparse", "data_structures", "general_physics", "korean_history"]
-        rid = _request(client, token, courses, submit=True)
-        _request(client, token, ["linear_algebra_detailed", "general_chemistry"], submit=False)
-        calc, sparse, ds = (_latest(rid, f"{n}.pdf") for n in ("calculus", "linear_algebra_sparse", "data_structures"))
-        physics = _latest(rid, "general_physics.pdf")
+        token = _login(client, "jiwon@student.example")  # 처음 들어오면 성적표 화면부터
+        transcript = [("file", ("transcript.pdf", text_to_pdf(TRANSCRIPT), "application/pdf"))]
+        _ok(client.post("/student/transcript", files=transcript, data={"csrf_token": token}).status_code, "transcript")
+        requests = _course_requests("jiwon@student.example")
+        for key, name in COURSES.items():
+            _upload(client, token, requests[key], name, submit=key != "code:CHEM101")
+        calc, sparse, ds, physics = (
+            _latest(requests[key], f"{COURSES[key]}.pdf")
+            for key in ("code:MATH101", "code:MATH201", "code:CSE204", "code:PHY101")
+        )
 
         token = _login(client, "rachel@msu.example")
         ids = [e.id for e in (calc, sparse, ds, physics)]
@@ -143,7 +174,7 @@ def run() -> None:
             ).status_code,
             "appeal",
         )
-    print(f"demo scenario ready: request #{rid}")
+    print(f"demo scenario ready: {len(requests)} course requests")
 
 
 if __name__ == "__main__":
