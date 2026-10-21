@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from backend.errors import DecisionValidationError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Course, CourseEvaluation, Decision, Syllabus, User
+from backend.models import Course, CourseEvaluation, Decision, Syllabus, TransferRequest, User
 from backend.models.enums import AppealStatus, DecisionAction, DecisionResult, ReasonCode, RequestStatus, Role
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -264,7 +264,10 @@ def decide(
         appeal=appeal.id if appeal else None,
     )
     _notify_student(session, evaluation, final, redecided=appeal is not None)
-    _close_request_if_done(session, evaluation)
+    if evaluation.transfer_request_id is not None:
+        request = request_repo.get(session, evaluation.transfer_request_id)
+        if request is not None:
+            close_request_if_done(session, request)
     session.commit()
     return decision
 
@@ -290,13 +293,13 @@ def _notify_student(session: Session, evaluation: CourseEvaluation, result: str,
     )
 
 
-def _close_request_if_done(session: Session, evaluation: CourseEvaluation) -> None:
-    if evaluation.transfer_request_id is None:
+def close_request_if_done(session: Session, request: TransferRequest) -> None:
+    """심사를 요청한 과목이 모두 판정됐으면 요청을 판정 완료로. 성적 기준 미달로 빠진 과목은 기다리지 않는다."""
+    if request.status != RequestStatus.SUBMITTED:
         return
-    request = request_repo.get(session, evaluation.transfer_request_id)
-    if request is None:
-        return
-    latest = [evaluation_repo.latest_for_syllabus(session, s.id) for s in syllabus_repo.of_request(session, request.id)]
+    syllabi = syllabus_repo.of_request(session, request.id)
+    failed = request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
+    latest = [evaluation_repo.latest_for_syllabus(session, s.id) for s in syllabi]
     decided = decision_repo.for_evaluations(session, [e.id for e in latest if e])
-    if latest and all(e and e.id in decided for e in latest):
+    if latest and all(e and (e.id in decided or e.syllabus_id in failed) for e in latest):
         request.status = RequestStatus.DECIDED

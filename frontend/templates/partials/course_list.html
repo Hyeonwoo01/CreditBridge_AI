@@ -12,6 +12,8 @@
             <span class="badge text-reject">{{ _("분석 실패") }}</span>
           {% elif analyzing %}
             <span class="badge"><span class="size-3 animate-spin rounded-full border-2 border-primary/20 border-t-primary"></span>{{ _("AI 분석 중") }}</span>
+          {% elif row.grade_failed and not row.decision %}
+            <span class="badge-reject">{{ _("성적 기준 미달") }}</span>
           {% elif row.decision and row.appeal and row.appeal.status in ('submitted', 'accepted') %}
             <span class="badge">{{ _("이의 신청 {status}", status=(row.appeal.status | appeal_status)) }}</span>
           {% elif row.decision %}
@@ -34,6 +36,7 @@
     </div>
 
     {% if row.syllabus.status == 'failed' %}<p class="text-sm text-reject">{{ row.syllabus.error_message | t }}</p>{% endif %}
+    {% if row.grade_failed and not row.decision %}<p class="text-sm text-reject">{{ _("성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.") }}</p>{% endif %}
 
     {% if row.candidate_code %}
     <div class="grid gap-3 rounded-md bg-parchment px-4 py-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">

@@ -72,6 +72,7 @@ class EvaluationView:
     target_courses: list[Course] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)  # 원 판정과 이의 신청 재판정, 오래된 순
     appeals: list[Appeal] = field(default_factory=list)
+    grade_failed: bool = False  # 성적표 성적이 인정 최저 성적 미달 (심사 대상 아님)
     appeal_files: dict[int, list[AppealFile]] = field(default_factory=dict)  # 이의 신청 id -> 근거 자료
     material_requests: list[MaterialRequest] = field(default_factory=list)
     suggested_materials: list[str] = field(default_factory=list)
@@ -184,6 +185,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
     if user.role == "professor":
         view.target_courses = catalog_repo.courses_of(session, request.target_institution_id)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
+    view.grade_failed = syllabus.id in request_repo.grade_failed_syllabus_ids(session, [syllabus.id])
     # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)
     if not (user.role == Role.STUDENT and request.status == RequestStatus.CLOSED):
         view.appeals = appeal_service.for_evaluation(session, evaluation.id)

@@ -72,8 +72,7 @@
 </section>
 {% endif %}
 
-<section class="mt-10 grid gap-4" aria-label="{{ _('편입 요청 목록') }}">
-  {% for sm in home.summaries %}
+{% macro request_card(sm) %}
   {% set r = sm.request %}
   {% set sim = sm.simulation %}
   {% set rd = sm.readiness %}
@@ -109,8 +108,33 @@
   </form>
   {% endif %}
   </div>
+{% endmacro %}
+
+{% set open_summaries = home.summaries | rejectattr("request.status", "equalto", "closed") | list %}
+{% set closed_summaries = home.summaries | selectattr("request.status", "equalto", "closed") | list %}
+<section class="mt-10 grid gap-4" aria-label="{{ _('편입 요청 목록') }}">
+  {% for sm in open_summaries %}
+{{ request_card(sm) }}
   {% else %}
+  {% if not closed_summaries %}
   <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("아직 편입 요청이 없어요. 위에서 대학을 골라 시작해 보세요.") }}</p>
+  {% else %}
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("진행 중인 편입 요청이 없어요. 새 요청을 만들어 시작해 보세요.") }}</p>
+  {% endif %}
   {% endfor %}
+  {% if closed_summaries %}
+  {# 문서 삭제로 종료된 요청은 맨 아래에 접어 둔다 (전체 합계에도 들어가지 않음) #}
+  <details>
+    <summary class="flex cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-hairline bg-white px-5 py-3.5 text-sm hover:text-primary">
+      <span>{{ _("문서 삭제로 종료된 요청 {n}건", n=(closed_summaries | length)) }}</span>
+      <span aria-hidden="true" class="text-muted">›</span>
+    </summary>
+    <div class="mt-4 grid gap-4">
+      {% for sm in closed_summaries %}
+{{ request_card(sm) }}
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
 </section>
 {% endblock %}

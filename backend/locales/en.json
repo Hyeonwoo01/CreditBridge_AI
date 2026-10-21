@@ -592,6 +592,10 @@
  "문서 삭제 요청이 접수됐어요 (요청 #{id}). 심사관 처리 뒤 승인해 주세요.": "A document deletion request was received (request #{id}). Approve it after the evaluator has processed it.",
  "문서 삭제가 승인돼 요청 #{id}의 심사가 종료됐어요.": "Document deletion was approved, so review of request #{id} has ended.",
  "문서 삭제로 종료": "Closed (documents deleted)",
+ "문서 삭제로 종료된 요청 {n}건": [
+  "{n} request closed by document deletion",
+  "{n} requests closed by document deletion"
+ ],
  "문서 삭제로 지워짐": "erased by document deletion",
  "문서가 삭제돼 전체 합계에서 빠진 요청이에요. 판정 기록은 요청을 열어 볼 수 있어요.": "Documents were deleted, so this request is left out of the overall total. Open it to see the decision record.",
  "문서가 삭제돼 종료된 요청의 과목은 이의 신청할 수 없어요.": "Courses in a request closed by document deletion can't be appealed.",
@@ -792,6 +796,10 @@
  "선택 항목 교수 일괄 배정": "Assign selected to faculty",
  "설정 링크 메일 발송": "Setup link emailed",
  "설정 링크 메일 보내기": "Email setup link",
+ "성적 기준 미달": "Grade below minimum",
+ "성적 기준 미달로 배정 해제": "Assignment released (grade below minimum)",
+ "성적 기준 미달로 심사 대상에서 빠져 요청 #{id}의 과목 배정이 해제됐어요.": "A course in request #{id} was released from your queue: its grade is below the minimum for transfer credit.",
+ "성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.": "The grade is below C (C- or lower), so this course isn't eligible. It's excluded without faculty review and isn't counted in expected credits.",
  "성적표 과목": "Transcript course",
  "성적표 과목 연결": "Transcript course links",
  "성적표 과목 연결 확인 {unconfirmed}건": [
@@ -1144,6 +1152,7 @@
  "직접 인정할 대상 과목을 선택해 주세요.": "Please choose the target course for direct credit.",
  "진행 단계": "Progress",
  "진행 중": "In progress",
+ "진행 중인 편입 요청이 없어요. 새 요청을 만들어 시작해 보세요.": "No transfer requests in progress. Create a new request to get started.",
  "찾기": "Search",
  "채워야 할 서류 {missing}건": [
   "{missing} document still needed",

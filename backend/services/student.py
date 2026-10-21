@@ -24,7 +24,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import RequestStatus, Role, SyllabusStatus
+from backend.models.enums import PASSING_GRADES, RequestStatus, Role, SyllabusStatus
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -192,6 +192,9 @@ def confirm_link(
     entry.link_confirmed = True
     audit.record(session, student, "transcript.link", "transfer_request", str(request.id), entry=entry.id)
     session.commit()
+    from backend.services import review  # review → decisions → appeals → student 순환을 피해 여기서 불러온다
+
+    review.release_grade_failed(session, request)
     return entry
 
 
@@ -310,6 +313,11 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
 STAGES = [N_("접수"), N_("AI 분석"), N_("교수 검토"), N_("확정")]
 
 
+def grade_failed(grade: str | None) -> bool:
+    """성적표 성적이 인정 최저 성적(C 이상·P/PASS/S) 미달인지. 성적이 없으면 미달이 아니다."""
+    return grade is not None and grade.strip().upper() not in PASSING_GRADES
+
+
 @dataclass(frozen=True)
 class CourseRow:
     syllabus: Syllabus
@@ -327,8 +335,15 @@ class CourseRow:
     reviewer: User | None = None  # 판정했으면 판정 교수, 아니면 배정된 교수
 
     @property
+    def grade_failed(self) -> bool:
+        """성적이 인정 최저 성적 미달이라 심사 대상에서 빠진 과목 (판정 전일 때 화면에 '성적 기준 미달')."""
+        return grade_failed(self.transcript_grade)
+
+    @property
     def group(self) -> str:
         """학생 화면 필터: approved(인정 확정) / supplement(보완 필요) / review(심사 중) / other."""
+        if self.decision is None and self.grade_failed:
+            return "other"
         if self.decision is not None and not (self.appeal and self.appeal.status in ("submitted", "accepted")):
             return "approved" if self.decision.result in ("direct", "elective") else "other"
         if self.open_materials or (self.evaluation and self.evaluation.recommendation == "insufficient"):
@@ -361,6 +376,8 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
             stage, expected = 2, (assigned or appeal.created_at) + sla  # 이의 신청 재판정 대기
         elif decision:
             stage, expected = 3, decision.decided_at
+        elif grade_failed(grades.get(s.id)):
+            stage, expected = 3, None  # 성적 기준 미달: 심사 없이 제외로 끝남
         elif assigned:
             stage, expected = 2, assigned + sla
         elif ev and ev.status == "done":
@@ -393,8 +410,6 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
 
 # ---------- 사전 시뮬레이션 (FR-15) ----------
 
-PASSING = {"A+", "A", "A0", "A-", "B+", "B", "B0", "B-", "C+", "C", "C0", "P", "PASS", "S"}
-
 
 @dataclass(frozen=True)
 class Simulation:
@@ -420,8 +435,7 @@ def simulate(
         source_total += source
         if ev is None or ev.status != "done":
             continue
-        passing = row.transcript_grade is None or row.transcript_grade.upper() in PASSING
-        if not passing:
+        if row.grade_failed:
             continue
         credit = min(source, row.candidate_credits) if row.candidate_credits else source
         decided = row.decision.result if row.decision else None

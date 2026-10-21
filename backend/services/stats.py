@@ -193,6 +193,7 @@ def institution_stats(session: Session, user: User) -> Stats:
 ACTION_LABELS = {
     "decision.create": (N_("판정 확정"), "decision"),
     "assignment.create": (N_("교수 배정"), "neutral"),
+    "assignment.release": (N_("성적 기준 미달로 배정 해제"), "reject"),
     "material.request": (N_("보완 서류 요청"), "elective"),
     "material.fulfilled": (N_("보완 서류 제출"), "neutral"),
     "appeal.submit": (N_("이의 신청 접수"), "elective"),

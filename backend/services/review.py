@@ -15,10 +15,11 @@ from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
+from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import audit, notifications
-from backend.services.decisions import HistoryItem, ai_result, conflicts, history
+from backend.services.decisions import HistoryItem, ai_result, close_request_if_done, conflicts, history
 
 # 심사 큐 필터. all 외에는 겹치지 않는 신뢰도 구분이고, conflict는 과거 판정과 어긋나는 건만 따로 모아 본다
 TABS = {
@@ -269,12 +270,14 @@ def assign_ready(session: Session, request: TransferRequest) -> int:
         return 0
     syllabi = syllabus_repo.of_request(session, request.id)
     asked = {m.syllabus_id for m in material_repo.for_syllabi(session, [s.id for s in syllabi]) if m.status == "open"}
+    failed = request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
     assigned = 0
     for syllabus in syllabi:
         evaluation = evaluation_repo.latest_for_syllabus(session, syllabus.id)
         if (
             evaluation is None
             or syllabus.id in asked
+            or syllabus.id in failed
             or evaluation.status != EvaluationStatus.DONE
             or evaluation.recommendation not in AUTO_ASSIGNABLE
             or evaluation.candidate_course_id is None
@@ -284,8 +287,38 @@ def assign_ready(session: Session, request: TransferRequest) -> int:
             continue
         if _assign_by_department(session, request.target_institution_id, evaluation, None) is None:
             assigned += 1
+    close_request_if_done(session, request)  # 모든 과목이 성적 기준 미달이면 판정할 것이 없다
     session.commit()
     return assigned
+
+
+def release_grade_failed(session: Session, request: TransferRequest) -> int:
+    """성적표 연결로 성적 기준 미달이 된 과목은 심사 대상에서 빠진다: 판정 전 배정을 끝내고 담당 교수에게 알린다.
+    판정 기록은 만들지 않는다 (최종 판정은 사람만). 해제한 배정 수를 돌려준다."""
+    if request.status != RequestStatus.SUBMITTED:
+        return 0
+    syllabi = syllabus_repo.of_request(session, request.id)
+    released = 0
+    for syllabus_id in request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi]):
+        evaluation = evaluation_repo.latest_for_syllabus(session, syllabus_id)
+        if evaluation is None or decision_repo.for_evaluation(session, evaluation.id) is not None:
+            continue
+        reviewer_id = evaluation_repo.deactivate_assignment(session, evaluation.id)
+        reviewer = user_repo.get_by_id(session, reviewer_id) if reviewer_id else None
+        if reviewer is None:
+            continue
+        released += 1
+        audit.record(session, None, "assignment.release", "course_evaluation", str(evaluation.id), reason="grade")
+        notifications.notify(
+            session,
+            [reviewer],
+            "assignment.closed",
+            N_("성적 기준 미달로 심사 대상에서 빠져 요청 #{id}의 과목 배정이 해제됐어요.").format(id=request.id),
+            "/professor",
+        )
+    close_request_if_done(session, request)
+    session.commit()
+    return released
 
 
 def set_away(session: Session, professor: User, days: int, delegate_id: int | None) -> int:

@@ -1,9 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.orm import Session
 
-from backend.models import Assignment, CourseEvaluation, Decision, EvidenceSpan, Syllabus, TransferRequest
+from backend.models import (
+    Assignment,
+    CourseEvaluation,
+    Decision,
+    EvidenceSpan,
+    Syllabus,
+    TranscriptEntry,
+    TransferRequest,
+)
+from backend.repositories.requests import failing_grade
 
 
 def get(session: Session, evaluation_id: int) -> CourseEvaluation | None:
@@ -70,8 +79,10 @@ def spans_of(session: Session, evaluation_id: int) -> list[EvidenceSpan]:
 def review_queue(
     session: Session, target_institution_id: int
 ) -> list[tuple[CourseEvaluation, Syllabus, TransferRequest]]:
-    """제출된 요청의 최신 분석 결과 중 아직 판정되지 않은 것."""
+    """제출된 요청의 최신 분석 결과 중 아직 판정되지 않은 것.
+    성적이 인정 최저 성적 미달인 과목은 심사 대상이 아니라 뺀다."""
     decided = select(Decision.course_evaluation_id)
+    grade_failed = exists().where(TranscriptEntry.syllabus_id == Syllabus.id, failing_grade())
     stmt = (
         select(CourseEvaluation, Syllabus, TransferRequest)
         .join(Syllabus, Syllabus.id == CourseEvaluation.syllabus_id)
@@ -82,6 +93,7 @@ def review_queue(
             CourseEvaluation.is_latest.is_(True),
             CourseEvaluation.status == "done",
             CourseEvaluation.id.not_in(decided),
+            ~grade_failed,
         )
         .order_by(TransferRequest.submitted_at, CourseEvaluation.id)
     )
@@ -115,6 +127,16 @@ def deactivate_assignments_of_request(session: Session, request_id: int) -> list
         reviewers.append(assignment.reviewer_id)
     session.flush()
     return sorted(set(reviewers))
+
+
+def deactivate_assignment(session: Session, evaluation_id: int) -> int | None:
+    """심사 건의 진행 중인 배정을 끝낸다. 배정이 있었으면 그 교수 id."""
+    assignment = active_assignment(session, evaluation_id)
+    if assignment is None:
+        return None
+    assignment.is_active = False
+    session.flush()
+    return assignment.reviewer_id
 
 
 def add_assignment(session: Session, assignment: Assignment) -> Assignment:

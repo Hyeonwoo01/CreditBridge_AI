@@ -1,7 +1,8 @@
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 from backend.models import TranscriptEntry, TransferRequest
+from backend.models.enums import PASSING_GRADES
 
 
 def get(session: Session, request_id: int) -> TransferRequest | None:
@@ -32,6 +33,19 @@ def delete(session: Session, request: TransferRequest) -> None:
 def transcript_entries(session: Session, request_id: int) -> list[TranscriptEntry]:
     stmt = select(TranscriptEntry).where(TranscriptEntry.transfer_request_id == request_id).order_by(TranscriptEntry.id)
     return list(session.scalars(stmt))
+
+
+def failing_grade() -> ColumnElement[bool]:
+    """성적표 줄의 성적이 인정 최저 성적 미달 (C- 이하·F 등)."""
+    return TranscriptEntry.grade.is_not(None) & func.upper(func.trim(TranscriptEntry.grade)).not_in(PASSING_GRADES)
+
+
+def grade_failed_syllabus_ids(session: Session, syllabus_ids: list[int]) -> set[int]:
+    """성적표에 미달 성적으로 연결된 강의계획서 id."""
+    if not syllabus_ids:
+        return set()
+    stmt = select(TranscriptEntry.syllabus_id).where(TranscriptEntry.syllabus_id.in_(syllabus_ids), failing_grade())
+    return {i for i in session.scalars(stmt) if i is not None}
 
 
 def replace_transcript_entries(session: Session, request_id: int, entries: list[TranscriptEntry]) -> None:

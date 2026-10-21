@@ -13,6 +13,9 @@
   <p class="text-sm text-muted">{{ _("{credits} · 분석 {time}", credits=(_('{n}학점', n=v.syllabus.credits) if v.syllabus.credits is not none else _('학점 기재 없음')), time=(time(ev.created_at))) }}{% if ev.model %} · {{ ev.prompt_version }}{% endif %}</p>
 </section>
 
+{% if v.grade_failed and not v.decision %}
+<div class="mt-6 rounded-md bg-pearl p-4 text-sm text-reject" role="status">{{ _("성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.") }}</div>
+{% endif %}
 {% if ev.status in ('queued', 'running') %}
 <div class="mt-6 flex items-center gap-3 rounded-md bg-parchment p-4 text-sm"><span class="size-4 animate-spin rounded-full border-2 border-primary/20 border-t-primary"></span>{{ _("AI가 강의계획서를 대상 과목과 비교하고 있어요.") }}</div>
 {% elif ev.status == 'failed' %}

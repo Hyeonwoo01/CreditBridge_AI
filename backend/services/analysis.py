@@ -537,6 +537,11 @@ def relink_transcript(session: Session, request_id: int) -> None:
         entry.link_score = score
         entry.link_confirmed = score >= AUTO_LINK_SCORE
     session.commit()
+    request = request_repo.get(session, request_id)
+    if request is not None:
+        from backend.services import review  # 순환 import를 피해 여기서 불러온다
+
+        review.release_grade_failed(session, request)
 
 
 def process_transcript(session: Session, request_id: int, *, llm: LLMClient, storage: ObjectStorage) -> None:
