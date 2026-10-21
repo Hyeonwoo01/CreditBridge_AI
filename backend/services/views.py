@@ -366,8 +366,16 @@ def student_home(session: Session, student: User) -> StudentHome:
             )
         )
     # 과목 요청은 심사 단계 순(올릴 것 → 심사 중 → 판정 완료), 같은 단계는 성적표 순서대로
+    # (문서를 지워 새로 준비한 과목 요청도 원래 자리에 온다)
     rank = {RequestStatus.DRAFT: 0, RequestStatus.SUBMITTED: 1, RequestStatus.DECIDED: 2, RequestStatus.CLOSED: 3}
-    summaries.sort(key=lambda sm: (rank.get(RequestStatus(sm.request.status), 4), sm.request.id))
+    order = student_service.course_order(student_service.account_transcript(session, student))
+    summaries.sort(
+        key=lambda sm: (
+            rank.get(RequestStatus(sm.request.status), 4),
+            order.get(sm.request.course_key or "", len(order)),
+            sm.request.id,
+        )
+    )
     total = None
     merged = student_service.merged_rows(groups)
     if total_inst is not None and (merged or pending):

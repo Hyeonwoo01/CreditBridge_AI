@@ -127,6 +127,10 @@ def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: i
     _delete_documents(session, storage, request)
     # 문서가 없으니 요청을 끝낸다: 학생 화면은 종료로, 심사 큐·교수 목록에서는 빠진다 (판정 기록은 그대로)
     request.status = RequestStatus.CLOSED
+    # 성적표 과목 요청이면 같은 과목의 새 요청을 바로 준비해 과목 카드가 그 자리에 남는다 (다시 제출할 수 있게)
+    from backend.services import student as student_service  # student → analysis 순환을 피해 여기서
+
+    student_service.reopen_course(session, request)
     reviewers = evaluation_repo.deactivate_assignments_of_request(session, request.id)
     notifications.notify(
         session,

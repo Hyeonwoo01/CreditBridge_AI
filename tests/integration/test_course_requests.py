@@ -109,3 +109,33 @@ def test_transfer_cap_lets_student_choose_courses(client: TestClient, seeded: Se
     other = login(client, "senior@student.example")
     r = client.post(f"/student/requests/{structures.id}/counted", data={"counted": "1", "csrf_token": other})
     assert r.status_code == 403  # 다른 학생의 요청은 바꿀 수 없다
+
+
+def test_document_deletion_keeps_course_card(client: TestClient, seeded: Session) -> None:
+    """과목 요청의 문서를 지워도 그 과목 카드는 목록의 같은 자리에 남아 다시 제출할 수 있다."""
+    from backend.models import PrivacyRequest
+
+    token = login(client, "jiwon@student.example")
+    send_transcript(client, token, TRANSCRIPT)
+    found = course_requests(seeded)
+    math_id = found["code:MATH101"].id
+    upload(client, math_id, token, "calculus.txt")
+    client.post(f"/student/requests/{math_id}/submit", data={"csrf_token": token})
+    client.post(f"/student/requests/{math_id}/delete-documents", data={"csrf_token": token})
+    token = login(client, "admin@msu.example")
+    privacy = seeded.scalars(select(PrivacyRequest).where(PrivacyRequest.transfer_request_id == math_id)).one()
+    client.post(f"/admin/privacy/{privacy.id}", data={"csrf_token": token})
+
+    seeded.expire_all()
+    assert seeded.get(TransferRequest, math_id).status == "closed"  # type: ignore[union-attr]
+    fresh = course_requests(seeded)["code:MATH101"]  # 닫힌 요청 대신 같은 과목의 새 초안
+    assert fresh.id != math_id and fresh.status == "draft" and entry_of(seeded, fresh.id).grade == "A"
+
+    login(client, "jiwon@student.example")
+    home = client.get("/student").text
+    cards = home[home.index('aria-label="편입 요청 목록"') :]
+    assert cards.index("MATH 101 Calculus I") < cards.index("CSE 204 Data Structures")  # 성적표 순서 그대로
+    assert cards.index(f'href="/student/requests/{fresh.id}"') < cards.index("<details")  # 진행 중 목록에
+    assert "문서 삭제로 종료된 요청 1건" in cards
+    page = client.get(f"/student/requests/{math_id}").text
+    assert "새 요청으로 다시 준비돼 있어요" in page

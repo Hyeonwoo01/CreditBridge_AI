@@ -29,7 +29,7 @@
 <section class="card mt-6 grid gap-3" aria-label="{{ _('요청 종료') }}">
   <h2 class="font-semibold">{{ _("이 요청은 문서 삭제로 종료됐어요") }}</h2>
   <p class="text-sm text-ink-80">{% if view.privacy and view.privacy.completed_at %}{{ _("{time}에 올린 원본 파일·추출 텍스트·성적표 정보를 삭제했어요.", time=(time(view.privacy.completed_at, "date"))) }} {% endif %}{{ _("더는 분석하거나 심사하지 않아요. 이미 내린 판정은 학사 기록으로 학사처에 남아요.") }}</p>
-  <p class="text-sm text-muted">{{ _("다시 학점 인정을 받으려면 성적표 화면에서 성적표를 다시 올려 주세요. 성적이 C 이상인 과목의 요청이 새로 만들어져요.") }}</p>
+  <p class="text-sm text-muted">{{ _("이 과목은 내 편입 요청 목록에 새 요청으로 다시 준비돼 있어요. 강의계획서를 다시 올려 심사를 받을 수 있어요.") if req.course_key else _("다시 학점 인정을 받으려면 성적표 화면에서 성적표를 다시 올려 주세요. 성적이 C 이상인 과목의 요청이 새로 만들어져요.") }}</p>
   <a href="/student" class="btn-secondary btn-sm w-fit">{{ _("내 편입 요청으로") }}</a>
 </section>
 {% else %}

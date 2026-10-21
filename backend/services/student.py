@@ -174,6 +174,47 @@ def sync_course_requests(session: Session, student: User, transcript: StudentTra
     return created
 
 
+def reopen_course(session: Session, closed: TransferRequest) -> TransferRequest | None:
+    """문서 삭제로 끝난 과목 요청 자리에 같은 과목의 새 요청을 준비한다 (과목 카드가 목록에서 사라지지 않게).
+    계정 성적표에 그 과목이 C 이상으로 있을 때만. 삭제된 이전 요청은 기록으로 남는다."""
+    if not closed.course_key:
+        return None
+    transcript = transcript_repo.for_student(session, closed.student_id)
+    if transcript is None or transcript.status != TranscriptStatus.READY:
+        return None
+    line = next(
+        (
+            ln
+            for ln in transcript.lines or []
+            if course_key(ln.get("code"), ln.get("title")) == closed.course_key and not grade_failed(ln.get("grade"))
+        ),
+        None,
+    )
+    if line is None:
+        return None
+    fresh = request_repo.add(
+        session,
+        TransferRequest(
+            student_id=closed.student_id,
+            source_institution_id=closed.source_institution_id,
+            target_institution_id=closed.target_institution_id,
+            major=closed.major,
+            course_key=closed.course_key,
+            counted=closed.counted,
+        ),
+    )
+    _copy_course_line(session, transcript, fresh, line)
+    return fresh
+
+
+def course_order(transcript: StudentTranscript | None) -> dict[str, int]:
+    """과목 키 → 성적표에 적힌 순서 (학생 홈에서 과목 카드를 늘 같은 자리에 두기 위해)."""
+    order: dict[str, int] = {}
+    for index, line in enumerate(transcript.lines or [] if transcript else []):
+        order.setdefault(course_key(line.get("code"), line.get("title")), index)
+    return order
+
+
 def _copy_course_line(session: Session, transcript: StudentTranscript, request: TransferRequest, line: dict) -> None:
     """과목 요청의 성적표 줄 하나를 새 성적표 값으로 맞춘다 (강의계획서 연결은 그대로)."""
     entries = request_repo.transcript_entries(session, request.id)
