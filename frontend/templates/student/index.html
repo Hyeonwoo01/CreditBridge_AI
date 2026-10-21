@@ -86,7 +86,9 @@
       </div>
       <span aria-hidden="true">›</span>
     </div>
-    {% if sm.courses %}
+    {% if r.status == "closed" %}
+    <p class="text-sm text-muted">{{ _("문서가 삭제돼 전체 합계에서 빠진 요청이에요. 판정 기록은 요청을 열어 볼 수 있어요.") }}</p>
+    {% elif sm.courses %}
     <dl class="grid grid-cols-2 gap-3">
       <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ sim.credits_low | round(1) }}{% if sim.credits_high != sim.credits_low %}~{{ sim.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(sim.source_credits | round(1))) }}</span></dd></div>
       <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("판정 확정") }}</dt><dd class="font-semibold tabular-nums">{{ sm.decided }} <span class="text-sm font-normal text-muted">{{ _("/ {courses}과목", courses=(sm.courses)) }}</span></dd></div>

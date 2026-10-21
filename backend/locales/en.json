@@ -591,6 +591,7 @@
  "문서 삭제 요청이 접수됐어요 (요청 #{id}). 심사관 처리 뒤 승인해 주세요.": "A document deletion request was received (request #{id}). Approve it after the evaluator has processed it.",
  "문서 삭제가 승인돼 요청 #{id}의 심사가 종료됐어요.": "Document deletion was approved, so review of request #{id} has ended.",
  "문서 삭제로 종료": "Closed (documents deleted)",
+ "문서가 삭제돼 전체 합계에서 빠진 요청이에요. 판정 기록은 요청을 열어 볼 수 있어요.": "Documents were deleted, so this request is left out of the overall total. Open it to see the decision record.",
  "문서를 분석하지 못했어요. 글자를 읽을 수 있는 PDF나 이미지인지 확인한 뒤 다시 올려 주세요.": "We couldn't analyze the document. Make sure it is a PDF or image with readable text, then upload it again.",
  "문서를 삭제해 종료된 요청이에요. 새 요청을 만들어 주세요.": "This request was closed because its documents were deleted. Please create a new request.",
  "문서에서 글자를 읽지 못했어요. 텍스트가 있는 PDF나 더 선명한 스캔본을 올려 주세요.": "We couldn't read any text in the document. Upload a PDF with a text layer or a clearer scan.",

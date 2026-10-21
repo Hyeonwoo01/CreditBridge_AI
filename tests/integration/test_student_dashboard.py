@@ -206,3 +206,5 @@ def test_total_merges_requests_and_counts_same_course_once(client: TestClient, s
     total, cards = total_and_cards()
     assert "편입 요청 1건을 합친 예상치예요" in total and "/ 2과목" in total  # 한국사는 빠진다
     assert "문서 삭제로 종료" in cards  # 카드는 그대로 보인다
+    closed = cards[cards.index(f'href="/student/requests/{first}"') :].split("</a>")[0]
+    assert "전체 합계에서 빠진 요청이에요" in closed and "예상 인정 학점" not in closed  # 종료 카드는 수치 대신 안내
