@@ -332,7 +332,19 @@ class StudentHome:
 
     @property
     def todos(self) -> list[tuple[TransferRequest, student_service.Todo]]:
-        return [(s.request, t) for s in self.summaries for t in s.readiness.todos]
+        """할 일 목록. 과목 요청마다 생기는 '강의계획서 올리기'는 한 줄로 묶는다 (과목이 많으면 목록이 길어져서)."""
+        out: list[tuple[TransferRequest, student_service.Todo]] = []
+        syllabus = [(s.request, t) for s in self.summaries for t in s.readiness.todos if t.group == "course_syllabus"]
+        for s in self.summaries:
+            out.extend((s.request, t) for t in s.readiness.todos if t.group != "course_syllabus")
+        if len(syllabus) == 1:
+            out.insert(0, syllabus[0])
+        elif syllabus:
+            merged = student_service.Todo(
+                "missing", tr("강의계획서 올리기 {n}과목", n=len(syllabus)), "/student#requests", "course_syllabus"
+            )
+            out.insert(0, (syllabus[0][0], merged))
+        return out
 
 
 def student_home(session: Session, student: User) -> StudentHome:

@@ -49,7 +49,7 @@ def test_dashboard_lists_todos_and_readiness(client: TestClient, seeded: Session
     assert "100%" in home and "제출할 준비가 됐어요" in home
     assert f'href="/student/requests/{rid}#submit"' in home and "학사처에 심사 요청하기" in home
     # 성적표를 올리면 C 이상 과목마다 요청이 따로 생겨 그 과목들의 강의계획서가 할 일로 남는다
-    assert "MATH 101 강의계획서 올리기" in home and "강의계획서 미등록" not in home
+    assert "강의계획서 올리기 3과목" in home and "강의계획서 미등록" not in home
 
 
 def test_nav_badges_for_new_results_clear_when_viewed(client: TestClient, seeded: Session) -> None:

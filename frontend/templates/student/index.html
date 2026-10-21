@@ -150,7 +150,7 @@
 
 {% set open_summaries = home.summaries | rejectattr("request.status", "equalto", "closed") | list %}
 {% set closed_summaries = home.summaries | selectattr("request.status", "equalto", "closed") | list %}
-<section class="mt-10 grid gap-4" aria-label="{{ _('편입 요청 목록') }}">
+<section id="requests" class="mt-10 grid scroll-mt-20 gap-4" aria-label="{{ _('편입 요청 목록') }}">
   {% for sm in open_summaries %}
 {{ request_card(sm) }}
   {% else %}

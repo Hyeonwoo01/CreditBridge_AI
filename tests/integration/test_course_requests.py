@@ -39,7 +39,11 @@ def test_courses_graded_c_or_above_become_requests(client: TestClient, seeded: S
     home = client.get("/student").text
     assert "새 요청 만들기" not in home
     assert "MATH 101 Calculus I" in home and "CSE 204 Data Structures" in home and "Korean History" not in home
-    assert "이 과목의 강의계획서를 올려 주세요" in home and "MATH 101 강의계획서 올리기" in home
+    assert "이 과목의 강의계획서를 올려 주세요" in home
+    # 할 일에는 과목마다가 아니라 한 줄로
+    todo = home[home.index('id="todo-title"') : home.index('id="requests"')]
+    assert "강의계획서 올리기 2과목" in todo and 'href="/student#requests"' in todo
+    assert "MATH 101 강의계획서 올리기" not in todo
 
     math = found["code:MATH101"]
     page = client.get(f"/student/requests/{math.id}").text

@@ -290,6 +290,10 @@
  ],
  "강의계획서 업로드": "Syllabus uploaded",
  "강의계획서 올리기": "Upload syllabi",
+ "강의계획서 올리기 {n}과목": [
+  "Upload syllabus for {n} course",
+  "Upload syllabi for {n} courses"
+ ],
  "강의계획서 원본 열람": "Original syllabus viewed",
  "강의계획서 유사도 {similarity}": "syllabus similarity {similarity}",
  "강의계획서는 요청당 최대 {max_syllabi_per_request}건까지 올릴 수 있어요.": "You can upload up to {max_syllabi_per_request} syllabi per request.",

@@ -707,6 +707,7 @@ class Todo:
     kind: str  # missing: 학생이 채워야 할 서류(앰버) / action: 다음 단계(파랑)
     label: str
     href: str
+    group: str | None = None  # 학생 홈 할 일에서 한 줄로 묶을 종류 (course_syllabus: 과목 요청의 강의계획서 올리기)
 
 
 @dataclass(frozen=True)
@@ -753,7 +754,11 @@ def readiness(session: Session, request: TransferRequest) -> Readiness:
             done += len(entries) - unlinked - unconfirmed
             if unlinked and request.course_key:
                 course = (entries[0].code or entries[0].title).strip()
-                todos.append(Todo("missing", tr("{course} 강의계획서 올리기", course=course), f"{base}#upload"))
+                todos.append(
+                    Todo(
+                        "missing", tr("{course} 강의계획서 올리기", course=course), f"{base}#upload", "course_syllabus"
+                    )
+                )
             elif unlinked:
                 todos.append(Todo("missing", tr("강의계획서 미등록 {unlinked}건", unlinked=unlinked), f"{base}#upload"))
             if unconfirmed:
