@@ -15,7 +15,7 @@ from backend.errors import CreditBridgeError, DuplicateRowError, NotFoundError, 
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import Appeal, AppealFile, Assignment, CourseEvaluation, Decision, Syllabus, TransferRequest, User
-from backend.models.enums import AppealStatus, Recommendation, Role
+from backend.models.enums import AppealStatus, Recommendation, RequestStatus, Role
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -35,12 +35,16 @@ OPEN = (AppealStatus.SUBMITTED, AppealStatus.ACCEPTED)
 # 이의 신청을 받지 않는 과목 (학생 화면에 그대로 보인다). 더 알고 싶으면 학과 사무실로 안내한다
 DIRECT_NOT_APPEALABLE = N_("직접 인정된 과목은 이의 신청을 받지 않아요.")
 ALREADY_APPEALED = N_("이의 신청은 과목당 한 번이라, 이미 처리된 이 과목은 다시 신청할 수 없어요.")
+REQUEST_CLOSED = N_("문서가 삭제돼 종료된 요청의 과목은 이의 신청할 수 없어요.")
 VISIT_OFFICE = N_("판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.")
 
 
-def block_reason(decision: Decision, appeals: list[Appeal]) -> str | None:
+def block_reason(decision: Decision, appeals: list[Appeal], closed: bool = False) -> str | None:
     """이의 신청을 받지 않는 이유 (N_ 원문). 받을 수 있으면 None.
-    직접 인정은 더 나은 결과가 없고, 기각·재판정으로 끝난 이의 신청이 있으면 다시 받지 않는다."""
+    문서 삭제로 종료된 요청은 받지 않고, 직접 인정은 더 나은 결과가 없고,
+    기각·재판정으로 끝난 이의 신청이 있으면 다시 받지 않는다."""
+    if closed:
+        return REQUEST_CLOSED
     if decision.result == Recommendation.DIRECT:
         return DIRECT_NOT_APPEALABLE
     if any(a.status in (AppealStatus.DISMISSED, AppealStatus.REDECIDED) for a in appeals):
@@ -89,7 +93,7 @@ def file_appeal(
     previous = appeal_repo.for_evaluation(session, evaluation.id)
     if any(a.status in OPEN for a in previous):
         raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요."))
-    blocked = block_reason(decision, previous)
+    blocked = block_reason(decision, previous, closed=request.status == RequestStatus.CLOSED)
     if blocked:
         raise CreditBridgeError(f"{tr(blocked)} {tr(VISIT_OFFICE)}")
     reason = reason.strip()
@@ -259,7 +263,7 @@ def rows(session: Session, evaluator: User) -> list[AppealRow]:
         raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
     today = utcnow().date()
     out = []
-    found = appeal_repo.of_institution(session, evaluator.institution_id)
+    found = appeal_repo.of_institution(session, evaluator.institution_id, exclude_closed=True)
     files = appeal_repo.files_for(session, [a.id for a, _, _, _ in found])
     for appeal, evaluation, syllabus, request in found:
         professors = _department_professors(session, evaluation, evaluator.institution_id)
@@ -335,7 +339,9 @@ def appealable(session: Session, student: User) -> list[Appealable]:
                 continue
             if row.appeal is not None and row.appeal.status in OPEN:
                 continue
-            if block_reason(row.decision, [row.appeal] if row.appeal else []):
+            if block_reason(
+                row.decision, [row.appeal] if row.appeal else [], closed=request.status == RequestStatus.CLOSED
+            ):
                 continue
             out.append(Appealable(row.evaluation, row.syllabus, request, row.decision))
     return out
@@ -378,6 +384,6 @@ def submitted_count(session: Session, evaluator: User) -> int:
         raise PermissionDeniedError(tr("심사관 계정만 사용할 수 있어요."))
     return sum(
         1
-        for appeal, _, _, _ in appeal_repo.of_institution(session, evaluator.institution_id)
+        for appeal, _, _, _ in appeal_repo.of_institution(session, evaluator.institution_id, exclude_closed=True)
         if appeal.status == AppealStatus.SUBMITTED
     )

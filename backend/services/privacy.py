@@ -160,8 +160,10 @@ def approve(session: Session, admin: User, storage: ObjectStorage, privacy_id: i
 
 
 def _delete_documents(session: Session, storage: ObjectStorage, request: TransferRequest) -> None:
-    """원본 파일(강의계획서·보완 자료·성적표·이의 신청 근거 자료)과 추출 텍스트·내부 메모를 지운다."""
+    """원본 파일(강의계획서·보완 자료·성적표·이의 신청 근거 자료)과 추출 텍스트·이의 사유·내부 메모를 지운다."""
     syllabi = syllabus_repo.of_request(session, request.id)
+    for appeal in appeal_repo.of_request(session, request.id):
+        appeal.reason = ""  # 학생이 쓴 이의 사유도 지운다 (처리 결과·판정 기록은 남김)
     for appeal_file in appeal_repo.files_of_request(session, request.id):
         if appeal_file.file_key:
             storage.delete(appeal_file.file_key)

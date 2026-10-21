@@ -60,7 +60,7 @@
 {% for a in v.appeals | reverse %}
 <section class="mt-3 rounded-md bg-parchment p-4 text-sm">
   <p class="font-semibold">{{ _("이의 신청 · {status}", status=(a.status | appeal_status)) }} <span class="font-normal text-muted">· {{ time(a.created_at) }}</span></p>
-  <p class="mt-1 whitespace-pre-line text-ink-80">{{ a.reason }}</p>
+  {% if a.reason %}<p class="mt-1 whitespace-pre-line text-ink-80">{{ a.reason }}</p>{% else %}<p class="mt-1 text-muted">{{ _("문서 삭제 요청으로 이의 사유가 지워졌어요.") }}</p>{% endif %}
   {% set files = v.appeal_files.get(a.id, []) %}
   {% if files %}<ul class="mt-2 flex flex-wrap gap-2" aria-label="{{ _('근거 자료') }}">{% for f in files %}<li>{% if f.file_key %}<a class="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1 text-sm hover:border-primary hover:text-primary" href="/appeal-files/{{ f.id }}">{{ f.original_filename }}</a>{% else %}<span class="inline-flex items-center rounded-full border border-hairline px-3 py-1 text-sm text-muted">{{ _("{original_filename} (삭제됨)", original_filename=(f.original_filename)) }}</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
   {% if a.handler_note %}<p class="mt-1"><span class="text-muted">{{ _("학사처 메모:") }}</span> {{ a.handler_note }}</p>{% endif %}

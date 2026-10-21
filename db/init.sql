@@ -566,5 +566,16 @@ UPDATE assignments SET is_active = false
 
 UPDATE alembic_version SET version_num='0005' WHERE alembic_version.version_num = '0004';
 
+-- Running upgrade 0005 -> 0006
+
+UPDATE appeals SET reason = ''
+        WHERE reason <> '' AND course_evaluation_id IN (
+            SELECT e.id FROM course_evaluations AS e
+            JOIN transfer_requests AS r ON r.id = e.transfer_request_id
+            WHERE r.status = 'closed'
+        );
+
+UPDATE alembic_version SET version_num='0006' WHERE alembic_version.version_num = '0005';
+
 COMMIT;
 

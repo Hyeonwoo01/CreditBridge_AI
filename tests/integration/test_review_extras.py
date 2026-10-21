@@ -607,4 +607,7 @@ def test_appeal_form_with_evidence_files(client: TestClient, seeded: Session, fa
     assert all(f.file_key is None for f in seeded.scalars(select(AppealFile)).all())
     login(client, "jiwon@student.example")
     assert client.get(url).status_code == 404
-    assert "(삭제됨)" in client.get("/student/appeals").text
+    assert "강의노트.pdf" not in client.get("/student/appeals").text  # 종료된 요청의 이의 신청은 학생 화면에서 사라진다
+    login(client, "rachel@msu.example")
+    page = client.get(f"/review/evaluations/{ev.id}").text  # 교직원 기록에는 파일 이름만 "(삭제됨)"
+    assert "강의노트.pdf (삭제됨)" in page and "문서 삭제 요청으로 이의 사유가 지워졌어요" in page

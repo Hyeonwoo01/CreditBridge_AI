@@ -87,8 +87,13 @@ class EvaluationView:
 
     @property
     def appeal_block(self) -> str | None:
-        """이의 신청을 받지 않는 이유 (직접 인정, 이미 처리된 이의 신청). 받을 수 있거나 판정 전이면 None."""
-        return appeal_service.block_reason(self.decision, self.appeals) if self.decision else None
+        """이의 신청을 받지 않는 이유 (문서 삭제로 종료, 직접 인정, 이미 처리된 이의 신청).
+        받을 수 있거나 판정 전이면 None."""
+        if self.decision is None:
+            return None
+        return appeal_service.block_reason(
+            self.decision, self.appeals, closed=self.request.status == RequestStatus.CLOSED
+        )
 
     @property
     def open_appeal(self) -> Appeal | None:
@@ -179,7 +184,9 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
     if user.role == "professor":
         view.target_courses = catalog_repo.courses_of(session, request.target_institution_id)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
-    view.appeals = appeal_service.for_evaluation(session, evaluation.id)
+    # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)
+    if not (user.role == Role.STUDENT and request.status == RequestStatus.CLOSED):
+        view.appeals = appeal_service.for_evaluation(session, evaluation.id)
     view.appeal_files = appeal_service.files_for(session, [a.id for a in view.appeals])
     view.material_requests = material_service.for_syllabi(session, [syllabus.id])
     suggested = view.result.missing_materials if view.result else []

@@ -22,7 +22,7 @@
 {% if v.decisions | length > 1 or v.appeals %}
 <h2>{{ _("판정·이의 신청 경과") }}</h2>
 {% for d in v.decisions %}<p>{{ d.decided_at | utc }} · {{ _('재판정') if d.appeal_id else _('원 판정') }} {{ d.result | rec }} · {{ d.action | action }} · {{ v.users[d.decided_by].name if d.decided_by in v.users else '' }}{% if d.reason_codes %} {{ _("· 사유") }} {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endfor %}
-{% for a in v.appeals %}<p>{{ _("{created_at} · 이의 신청 {status}: “{reason}”", created_at=(a.created_at | utc), status=(a.status | appeal_status), reason=(a.reason)) }}{% if a.handler_note %} {{ _("· 학사처 메모: {handler_note}", handler_note=(a.handler_note)) }}{% endif %}</p>{% endfor %}
+{% for a in v.appeals %}<p>{{ _("{created_at} · 이의 신청 {status}: “{reason}”", created_at=(a.created_at | utc), status=(a.status | appeal_status), reason=(a.reason or _("문서 삭제로 지워짐"))) }}{% if a.handler_note %} {{ _("· 학사처 메모: {handler_note}", handler_note=(a.handler_note)) }}{% endif %}</p>{% endfor %}
 {% endif %}
 
 <h2>{{ _("AI 추천") }}</h2>
