@@ -292,6 +292,16 @@ class RequestSummary:
     empty: bool = False  # 서류를 하나도 올리지 않은 초안 (지울 수 있음)
 
 
+@dataclass(frozen=True)
+class StudentTotal:
+    """학생 홈 맨 위 전체 합계: 같은 편입 대학 요청을 합친 예상 인정 학점·판정 확정 수·남은 학기."""
+
+    simulation: student_service.Simulation
+    courses: int
+    decided: int
+    requests: int  # 합친 요청 수
+
+
 @dataclass
 class StudentHome:
     requests: list[TransferRequest]
@@ -300,6 +310,7 @@ class StudentHome:
     major: str | None  # 계정에 등록된 편입 전공
     summaries: list[RequestSummary] = field(default_factory=list)
     unread_results: int = 0  # 아직 열어 보지 않은 판정 결과 알림
+    total: StudentTotal | None = None  # 과목이 하나도 없으면 None
 
     @property
     def todos(self) -> list[tuple[TransferRequest, student_service.Todo]]:
@@ -312,9 +323,14 @@ def student_home(session: Session, student: User) -> StudentHome:
         target = None
     requests = request_repo.of_student(session, student.id)
     summaries = []
+    groups: list[list[student_service.CourseRow]] = []
+    # 합계는 한 편입 대학 기준 (졸업 학점이 대학마다 달라서): 소속 대학, 없으면 가장 최근 요청의 대학
+    total_inst = target or (requests[0].target_institution if requests else None)
     for r in requests:
         rows = student_service.course_rows(session, r)
         inst = r.target_institution
+        if total_inst is not None and inst.id == total_inst.id:
+            groups.append(rows)
         summaries.append(
             RequestSummary(
                 r,
@@ -325,6 +341,15 @@ def student_home(session: Session, student: User) -> StudentHome:
                 student_service.is_empty_draft(session, r),
             )
         )
+    total = None
+    merged = student_service.merged_rows(groups)
+    if total_inst is not None and merged:
+        total = StudentTotal(
+            student_service.simulate(merged, total_inst.degree_credits or 120, total_inst.tuition_per_credit or 1000),
+            len(merged),
+            sum(1 for row in merged if row.decision is not None),
+            sum(1 for rows in groups if rows),
+        )
     return StudentHome(
         requests=requests,
         target=target,
@@ -332,6 +357,7 @@ def student_home(session: Session, student: User) -> StudentHome:
         major=student.department_name,
         summaries=summaries,
         unread_results=notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
+        total=total,
     )
 
 

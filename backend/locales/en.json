@@ -1087,6 +1087,7 @@
  "전체 {appeals_total} · 처리 중 {appeals_open} · 기각 {appeals_dismissed} · 재판정으로 결과 변경 {appeals_changed}": "Total {appeals_total} · in progress {appeals_open} · dismissed {appeals_dismissed} · result changed on re-decision {appeals_changed}",
  "전체 감사 로그": "Full audit log",
  "전체 보기": "View all",
+ "전체 합계": "Overall total",
  "접수": "Received",
  "접수 / 일자": "Received / date",
  "접수된 이의 신청이 없어요.": "No appeals received.",
@@ -1284,6 +1285,10 @@
  "편입 요청 {n}건": [
   "{n} transfer request",
   "{n} transfer requests"
+ ],
+ "편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 셌어요.": [
+  "Estimate across {requests} transfer request. A course uploaded to more than one request is counted once.",
+  "Estimate across {requests} transfer requests. A course uploaded to more than one request is counted once."
  ],
  "편입 요청 목록": "Transfer requests",
  "편입 요청을 찾을 수 없어요.": "We couldn't find the transfer request.",

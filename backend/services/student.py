@@ -452,6 +452,23 @@ def simulate(
     )
 
 
+def merged_rows(groups: list[list[CourseRow]]) -> list[CourseRow]:
+    """여러 편입 요청의 과목을 합친다 (학생 홈 전체 합계). groups는 최근 요청부터.
+
+    같은 과목(같은 출신 대학의 같은 과목 코드, 코드가 없으면 같은 파일)을 여러 요청에 올렸으면 한 번만 센다:
+    판정이 난 행을 쓰고, 없으면 가장 최근 요청의 행을 쓴다.
+    """
+    chosen: dict[str, CourseRow] = {}
+    for rows in groups:
+        for row in rows:
+            code = "".join(row.syllabus.course_code.split()).upper()
+            key = f"{row.syllabus.institution_id}:{code}" if code else f"hash:{row.syllabus.content_hash}"
+            kept = chosen.get(key)
+            if kept is None or (kept.decision is None and row.decision is not None):
+                chosen[key] = row
+    return list(chosen.values())
+
+
 def ensure_student(user: User) -> None:
     if user.role != Role.STUDENT:
         raise PermissionDeniedError(tr("학생 계정으로 로그인해 주세요."))

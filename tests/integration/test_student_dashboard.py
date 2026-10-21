@@ -173,3 +173,22 @@ def test_progress_marks_only_the_next_step_as_current(client: TestClient, seeded
     steps = client.get(f"/student/requests/{rid}").text
     steps = steps[steps.index('aria-label="심사 진행 현황"') :].split("</ol>")[0]
     assert steps.count("진행 중") == 1 and steps.index("진행 중") < steps.index("최종 확정")  # 학과 교수 심사가 진행 중
+
+
+def test_total_merges_requests_and_counts_same_course_once(client: TestClient, seeded: Session) -> None:
+    """맨 위 전체 합계: 요청을 합치되 같은 과목은 한 번만. 남은 학기는 합계에만 (요청 카드에는 없음)."""
+    token = login(client, "jiwon@student.example")
+    assert "전체 합계" not in client.get("/student").text  # 과목이 없으면 숨김
+
+    first = new_request(client, seeded, token)
+    upload(client, first, token, "calculus.txt")
+    second = new_request(client, seeded, token)
+    assert second != first
+    upload(client, second, token, "calculus.txt", "data_structures.txt")
+
+    home = client.get("/student").text
+    total = home[home.index('id="total-title"') : home.index('aria-label="편입 요청 목록"')]
+    assert "편입 요청 2건을 합친 예상치예요" in total
+    assert "/ 2과목" in total and "남은 학기(예상)" in total  # 미적분학은 두 요청에 있어도 한 번
+    cards = home[home.index('aria-label="편입 요청 목록"') :]
+    assert "예상 인정 학점" in cards and "판정 확정" in cards and "남은 학기" not in cards

@@ -38,6 +38,22 @@
 <p class="mt-6 rounded-md bg-parchment p-6 text-sm text-ink-80">{{ _("입학이 확정된 대학에 소속된 계정만 편입 요청을 만들 수 있어요. 학사처에 계정 연결을 요청해 주세요.") }}</p>
 {% endif %}
 
+{% if home.total %}
+{% set tot = home.total %}
+{% set ts = tot.simulation %}
+<section class="mt-10 grid gap-3" aria-labelledby="total-title">
+  <div class="grid gap-1">
+    <h2 id="total-title" class="section-title">{{ _("전체 합계") }}</h2>
+    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 셌어요.", requests=(tot.requests)) }}</p>
+  </div>
+  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ ts.credits_low | round(1) }}{% if ts.credits_high != ts.credits_low %}~{{ ts.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(ts.source_credits | round(1))) }}</span></dd></div>
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("판정 확정") }}</dt><dd class="font-semibold tabular-nums">{{ tot.decided }} <span class="text-sm font-normal text-muted">{{ _("/ {courses}과목", courses=(tot.courses)) }}</span></dd></div>
+    <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">{{ _("남은 학기(예상)") }}</dt><dd class="font-semibold tabular-nums">{{ ts.semesters_low }}{% if ts.semesters_high != ts.semesters_low %}~{{ ts.semesters_high }}{% endif %}{{ _("학기") }}</dd></div>
+  </dl>
+</section>
+{% endif %}
+
 {% if home.todos or home.unread_results %}
 <section class="mt-10 grid gap-3" aria-labelledby="todo-title">
   <h2 id="todo-title" class="section-title">{{ _("할 일") }}</h2>
@@ -71,10 +87,9 @@
       <span aria-hidden="true">›</span>
     </div>
     {% if sm.courses %}
-    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <dl class="grid grid-cols-2 gap-3">
       <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{{ sim.credits_low | round(1) }}{% if sim.credits_high != sim.credits_low %}~{{ sim.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(sim.source_credits | round(1))) }}</span></dd></div>
       <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("판정 확정") }}</dt><dd class="font-semibold tabular-nums">{{ sm.decided }} <span class="text-sm font-normal text-muted">{{ _("/ {courses}과목", courses=(sm.courses)) }}</span></dd></div>
-      <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">{{ _("남은 학기(예상)") }}</dt><dd class="font-semibold tabular-nums">{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}{{ _("학기") }}</dd></div>
     </dl>
     {% endif %}
     {% if rd.percent is not none %}
