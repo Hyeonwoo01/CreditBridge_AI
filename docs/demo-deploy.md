@@ -1,5 +1,7 @@
 # 예시용 공개 데모 배포 (Render · Hugging Face Spaces)
 
+> 2026-10-21 기준으로 운영 중인 공개 데모(Render 서비스)는 없다. 필요하면 아래 순서로 다시 만든다.
+
 CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입니다. 실제 학생 자료를 다루는 운영 배포는 저장소 루트의 `Dockerfile`·`docker-compose.yml`과 README "운영 시 확인할 것"을 따르세요.
 
 ## 데모 모드가 하는 일
