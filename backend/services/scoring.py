@@ -11,7 +11,8 @@ from backend.models.enums import Confidence, Recommendation
 from backend.schemas.results import ConceptResult
 
 # 아래 규칙을 바꾸면 버전을 올린다. 같은 입력의 이전 결과를 재사용할 때 이 버전도 비교한다.
-RULES_VERSION = "scoring-v3"
+# 근거로 인정하는 구절의 기준(ai/evidence.py)이 바뀌어도 올린다. v4: 선수과목·교재 칸·부정 문장 구절 제외
+RULES_VERSION = "scoring-v4"
 
 DIRECT_MIN = 0.75
 ELECTIVE_MIN = 0.40

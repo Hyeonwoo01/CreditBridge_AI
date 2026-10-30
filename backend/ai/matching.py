@@ -1,10 +1,11 @@
-"""AI(Claude·GPT) 비교로 매핑·개념별 커버리지 산출 (FR-05, FR-06). 근거 구절은 원문 검증을 통과한 것만 남긴다."""
+"""AI(Claude·GPT) 비교로 매핑·개념별 커버리지 산출 (FR-05, FR-06). 근거 구절은 원문 검증을 통과한 것만 남기고,
+학생 쪽은 선수과목·교재 칸이나 부정 문장에서 나온 구절도 뺀다."""
 
 import json
 from dataclasses import dataclass
 
 from backend.ai import injection
-from backend.ai.evidence import verify_quotes
+from backend.ai.evidence import Span, teaching_evidence, verify_quotes
 from backend.ai.llm_client import LLMClient, LLMResult
 from backend.ai.prompts_loader import load_prompt
 from backend.schemas.evaluation import CandidateJudgment, EvaluationOutput
@@ -68,10 +69,15 @@ def compare(llm: LLMClient, prompt: str) -> LLMResult[EvaluationOutput]:
 
 
 def concept_results(
-    judgment: CandidateJudgment, ref: Reference, student_text: str, student_syllabus_id: int
+    judgment: CandidateJudgment,
+    ref: Reference,
+    student_text: str,
+    student_syllabus_id: int,
+    non_teaching: list[Span] | None = None,
 ) -> tuple[list[ConceptResult], list[VerifiedSpan]]:
     """대상 과목의 필수 개념 순서대로 판단을 정리한다. coverage는 AI가 매긴 원점수(0~1)이고,
-    근거 검증에 따른 보정은 services/scoring.py가 한다. 응답에 빠진 개념은 판단 불가로 둔다."""
+    근거 검증에 따른 보정은 services/scoring.py가 한다. 응답에 빠진 개념은 판단 불가로 둔다.
+    non_teaching은 학생 강의계획서의 선수과목·교재 칸 위치(evidence.non_teaching_regions)."""
     by_name = {c.concept.strip().lower(): c for c in judgment.concepts}
     results: list[ConceptResult] = []
     spans: list[VerifiedSpan] = []
@@ -92,6 +98,7 @@ def concept_results(
             continue
         context = f"{ref.code}|{concept}"[:255]
         src = verify_quotes(student_text, j.source_quotes, context=context)
+        src = teaching_evidence(student_text, src, non_teaching or [], context=context)
         tgt = verify_quotes(ref.text, j.target_quotes, context=context)
         spans += [VerifiedSpan("source", student_syllabus_id, s.start, s.end, context) for s in src]
         spans += [VerifiedSpan("target", ref.syllabus_id, s.start, s.end, context) for s in tgt]

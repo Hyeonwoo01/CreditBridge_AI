@@ -1,4 +1,4 @@
-from backend.ai.evidence import locate, verify_quotes
+from backend.ai.evidence import locate, non_teaching_regions, teaching_evidence, verify_quotes
 
 TEXT = (
     "Week 5: Differentiation rules:  product rule and\nquotient rule\nWeek 6: The chain rule, implicit differentiation"
@@ -65,3 +65,89 @@ def test_ellipsis_with_short_or_distant_parts_is_rejected() -> None:
     assert locate(weeks, "이수 ... 인정") is None  # 조각이 너무 짧아 여러 주차를 묶어 버린다
     far = "Week 1: Limits and continuity. " + "Filler topic text. " * 30 + "Week 15: Final exam review."
     assert locate(far, "Limits and continuity ... Final exam review") is None  # 조각 사이가 너무 멀다
+
+
+SYLLABUS = (
+    "Course: Business Analytics\n"
+    "Prerequisites: Regression analysis (STAT 201)\n"
+    "\n"
+    "Textbook: Inventory Management, 3rd ed.\n"
+    "Week 1: Descriptive statistics and data visualization\n"
+    "Week 2: Linear regression and model fitting\n"
+    "Machine learning is not covered in this course; see the next course.\n"
+    "8주차: 시계열 예측. 딥러닝은 다루지 않는다.\n"
+)
+
+
+def _kept(quote: str, items: list[str] | None = None) -> bool:
+    spans = verify_quotes(SYLLABUS, [quote], context="t")
+    assert spans, quote  # 원문 검증은 통과하는 구절들
+    regions = non_teaching_regions(SYLLABUS, items or [])
+    return bool(teaching_evidence(SYLLABUS, spans, regions, context="t"))
+
+
+def test_quotes_from_prerequisite_or_textbook_sections_are_not_teaching_evidence() -> None:
+    assert not _kept("Prerequisites: Regression analysis")
+    assert not _kept("Regression analysis (STAT 201)")
+    assert not _kept("Inventory Management, 3rd ed.")
+    # 칸은 다음 수업 내용 제목에서 끝난다: 교재 줄 바로 아래 주차 계획은 근거로 남는다
+    assert _kept("Week 2: Linear regression and model fitting")
+    assert _kept("Descriptive statistics and data visualization")
+
+
+def test_negated_or_deferred_topics_are_not_teaching_evidence() -> None:
+    assert not _kept("Machine learning is not covered in this course")
+    assert not _kept("딥러닝은 다루지 않는다")
+    assert _kept("8주차: 시계열 예측")
+
+
+def test_extracted_prerequisite_items_mark_regions_without_headings() -> None:
+    text = "Students must have completed Calculus I.\nWeek 1: Limits and continuity"
+    spans = verify_quotes(text, ["completed Calculus I", "Limits and continuity"], context="t")
+    kept = teaching_evidence(text, spans, non_teaching_regions(text, ["completed Calculus I"]), context="t")
+    assert [text[s.start : s.end] for s in kept] == ["Limits and continuity"]
+
+
+def test_korean_prerequisite_heading_section() -> None:
+    text = "선수과목: 회귀분석, 기초통계\n\n3주차: 회귀분석 실습"
+    regions = non_teaching_regions(text, [])
+    spans = verify_quotes(text, ["회귀분석, 기초통계", "3주차: 회귀분석 실습"], context="t")
+    kept = teaching_evidence(text, spans, regions, context="t")
+    assert [text[s.start : s.end] for s in kept] == ["3주차: 회귀분석 실습"]
+
+
+def test_concept_quoted_only_from_prerequisites_is_capped() -> None:
+    from backend.ai.matching import Reference, concept_results
+    from backend.schemas.evaluation import CandidateJudgment, ConceptJudgment
+    from backend.services.scoring import UNVERIFIED_CAP, apply_verification
+
+    def judged(concept: str, quote: str) -> ConceptJudgment:
+        return ConceptJudgment(
+            concept=concept,
+            status="taught",
+            coverage=90,
+            source_quotes=[quote],
+            target_quotes=[],
+            reason="",
+            reason_en="",
+        )
+
+    ref = Reference(1, "BUS 300", "Analytics", 3.0, "same", 2, "ref", ["Regression", "Visualization"])
+    judgment = CandidateJudgment(
+        course_code="BUS 300",
+        level="same",
+        level_note="",
+        level_note_en="",
+        summary="",
+        summary_en="",
+        concepts=[
+            judged("Regression", "Regression analysis (STAT 201)"),
+            judged("Visualization", "Descriptive statistics and data visualization"),
+        ],
+    )
+    regions = non_teaching_regions(SYLLABUS, ["Regression analysis (STAT 201)"])
+    results, spans = concept_results(judgment, ref, SYLLABUS, 7, regions)
+    regression, visualization = results
+    assert not regression.verified and regression.source_evidence == []
+    assert apply_verification(regression.status, regression.coverage, regression.verified) == UNVERIFIED_CAP
+    assert visualization.verified and len(spans) == 1

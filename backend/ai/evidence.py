@@ -1,4 +1,6 @@
 """근거 구절 원문 검증. 원문에 실제로 있는 문자열만 근거로 저장한다 (FR-06, 근거 환각 0건).
+학생 쪽 구절은 한 번 더 거른다: 원문에 있어도 선수과목·교재 칸이나 "다루지 않음" 같은 문장이면
+가르쳤다는 근거가 아니다 (teaching_evidence).
 
 LLM이 인용할 때 흔히 생기는 표기 차이만 허용한다: 공백·줄바꿈, 대소문자, 따옴표·대시 모양, 문장부호,
 그리고 중간을 "..."로 줄인 인용. 단어가 하나라도 다르면(바꿔 말하기, 조사 변경, 지어낸 문장) 버린다.
@@ -113,3 +115,73 @@ def verify_quotes(text: str, quotes: list[str], *, context: str) -> list[Span]:
     if rejected:
         logger.info("discarded unverified evidence quotes", extra={"context": context, "rejected": rejected})
     return spans
+
+
+# 원문에 있어도 '이 과목에서 가르쳤다'는 근거가 되지 않는 칸의 제목 (선수과목·교재·참고문헌)
+_NON_TEACHING_HEADING = re.compile(
+    r"^[ \t>*#\-•·\d.)]*(?:"
+    r"pre-?requisites?|co-?requisites?|required\s+(?:texts?|textbooks?|readings?|materials?)|textbooks?|"
+    r"recommended\s+(?:texts?|readings?)|course\s+materials?|references?|bibliography|"
+    r"선수\s*과목|선이수\s*과목|선수\s*학습|권장\s*선수|교재|주\s*교재|부\s*교재|참고\s*(?:문헌|도서|자료|교재)"
+    r")(?![a-z])",
+    re.IGNORECASE | re.MULTILINE,
+)
+# 칸이 끝나는 곳: 빈 줄, 또는 수업 내용 칸의 제목이 나오는 줄
+_TEACHING_HEADING = re.compile(
+    r"^[ \t>*#\-•·]*(?:week|wk\.?|session|lecture|module|unit|topic|schedule|course\s+(?:description|outline|"
+    r"objectives?|content)|learning\s+(?:outcomes?|objectives?)|grading|assessment|evaluation|"
+    r"\d+\s*주\s*차|제?\s*\d+\s*주|주차|강의\s*(?:개요|목표|계획|내용)|학습\s*목표|수업\s*(?:목표|계획|내용)|평가)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_BLANK_LINE = re.compile(r"\n[ \t]*\n")
+MAX_SECTION_CHARS = 600
+# 구절 안에 있으면 '가르치지 않음'·'다른 과목에서'·'이미 알아야 함'을 뜻하는 표현
+_NEGATION = re.compile(
+    r"\bnot\s+(?:be\s+)?(?:covered|taught|included|discussed|addressed|part\s+of)\b|\bwill\s+not\b|\bwon'?t\b|"
+    r"\bexclud(?:e|es|ed|ing)\b|\b(?:outside|beyond|out\s+of)\s+(?:the\s+)?scope\b|"
+    r"\b(?:next|following|later|subsequent|follow-?up)\s+(?:course|semester|term|class)\b|"
+    r"\b(?:assumed|prior|assumes)\s+knowledge\b|\bshould\s+(?:already\s+)?(?:know|be\s+familiar)\b|"
+    r"다루지\s*않|가르치지\s*않|포함(?:하지|되지)\s*않|제외|다음\s*학기|후속\s*(?:과목|강의|수업)|범위\s*(?:밖|외)|"
+    r"사전\s*지식|선수\s*지식|이미\s*(?:알고|배운|이수)",
+    re.IGNORECASE,
+)
+
+
+def non_teaching_regions(text: str, items: list[str]) -> list[Span]:
+    """선수과목·교재·참고문헌 칸의 원문 위치. 제목 줄부터 빈 줄이나 수업 내용 칸 제목까지(최대 600자)이고,
+    구조화 추출이 선수과목·교재로 뽑은 항목(items)이 원문에 있으면 그 위치도 더한다."""
+    regions: list[Span] = []
+    for heading in _NON_TEACHING_HEADING.finditer(text):
+        start = heading.start()
+        end = min(len(text), start + MAX_SECTION_CHARS)
+        blank = _BLANK_LINE.search(text, heading.end(), end)
+        if blank:
+            end = blank.start()
+        line_end = text.find("\n", heading.end(), end)
+        if line_end >= 0:
+            nxt = _TEACHING_HEADING.search(text, line_end + 1, end)
+            if nxt:
+                end = nxt.start()
+        regions.append(Span(start, end))
+    for item in items:
+        span = locate(text, item)
+        if span is not None:
+            regions.append(span)
+    return regions
+
+
+def teaching_evidence(text: str, spans: list[Span], excluded: list[Span], *, context: str) -> list[Span]:
+    """원문 검증을 통과한 학생 쪽 구절 중 '이 과목에서 가르쳤다'는 근거가 되는 것만 남긴다.
+    선수과목·교재 칸 안에만 있는 구절, 부정·다른 과목 표현이 든 구절은 버린다 (단어 하나로 버려질 수 있지만,
+    가르치지 않은 개념을 인정하는 쪽보다 '근거 부족'으로 교수에게 넘기는 쪽이 안전하다)."""
+    kept: list[Span] = []
+    rejected = 0
+    for span in spans:
+        inside = any(r.start <= span.start and span.end <= r.end for r in excluded)
+        if inside or _NEGATION.search(text[span.start : span.end]):
+            rejected += 1
+        else:
+            kept.append(span)
+    if rejected:
+        logger.info("discarded non-teaching evidence quotes", extra={"context": context, "rejected": rejected})
+    return kept

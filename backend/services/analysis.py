@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
 
 from backend.ai import candidates as candidate_filter
-from backend.ai import injection, matching
+from backend.ai import evidence, injection, matching
 from backend.ai.extraction import build_chunks, extract_syllabus
 from backend.ai.llm_client import LLMClient
 from backend.ai.prompts_loader import load_prompt
@@ -364,13 +364,14 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     output = result.output
     sparse = scoring.is_sparse(len(extraction.weekly_topics), len(extraction.learning_outcomes))
     refs_by_code = {r.code.lower(): r for r in refs}
+    non_teaching = evidence.non_teaching_regions(student.raw_text, extraction.prerequisites + extraction.textbooks)
     spans: list[matching.VerifiedSpan] = []
     scored: list[tuple[scoring.Score, CandidateResult]] = []
     for judgment in output.candidates[:3]:
         ref = refs_by_code.get(judgment.course_code.strip().lower())
         if ref is None:
             continue
-        concepts, found = matching.concept_results(judgment, ref, student.raw_text, student.id)
+        concepts, found = matching.concept_results(judgment, ref, student.raw_text, student.id, non_teaching)
         for c in concepts:
             c.coverage = scoring.apply_verification(c.status, c.coverage, c.verified)
         spans += found
