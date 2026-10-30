@@ -636,5 +636,31 @@ UPDATE transfer_requests AS r SET transcript_copied_at = now() AT TIME ZONE 'utc
 
 UPDATE alembic_version SET version_num='0007' WHERE alembic_version.version_num = '0006';
 
+-- Running upgrade 0007 -> 0008
+
+CREATE TABLE evidence_feedback (
+    evidence_span_id BIGINT NOT NULL, 
+    user_id BIGINT NOT NULL, 
+    verdict VARCHAR(10) NOT NULL, 
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_evidence_feedback PRIMARY KEY (id), 
+    CONSTRAINT ck_evidence_feedback_verdict_valid CHECK (verdict IN ('correct', 'wrong')), 
+    CONSTRAINT fk_evidence_feedback_evidence_span_id_evidence_spans FOREIGN KEY(evidence_span_id) REFERENCES evidence_spans (id), 
+    CONSTRAINT fk_evidence_feedback_user_id_users FOREIGN KEY(user_id) REFERENCES users (id), 
+    CONSTRAINT uq_evidence_feedback_span_user UNIQUE (evidence_span_id, user_id)
+);
+
+CREATE INDEX ix_evidence_feedback_evidence_span_id ON evidence_feedback (evidence_span_id);
+
+ALTER TABLE course_evaluations ADD COLUMN quotes_total INTEGER;
+
+ALTER TABLE course_evaluations ADD COLUMN quotes_unmatched INTEGER;
+
+ALTER TABLE course_evaluations ADD COLUMN quotes_non_teaching INTEGER;
+
+UPDATE alembic_version SET version_num='0008' WHERE alembic_version.version_num = '0007';
+
 COMMIT;
 

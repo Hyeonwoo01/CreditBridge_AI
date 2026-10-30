@@ -17,6 +17,10 @@ class ConceptResult(BaseModel):
     reason: str
     reason_en: str = ""  # 영어 설명 (evaluation-v2부터, 없으면 한국어를 보여 준다)
     verified: bool
+    # 검증된 근거가 걸친 주차 수 (0이면 주차 표시가 없어 모름, scoring-v5부터)
+    source_weeks: int = 0
+    target_weeks: int = 0
+    shallow: bool = False  # 학생 쪽은 한 주에만 나오고 기준 과목은 여러 주 다뤄 '부분'까지로 낮춤
     source_evidence: list[EvidenceView]
     target_evidence: list[EvidenceView]
 

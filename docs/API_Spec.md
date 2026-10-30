@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 83개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 84개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -114,6 +114,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | F3 | GET | `/professor/evaluations/{id}` | 교수(배정·판정 건) | – | HTML | P12 | FR-05~11·16·20·25 |
 | F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `csrf_token` | 303→F1 / 409(경보 확인 필요)·422 HTML | P12 | FR-09·10·11 |
 | F5 | POST | `/professor/evaluations/{id}/materials` | 교수(배정 건) | `items[]`, `note`, `csrf_token` | 303→F3 | P12 | FR-22 |
+| F6 | POST | `/professor/evaluations/{id}/evidence/{span_id}` | 교수(배정·판정 건) | `verdict`(correct·wrong), `csrf_token`(또는 `X-CSRF-Token` 헤더) | HTMX면 버튼 조각 HTML, 아니면 303→F3 / 404(다른 분석의 구절·알 수 없는 값) | P12 | FR-06 (AI 근거 정확도) |
 
 ### 2.5 여러 역할 공용 (심사 건)
 
@@ -297,6 +298,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P12 | 사유 선택 창 [사유 저장 및 판정 확정] | F4 (같은 폼) |
 | P12 | 사유 선택 창 [취소 / 판정 변경] · 닫기 · 과거 판정 이력 보기 | 화면 안 |
 | P12 | 보완 자료 요청 (하단 바) → [요청 보내기] | F5 |
+| P12 | 근거 구절 옆 [맞음] · [틀림] | F6 (HTMX, 버튼만 다시 그림) |
 | P12 | 메모 남기기 | C4 |
 | P12 | ← 배정된 심사 · 판정 근거 리포트 · 원본 N쪽 ↗ | F1 · C1 · C3 |
 | P13 | PDF 내려받기 | C2 |
@@ -345,12 +347,12 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P02 | S1 | `views.student_home` | 할 일, 전체 합계(요청을 합친 예상 인정 학점·판정 확정 수·남은 학기, 편입 학점 상한으로 자름, 졸업 학점에 넣을 과목 선택), 성적표 과목 요청 목록(과목·성적·학점), 요청별 예상 인정 학점·판정 확정 수·서류 준비율, 계정 성적표 상태, 소속 대학·출신 대학·전공 |
 | P26 | S2 | `student.account_transcript` | 계정 성적표 상태·올린 날·마스킹 이름·과목 줄(성적 기준 미달 표시) |
 | P03 | S3 | `views.request_view` (+ `student.simulate`) | 예상 학점·학기·비용, 과목 카드(추천·커버리지·대응 과목·판정 교수·담당 교수·심사 단계·보완 요청), 성적표 과목 연결, 진행 단계, 삭제 요청 상태 |
-| P04·P06·P12 | S10 · R4 · F3 | `views.evaluation_view` | 추천·신뢰도·커버리지·후보 과목, 판정·이의 신청·보완 요청 경과, 이전 분석과 비교, 경고, 정보 부족 진단, 개념별 근거(원본 쪽), 원문, 추출 정보, 과거 판정 이력, 내부 메모(교직원), 처리 기록(심사관), 대상 과목 목록(교수) |
+| P04·P06·P12 | S10 · R4 · F3 | `views.evaluation_view` | 추천·신뢰도·커버리지·후보 과목, 판정·이의 신청·보완 요청 경과, 이전 분석과 비교, 경고, 정보 부족 진단, 개념별 근거(원본 쪽), 원문, 추출 정보, 과거 판정 이력, 내부 메모(교직원), 처리 기록(심사관), 대상 과목 목록·근거 구절 id와 내가 누른 맞음·틀림(교수) |
 | P05 | R1 | `review.queue`, `stats.institution_stats` | 지표 카드 4개, 탭·학과별 건수, 행(접수 번호·학생·출신 대학·과목·후보·커버리지·추천·신뢰도·담당 교수·상태·경보), 페이지 |
 | P07 | R6 | `appeals.rows` | 접수된 이의 신청(과목·출신 대학·신청 시각·사유·근거 자료·원 판정, 학생 이름은 없음), 재판정 교수 후보 |
 | P08 | R8 · M9 | `privacy.rows` | 삭제 요청(요청 #·학생 이메일·기한·상태·기한 초과) |
 | P09 | R10 | `equivalencies.search` | 가져온 동등 과목표 검색 (출신 대학·출신 과목·대상 과목·판정, 50건씩) |
-| P10 | M1 · R12 | `stats.institution_stats`, `stats.recent_audit`(관리자), `views.reminder_preview` | 수용률·불일치율, 개인정보, SIS 상태, 처리 현황, 기한 알림, 학과별 지표, 월별 판정, 판정 구성, 최근 감사 로그 8건(관리자), 보존 정책 |
+| P10 | M1 · R12 | `stats.institution_stats`, `stats.recent_audit`(관리자), `views.reminder_preview` | 수용률·불일치율, 개인정보, SIS 상태, 처리 현황, 기한 알림, 학과별 지표, AI 근거 품질(프롬프트 버전별 인용 수·원문에 없어 버림·가르친 근거 아님·교수 확인 맞음 비율, `evidence_feedback.quality_by_prompt`), 월별 판정, 판정 구성, 최근 감사 로그 8건(관리자), 보존 정책 |
 | P11 | F1 | `views.professor_items`, `views.colleagues` | 배정된 심사(재판정·대리 표시), 부재 설정·대리 교수 후보 |
 | P13 | C1 · C2 | `views.evaluation_view(with_audit=True)` | 사람 판정·당시 AI 추천, 경과, AI 추천, 개념별 근거, 과거 판정, 감사 로그 |
 | P14 | A12 | `notifications.inbox`, `push.device_count` | 알림 50건씩 페이지 (저장된 한국어 원문을 화면 언어로), 푸시 받는 기기 수 |

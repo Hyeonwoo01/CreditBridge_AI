@@ -141,7 +141,7 @@ def test_ai_explanations_follow_screen_language(client: TestClient, seeded: Sess
     ev, _, token = professor_for(client, seeded, "linear_algebra_sparse.txt")
     seeded.expire_all()
     stored = seeded.get(type(ev), ev.id)
-    assert stored is not None and stored.prompt_version == "evaluation-v2"
+    assert stored is not None and stored.prompt_version == "evaluation-v3"
     result = stored.coverage_json or {}
     assert result["candidates"][0]["concepts"][0]["reason_en"] == "Test judgment"
     assert result["missing_materials_en"] == ["Detailed weekly course plan", "Lecture notes for the eigenvalue unit"]

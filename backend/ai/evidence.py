@@ -34,6 +34,15 @@ class Span:
     end: int
 
 
+@dataclass
+class QuoteCounts:
+    """한 번의 AI 비교에서 받은 인용 구절 수와 버린 수 (프롬프트 버전별 환각 지표, course_evaluations에 저장)."""
+
+    total: int = 0
+    unmatched: int = 0  # 원문에 없어서 버림 (지어낸 인용)
+    non_teaching: int = 0  # 원문에는 있지만 선수과목·교재 칸이나 부정 문장이라 버림
+
+
 def _fold(ch: str) -> str:
     """비교용 한 글자: 문장부호는 공백, 영문은 소문자 (원문 위치 표를 유지하려고 한 글자는 한 글자로)."""
     if ch.isspace() or (unicodedata.category(ch).startswith("P") and ch not in _KEEP and ch != "'"):
@@ -102,7 +111,7 @@ def locate(text: str, quote: str) -> Span | None:
     return None
 
 
-def verify_quotes(text: str, quotes: list[str], *, context: str) -> list[Span]:
+def verify_quotes(text: str, quotes: list[str], *, context: str, counts: QuoteCounts | None = None) -> list[Span]:
     """검증된 구절만 반환하고, 폐기한 구절 수는 로그로 남긴다 (구절 내용은 남기지 않는다)."""
     spans: list[Span] = []
     rejected = 0
@@ -112,6 +121,9 @@ def verify_quotes(text: str, quotes: list[str], *, context: str) -> list[Span]:
             rejected += 1
         elif span not in spans:
             spans.append(span)
+    if counts is not None:
+        counts.total += len(quotes)
+        counts.unmatched += rejected
     if rejected:
         logger.info("discarded unverified evidence quotes", extra={"context": context, "rejected": rejected})
     return spans
@@ -170,7 +182,9 @@ def non_teaching_regions(text: str, items: list[str]) -> list[Span]:
     return regions
 
 
-def teaching_evidence(text: str, spans: list[Span], excluded: list[Span], *, context: str) -> list[Span]:
+def teaching_evidence(
+    text: str, spans: list[Span], excluded: list[Span], *, context: str, counts: QuoteCounts | None = None
+) -> list[Span]:
     """원문 검증을 통과한 학생 쪽 구절 중 '이 과목에서 가르쳤다'는 근거가 되는 것만 남긴다.
     선수과목·교재 칸 안에만 있는 구절, 부정·다른 과목 표현이 든 구절은 버린다 (단어 하나로 버려질 수 있지만,
     가르치지 않은 개념을 인정하는 쪽보다 '근거 부족'으로 교수에게 넘기는 쪽이 안전하다)."""
@@ -182,6 +196,46 @@ def teaching_evidence(text: str, spans: list[Span], excluded: list[Span], *, con
             rejected += 1
         else:
             kept.append(span)
+    if counts is not None:
+        counts.non_teaching += rejected
     if rejected:
         logger.info("discarded non-teaching evidence quotes", extra={"context": context, "rejected": rejected})
     return kept
+
+
+# 주차 표시: "Week 3", "Weeks 3-4", "Wk 3", "3주차", "3~4주차", "제3주"
+_WEEK_MARK = re.compile(
+    r"\b(?:weeks?|wk\.?)\s*(\d{1,2})(?:\s*(?:-|–|~|to|and|&)\s*(\d{1,2}))?(?!\d)"
+    r"|(?:제\s*)?(\d{1,2})(?:\s*[-~–]\s*(\d{1,2}))?\s*주\s*차|제\s*(\d{1,2})\s*주",
+    re.IGNORECASE,
+)
+# 한 주차 칸은 다음 주차 표시까지, 최대 이 글자 수 (주차 계획 뒤의 평가 방법 등을 마지막 주로 세지 않게)
+MAX_WEEK_BLOCK = 400
+MAX_WEEK_RANGE = 6
+
+
+def _week_blocks(text: str) -> list[tuple[int, int, frozenset[int]]]:
+    marks: list[tuple[int, frozenset[int]]] = []
+    for m in _WEEK_MARK.finditer(text):
+        first = m.group(1) or m.group(3) or m.group(5)
+        last = m.group(2) or m.group(4) or first
+        a, b = int(first), int(last)
+        if a < 1 or b < a or b - a >= MAX_WEEK_RANGE:
+            continue
+        marks.append((m.start(), frozenset(range(a, b + 1))))
+    blocks = []
+    for i, (start, weeks) in enumerate(marks):
+        nxt = marks[i + 1][0] if i + 1 < len(marks) else len(text)
+        blocks.append((start, min(nxt, start + MAX_WEEK_BLOCK), weeks))
+    return blocks
+
+
+def weeks_of(text: str, spans: list[Span]) -> int:
+    """근거 구절들이 걸친 주차 수. 주차 표시가 없는 문서이거나 구절이 주차 계획 밖(학습 목표 등)에만 있으면 0."""
+    blocks = _week_blocks(text)
+    weeks: set[int] = set()
+    for span in spans:
+        for start, end, block_weeks in blocks:
+            if start < span.end and span.start < end:
+                weeks |= block_weeks
+    return len(weeks)

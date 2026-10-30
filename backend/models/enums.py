@@ -66,6 +66,11 @@ class EvidenceSide(StrEnum):
     TARGET = "target"  # 대상 대학 기준 강의계획서
 
 
+class EvidenceVerdict(StrEnum):
+    CORRECT = "correct"  # 교수가 보기에 그 개념을 가르쳤다는 근거가 맞음
+    WRONG = "wrong"  # 원문에는 있지만 그 개념의 근거가 아님
+
+
 class ReasonCode(StrEnum):
     """교수 판정 선택형 사유 (FR-09)."""
 

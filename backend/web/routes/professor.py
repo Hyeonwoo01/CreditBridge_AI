@@ -10,6 +10,7 @@ from backend.models.enums import Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import decisions as decision_service
+from backend.services import evidence_feedback as feedback_service
 from backend.services import materials as material_service
 from backend.services import review as review_service
 from backend.services import views
@@ -89,6 +90,31 @@ def decide(
     send_notifications()
     flash(request, tr("판정을 확정했어요. 학생 포털과 내보내기에 바로 반영돼요."))
     return RedirectResponse("/professor", status_code=303)
+
+
+@router.post("/evaluations/{evaluation_id}/evidence/{span_id}")
+def evidence_feedback(
+    request: Request,
+    evaluation_id: int,
+    span_id: int,
+    verdict: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Professor,
+    session: Session = Depends(get_db),
+) -> Response:
+    """근거 구절 맞음·틀림 (AI 근거 정확도 측정). HTMX면 버튼만 다시 그린다."""
+    check_csrf(request, csrf_token)
+    saved = feedback_service.record(session, user, evaluation_id, span_id, verdict)
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "partials/evidence_feedback.html",
+            user=user,
+            evaluation_id=evaluation_id,
+            span_id=span_id,
+            verdict=saved,
+        )
+    return RedirectResponse(f"/professor/evaluations/{evaluation_id}", status_code=303)
 
 
 @router.post("/away")

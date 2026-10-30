@@ -151,3 +151,30 @@ def test_concept_quoted_only_from_prerequisites_is_capped() -> None:
     assert not regression.verified and regression.source_evidence == []
     assert apply_verification(regression.status, regression.coverage, regression.verified) == UNVERIFIED_CAP
     assert visualization.verified and len(spans) == 1
+
+
+def test_weeks_of_counts_week_blocks_touched_by_evidence() -> None:
+    from backend.ai.evidence import weeks_of
+
+    text = (
+        "Learning outcomes: apply regression models.\n"
+        "Week 1: Intro\nWeek 2: Regression basics\nWeeks 3-4: Multiple regression\n5주차: 회귀 진단\n제6주 시계열"
+    )
+
+    def weeks(*quotes: str) -> int:
+        return weeks_of(text, verify_quotes(text, list(quotes), context="t"))
+
+    assert weeks("Regression basics") == 1
+    assert weeks("Regression basics", "Multiple regression") == 3  # "Weeks 3-4"는 두 주
+    assert weeks("회귀 진단", "제6주 시계열") == 2
+    assert weeks("apply regression models") == 0  # 주차 계획 밖 (학습 목표)
+    assert weeks_of("No schedule here", []) == 0
+
+
+def test_quote_counts_track_unmatched_and_non_teaching() -> None:
+    from backend.ai.evidence import QuoteCounts
+
+    counts = QuoteCounts()
+    spans = verify_quotes(SYLLABUS, ["Regression analysis (STAT 201)", "made up", "Week 1"], context="t", counts=counts)
+    teaching_evidence(SYLLABUS, spans, non_teaching_regions(SYLLABUS, []), context="t", counts=counts)
+    assert (counts.total, counts.unmatched, counts.non_teaching) == (3, 1, 1)

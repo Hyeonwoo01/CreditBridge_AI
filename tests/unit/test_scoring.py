@@ -70,3 +70,18 @@ def test_score_has_no_probability() -> None:
     """MVP는 판정 확률을 계산하지 않는다 (기능명세서 FR-07)."""
     s = score_candidate([concept("taught", 90)] * 3, "same", sparse_document=False, elective_eligible=True)
     assert not hasattr(s, "probability")
+
+
+def test_concept_mentioned_in_one_week_is_partial_when_reference_spends_more() -> None:
+    from backend.services.scoring import SHALLOW_CAP, apply_depth
+
+    shallow = concept("taught", 95)
+    shallow.source_weeks, shallow.target_weeks = 1, 3
+    apply_depth(shallow)
+    assert shallow.status == "partial" and shallow.coverage == SHALLOW_CAP and shallow.shallow
+
+    for source_weeks, target_weeks in ((2, 3), (1, 1), (0, 3), (1, 0)):  # 여러 주 다룸·같은 깊이·주차 모름
+        c = concept("taught", 95)
+        c.source_weeks, c.target_weeks = source_weeks, target_weeks
+        apply_depth(c)
+        assert c.status == "taught" and c.coverage == 0.95 and not c.shallow

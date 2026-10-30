@@ -42,3 +42,7 @@ class CourseEvaluation(IdMixin, CreatedAtMixin, Base):
     model: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(String(500))
     is_latest: Mapped[bool] = mapped_column(default=True, index=True)
+    # AI가 낸 인용 구절 수와 버린 수 (프롬프트 버전별 환각 지표). 이전 결과를 재사용한 행과 0008 이전 행은 비어 있다
+    quotes_total: Mapped[int | None]
+    quotes_unmatched: Mapped[int | None]  # 원문에 없어서 버림
+    quotes_non_teaching: Mapped[int | None]  # 원문에는 있지만 선수과목·교재 칸이나 부정 문장이라 버림

@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (25개)
+## 1. 엔티티 한눈에 보기 (26개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -22,6 +22,7 @@
 | | `transcript_entries` | 성적표에서 뽑은 과목과 강의계획서 연결 | FR-02 |
 | AI 분석 | `course_evaluations` | 강의계획서 한 건의 AI 분석 결과(재분석마다 새 행) | FR-05~08·16 |
 | | `evidence_spans` | 원문 검증을 통과한 근거 구절 위치 | FR-06·25 |
+| | `evidence_feedback` | 교수가 근거 구절마다 누른 맞음·틀림 (AI 근거 정확도) | FR-06 |
 | 심사 | `assignments` | 교수 배정·대리 재배정 이력 | FR-18·19 |
 | | `decisions` | 교수 최종 판정 (추가 전용) | FR-09·10·11 |
 | | `material_requests` | 보완 자료 요청 | FR-22 |
@@ -64,6 +65,8 @@ erDiagram
     syllabi ||--o{ course_evaluations : "분석(재분석마다)"
     courses |o--o{ course_evaluations : "1순위 후보"
     course_evaluations ||--o{ evidence_spans : "근거 구절"
+    evidence_spans ||--o{ evidence_feedback : "맞음·틀림"
+    users ||--o{ evidence_feedback : "누른 교수"
     course_evaluations ||--o{ assignments : "배정 이력"
     users ||--o{ assignments : "담당 교수"
     course_evaluations ||--o{ decisions : "판정(원·재판정)"
@@ -190,6 +193,12 @@ erDiagram
         varchar side
         int char_start
         int char_end
+    }
+    evidence_feedback {
+        bigint id PK
+        bigint evidence_span_id FK
+        bigint user_id FK
+        varchar verdict
     }
     assignments {
         bigint id PK
@@ -422,14 +431,17 @@ erDiagram
 | coverage_json | JSONB | null | 후보 3개·개념별 판단·근거·정보 부족 진단·경고, 한국어·영어 설명 |
 | summary | TEXT | NN | 요약 (한국어) |
 | input_hash | VARCHAR(64) | IX, null | 프롬프트 버전·규칙 버전·모델·입력의 해시 (같으면 결과 재사용) |
-| prompt_version · model | VARCHAR(20) · VARCHAR(100) | null | evaluation-v2 등 |
+| prompt_version · model | VARCHAR(20) · VARCHAR(100) | null | evaluation-v3 등 |
 | error_message | VARCHAR(500) | null | 실패 사유 |
 | is_latest | BOOLEAN | NN, IX | 그 강의계획서의 최신 분석 (`syllabus_id, is_latest` 복합 IX) |
+| quotes_total · quotes_unmatched · quotes_non_teaching | INT · INT · INT | null | AI가 낸 인용 구절 수, 원문에 없어 버린 수, 선수과목·교재 칸이나 부정 문장이라 버린 수 (프롬프트 버전별 환각 지표, 0008). 이전 결과를 재사용한 행은 비움 |
 | (부분 유니크 인덱스) | `uq_course_evaluations_latest_syllabus` | UQ | `syllabus_id` `WHERE is_latest` — 강의계획서당 최신 분석 하나 |
 
 판정 확률(%) 컬럼은 두지 않는다 (MVP 규칙).
 
 **evidence_spans** — `course_evaluation_id` FK(IX), `side` VARCHAR(10)(source·target), `syllabus_id` FK→syllabi, `char_start`·`char_end` INT, `concept` VARCHAR(255), `verified` BOOLEAN. 원문 문자열과 일치한 구절만 저장한다(FR-06). `created_at` 없음.
+
+**evidence_feedback** — `evidence_span_id` FK→evidence_spans(IX), `user_id` FK→users, `verdict` VARCHAR(10)(correct·wrong, CHECK), `created_at`, `updated_at`. (`evidence_span_id`, `user_id`) UQ — 교수 한 명당 구절 하나에 한 행이고 다시 누르면 고친다(판정이 아니라 AI 근거 품질 표시). 운영 통계의 프롬프트 버전별 근거 정확도에 쓴다(0008).
 
 ### 3.4 심사
 
@@ -514,6 +526,7 @@ erDiagram
 | 11 | 강의계획서 – 분석 | 1 : N (최신 1개 is_latest) | course_evaluations.syllabus_id | FR-05 재분석 이력, FR-22 |
 | 12 | 과목 – 분석 (1순위 후보) | 0..1 : N | course_evaluations.candidate_course_id | FR-05 |
 | 13 | 분석 – 근거 구절 | 1 : N | evidence_spans.course_evaluation_id | FR-06 |
+| 13a | 근거 구절 – 교수 확인 | 1 : N (교수당 1개) | evidence_feedback.evidence_span_id, user_id | FR-06 근거 정확도 |
 | 14 | 분석 – 배정 | 1 : N (활성 1개) | assignments.course_evaluation_id | FR-18 |
 | 15 | 교수 – 배정 | 1 : N | assignments.reviewer_id, reassigned_from | FR-18·19 |
 | 16 | 분석 – 판정 | 1 : N (원 판정 + 재판정) | decisions.course_evaluation_id | FR-09·10 |
@@ -542,7 +555,8 @@ erDiagram
 | transfer_requests | S2 | S5, S7, S8, 판정 완료 시 | S1·S3·R1 |
 | syllabi | S4, M4 | S11, 작업 큐(추출·분석), M10(삭제) | S3·S10·R4·F3·C3 |
 | transcript_entries | S5(작업 큐) | S6 | S3 |
-| course_evaluations · evidence_spans | 작업 큐(분석) | 재분석 시 is_latest | S3·S10·R1·R4·F1·F3·C1·J1 |
+| course_evaluations · evidence_spans | 작업 큐(분석) | 재분석 시 is_latest | S3·S10·R1·R4·F1·F3·C1·J1·M1·R12(인용 수) |
+| evidence_feedback | F6 | F6(다시 누르면 고침) | F3(내가 누른 값)·M1·R12(근거 정확도) |
 | assignments | R2, R7(재판정), F2(대리), M7(비활성화 인계), M18·M19(관리자 배정) | 같은 API | R1·F1·F3·M17 |
 | decisions | F4, J2 | – (추가 전용) | S3·S10·R4·F3·C1·M1·J1·J3·R3 |
 | appeals · appeal_files | S13 | R7 | S14·R6·S10·C5 |

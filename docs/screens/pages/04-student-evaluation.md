@@ -29,7 +29,7 @@
 경고 목록(학점 차이, 의심 문구 제외)
 (정보 부족) 무엇을 보완하면 되나요 박스
 개념별 커버리지와 근거
-  1순위 후보 (펼침) ─ 개념 행: 이름·상태·% / 게이지 / 사유 / 근거 쌍(학생 │ 기준), 구절 옆 "원본 N쪽 ↗"
+  1순위 후보 (펼침) ─ 개념 행: 이름·상태·% / 게이지 / "다룬 주차: 학생 N주 · 기준 M주" / 사유 / 근거 쌍(학생 │ 기준), 구절 옆 "원본 N쪽 ↗"
   2·3순위 후보 (접힘)
 학생 강의계획서 원문 (접힘, 근거 하이라이트, "원본 파일(이름) ↗" 안내)
 기준 강의계획서 원문 (접힘)
@@ -53,6 +53,7 @@
 | 정보 부족 | 앰버 카드 | 근거 부족 개념 칩, 기재 없는 항목, 함께 내면 좋은 자료 | `{colors.surface-elective-subtle}`, 칩 `decision-option-chip` |
 | 후보 과목 | `<details>` 카드 | "N순위 · 코드 과목명" / 수준 배지 / 커버리지 % | 흰 카드 `{rounded.lg}`, 패딩 24px |
 | 개념 게이지 | coverage bar | 높이 8px 캡슐 트랙 | 트랙 `{colors.hairline}`, 채움 `{colors.primary}` |
+| 다룬 주차 | muted 12px 한 줄 | 양쪽 근거 구절이 걸친 주차 수 "다룬 주차: 학생 N주 · 기준 M주"(어느 쪽이든 주차를 모르면 줄 없음). 학생 쪽 1주·기준 2주 이상이면 "· 학생 강의계획서는 한 주만 다뤄 '부분'까지로 계산했어요"(상태 부분, 커버리지 최대 50%) | `text-xs text-muted` |
 | 근거 쌍 | `evidence-quote-block` ×2 | 왼쪽 학생 원문, 오른쪽 기준 원문, 각 "원문 일치 검증됨" | 파치먼트 배경 + 왼쪽 3px `{colors.primary}`, `{rounded.sm}`, 패딩 17px 24px |
 | 근거 하이라이트 | `<mark>` | 학생 구절 / 기준 구절. 누르면 아래 원문 패널을 펼치고 해당 위치로 이동 | 학생 `{colors.highlight-evidence-source}` #fff8c5, 기준 `{colors.highlight-evidence-target}` #e6f2ff, `{rounded.xs}` 5px, 선택된 구절 2px `{colors.primary-focus}` 외곽선 |
 | 버전 비교 | `<details open>` 카드 (`partials/version_compare.html`) | 같은 강의계획서를 다시 분석했을 때 바로 앞의 완료된 분석과 비교. 위 3칸: AI 추천 배지 → 배지, 1순위 커버리지 % → %(차이 %p), 신뢰도. 각 칸 아래 ▲ 좋아짐(초록)·▼ 낮아짐(빨강)·– 그대로(회색). 1순위 후보가 바뀌면 앰버 안내 "1순위 후보가 A에서 B(으)로 바뀌었어요." 같은 후보면 개념별 표(개념·이전 판단 %·이번 판단 %·학생 근거 구절 수·변화: 좋아짐/낮아짐/그대로/새 개념(파랑)/빠진 개념). 그 사이 올린 보완 자료는 파일 이름과 원문에 덧붙인 글(펼침, 최대 높이 256px 스크롤). 보완 자료 없이 다시 분석했으면 "분석 규칙이 바뀌었거나 다시 분석을 요청한 경우예요." | 카드 흰 배경 1px `{colors.hairline}` `{rounded.lg}`, 3칸 `{colors.canvas-parchment}` `{rounded.md}` 수치 22px/600, 표 최소 폭 560px·행 구분 `{colors.divider-soft}`, 좋아짐 `{colors.status-approve}`·낮아짐 `{colors.status-reject}`·새 개념 `{colors.primary}` |

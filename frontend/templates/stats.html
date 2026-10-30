@@ -105,6 +105,44 @@
   {% endif %}
 </section>
 
+<section class="mt-10 grid gap-4" aria-label="{{ _('AI 근거 품질') }}">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="section-title">{{ _("AI 근거 품질") }}</h2>
+    <span class="text-xs text-muted">{{ _("프롬프트 버전별 · 이전 결과를 재사용한 분석은 빼고 셈") }}</span>
+  </div>
+  {% if s.ai_quality %}
+  <div class="card overflow-x-auto p-0">
+    <table class="w-full min-w-[820px] text-sm">
+      <thead class="bg-pearl text-left text-xs text-muted">
+        <tr>
+          <th class="px-5 py-3 font-normal">{{ _("프롬프트") }}</th>
+          <th class="px-3 py-3 text-right font-normal">{{ _("AI 비교") }}</th>
+          <th class="px-3 py-3 text-right font-normal">{{ _("받은 인용") }}</th>
+          <th class="px-3 py-3 text-right font-normal">{{ _("원문에 없어 버림") }}</th>
+          <th class="px-3 py-3 text-right font-normal">{{ _("가르친 근거 아님") }}</th>
+          <th class="px-3 py-3 text-right font-normal">{{ _("교수 확인 근거 맞음") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in s.ai_quality %}
+        <tr class="border-t border-divider">
+          <td class="px-5 py-3 font-semibold">{{ q.prompt_version }}</td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ q.evaluations }}</td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ q.quotes }}</td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ q.unmatched_rate | pct if q.unmatched_rate is not none else '–' }} <span class="text-xs text-muted">({{ q.unmatched }})</span></td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ q.non_teaching_rate | pct if q.non_teaching_rate is not none else '–' }} <span class="text-xs text-muted">({{ q.non_teaching }})</span></td>
+          <td class="px-3 py-3 text-right tabular-nums">{{ q.precision | pct if q.precision is not none else '–' }} <span class="text-xs text-muted">({{ _("{correct}/{checked}건", correct=(q.correct), checked=(q.checked)) }})</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-muted">{{ _("원문에 없어 버림은 AI가 지어낸 인용이에요. 교수 확인은 담당 교수가 판정 화면의 근거 구절 옆에서 누른 맞음·틀림이에요.") }}</p>
+  {% else %}
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("아직 AI 비교 기록이 없어요.") }}</p>
+  {% endif %}
+</section>
+
 <section class="mt-10 grid gap-6 md:grid-cols-2">
   <div class="card grid content-start gap-3 p-5">
     <h2 class="font-semibold">{{ _("월별 판정 건수 (최근 6개월)") }}</h2>

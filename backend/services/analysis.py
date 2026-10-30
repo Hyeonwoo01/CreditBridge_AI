@@ -365,15 +365,17 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     sparse = scoring.is_sparse(len(extraction.weekly_topics), len(extraction.learning_outcomes))
     refs_by_code = {r.code.lower(): r for r in refs}
     non_teaching = evidence.non_teaching_regions(student.raw_text, extraction.prerequisites + extraction.textbooks)
+    counts = evidence.QuoteCounts()
     spans: list[matching.VerifiedSpan] = []
     scored: list[tuple[scoring.Score, CandidateResult]] = []
     for judgment in output.candidates[:3]:
         ref = refs_by_code.get(judgment.course_code.strip().lower())
         if ref is None:
             continue
-        concepts, found = matching.concept_results(judgment, ref, student.raw_text, student.id, non_teaching)
+        concepts, found = matching.concept_results(judgment, ref, student.raw_text, student.id, non_teaching, counts)
         for c in concepts:
             c.coverage = scoring.apply_verification(c.status, c.coverage, c.verified)
+            scoring.apply_depth(c)
         spans += found
         score = scoring.score_candidate(
             concepts, judgment.level, sparse_document=sparse, elective_eligible=output.elective_eligible
@@ -460,6 +462,9 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         warnings_en=warnings_en,
     ).model_dump()
     evaluation.model = result.model
+    evaluation.quotes_total = counts.total
+    evaluation.quotes_unmatched = counts.unmatched
+    evaluation.quotes_non_teaching = counts.non_teaching
     evaluation.status = EvaluationStatus.DONE
     evaluation_repo.add_spans(
         session,

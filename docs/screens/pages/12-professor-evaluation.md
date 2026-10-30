@@ -14,7 +14,7 @@
 [global-nav: 배정된 심사 (1)]
 [workspace-sub-bar: 기관 / 학과 심사 워크스페이스             집계 칩]
 ← 배정된 심사 · 판정 근거 리포트 · 판정하기 ↓
-(분석 결과 영역: P04와 같음 — 추천 요약, 판정·이의 신청 경과, 이전 분석과 달라진 점(#compare), 근거 쌍 + "원본 N쪽 ↗", 원문)
+(분석 결과 영역: P04와 같음 — 추천 요약, 판정·이의 신청 경과, 이전 분석과 달라진 점(#compare), 근거 쌍 + "원본 N쪽 ↗" + 구절마다 [맞음][틀림], 원문)
 같은 과목의 과거 판정 N건 (#history, 경보 조건이면 앰버)
 내부 메모 N (#notes, P06과 같음 — 심사관과 공유, 학생 비공개)
 학생에게 보완 자료 요청 (#materials, 판정 전)
@@ -64,6 +64,7 @@
 | 사유 행 | `reason-option-row` ×5 | 체크박스 + 사유 이름 + 한 줄 설명(`decisions.REASON_HINTS`): 주차 범위 부족 · 수준 차이 · 실험·실습 미포함 · 선수과목 차이 · 기타 | 1px 헤어라인, `{rounded.md}`, 패딩 12px 16px, 이름 17px/600, 설명 14px muted. 선택 시 `{colors.surface-reject-subtle}` + `{colors.status-reject}` 50% 테두리(CSS `:has(:checked)`) |
 | 소명 메모 | textarea | 최대 500자, 오른쪽 위 "n/500" 실시간 글자 수, '기타'면 필수 | `textarea`, 3줄 |
 | 창 버튼 | `button-secondary-pill` + `button-primary` (작은 캡슐) | "취소 / 판정 변경"(창을 닫고 판정을 다시 고름) / 반려 "불인정 사유 저장 및 판정 확정", 수정 "사유 저장 및 판정 확정", 경보만 "확인하고 판정 확정" | 바닥 바 `{colors.surface-pearl}`, 위 1px `{colors.divider-soft}` |
+| 근거 맞음·틀림 | 작은 칩 버튼 2개 (`partials/evidence_feedback.html`) | 학생·기준 근거 구절마다 "맞음 / 틀림". 누르면 그 자리만 다시 그림(HTMX), 누른 쪽이 채워짐(맞음 초록, 틀림 빨강), 다시 누르면 바뀜. 판정과는 별개인 AI 근거 품질 표시로 P10 "AI 근거 품질"에 모임. 학생·심사관 화면에는 없음 | `chip-count` / 맞음 `chip-count-approve`, 틀림 `bg-reject-subtle text-reject` |
 | 원본 쪽 링크 | `text-link` (P04와 같음) | 근거 구절 옆 "원본 N쪽 ↗"을 누르면 원본 PDF가 새 탭에서 그 쪽으로 열려 표·그림까지 대조 | `{colors.primary}` 12px |
 | 내부 메모 | `evaluation-utility-card` (P06과 같음) | 심사관과 함께 보고 쓰는 메모. 학생 화면·판정 근거 리포트에는 나오지 않음 | |
 | 하단 바 | `floating-sticky-bar` | 왼쪽: 과목 → 후보 · 커버리지, 상충 이력이 있으면 빨강 배지 "과거 판정 확인 필요" / 오른쪽: 보완 자료 요청(#materials로 이동), 판정 확정(같은 폼 제출 → 같은 검사) | 배경 파치먼트 80% + `backdrop-filter: saturate(180%) blur(20px)`, 위 1px `{colors.hairline}`, 최소 높이 64px, 안쪽 내용 `max-w-[1440px]`, 안전 영역 패딩 |

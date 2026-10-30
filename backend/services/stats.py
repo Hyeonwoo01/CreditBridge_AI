@@ -23,6 +23,7 @@ from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import privacy as privacy_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import users as user_repo
+from backend.services.evidence_feedback import PromptQuality, quality_by_prompt
 from backend.services.privacy import is_overdue
 
 
@@ -50,6 +51,7 @@ class Stats:
     privacy_completed: int = 0
     privacy_on_time: int = 0
     sis_token: bool = False
+    ai_quality: list[PromptQuality] = field(default_factory=list)  # 프롬프트 버전별 AI 근거 품질
 
     @property
     def acceptance_rate(self) -> float | None:
@@ -87,6 +89,7 @@ def institution_stats(session: Session, user: User) -> Stats:
     now = utcnow()
     stats = Stats()
 
+    stats.ai_quality = quality_by_prompt(session, institution_id)
     requests = request_repo.submitted_of_institution(session, institution_id)
     stats.requests_submitted = len(requests)
     stats.requests_decided = sum(1 for r in requests if r.status == "decided")

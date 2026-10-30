@@ -1,0 +1,6 @@
+{# 담당 교수의 근거 맞음·틀림 (AI 근거 정확도 측정, 판정과는 별개). evaluation_id, span_id, verdict #}
+<form id="fb-{{ span_id }}" class="ml-1 inline-flex items-center gap-1 align-middle" method="post" action="/professor/evaluations/{{ evaluation_id }}/evidence/{{ span_id }}" hx-post="/professor/evaluations/{{ evaluation_id }}/evidence/{{ span_id }}" hx-target="this" hx-swap="outerHTML" aria-label="{{ _('이 구절이 이 개념의 근거로 맞나요?') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button class="chip-count {{ 'chip-count-approve' if verdict == 'correct' else '' }}" name="verdict" value="correct" aria-pressed="{{ 'true' if verdict == 'correct' else 'false' }}" title="{{ _('이 개념을 가르쳤다는 근거가 맞아요') }}">{{ _("맞음") }}</button>
+  <button class="chip-count {{ 'border-reject/20 bg-reject-subtle text-reject' if verdict == 'wrong' else '' }}" name="verdict" value="wrong" aria-pressed="{{ 'true' if verdict == 'wrong' else 'false' }}" title="{{ _('원문에는 있지만 이 개념의 근거가 아니에요') }}">{{ _("틀림") }}</button>
+</form>

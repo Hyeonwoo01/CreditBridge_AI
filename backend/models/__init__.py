@@ -10,6 +10,7 @@ from backend.models.decision import Decision
 from backend.models.department import Department
 from backend.models.equivalency import Equivalency
 from backend.models.evaluation_note import EvaluationNote
+from backend.models.evidence_feedback import EvidenceFeedback
 from backend.models.evidence_span import EvidenceSpan
 from backend.models.institution import Institution
 from backend.models.institution_source import InstitutionSource
@@ -36,6 +37,7 @@ __all__ = [
     "Department",
     "Equivalency",
     "EvaluationNote",
+    "EvidenceFeedback",
     "EvidenceSpan",
     "Institution",
     "InstitutionSource",

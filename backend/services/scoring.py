@@ -11,13 +11,16 @@ from backend.models.enums import Confidence, Recommendation
 from backend.schemas.results import ConceptResult
 
 # 아래 규칙을 바꾸면 버전을 올린다. 같은 입력의 이전 결과를 재사용할 때 이 버전도 비교한다.
-# 근거로 인정하는 구절의 기준(ai/evidence.py)이 바뀌어도 올린다. v4: 선수과목·교재 칸·부정 문장 구절 제외
-RULES_VERSION = "scoring-v4"
+# 근거로 인정하는 구절의 기준(ai/evidence.py)이 바뀌어도 올린다. v4: 선수과목·교재 칸·부정 문장 구절 제외,
+# v5: 다룬 주차 수 비교(apply_depth)
+RULES_VERSION = "scoring-v5"
 
 DIRECT_MIN = 0.75
 ELECTIVE_MIN = 0.40
 # 원문 근거를 확인하지 못한 개념의 커버리지 상한
 UNVERIFIED_CAP = 0.40
+# 학생 쪽 근거는 한 주에만 있는데 기준 과목은 두 주 이상 다루는 개념(한 번 스치고 지나감)은 '부분'까지만
+SHALLOW_CAP = 0.50
 # 수준이 낮은 과목은 내용이 겹쳐도 직접 인정을 추천하지 않고 점수를 낮춘다
 LOWER_LEVEL_FACTOR = 0.75
 # 판단 불가 개념이 이 비율 이상이면 추천 대신 정보 부족으로 안내한다
@@ -42,6 +45,14 @@ def apply_verification(status: str, coverage: float, verified: bool) -> float:
     if status in ("taught", "partial") and not verified:
         return min(coverage, UNVERIFIED_CAP)
     return coverage
+
+
+def apply_depth(concept: ConceptResult) -> None:
+    """다룬 주차 수를 비교해 짧게 다룬 개념을 '부분'으로 낮춘다. 주차를 모르는 쪽(0)이 있으면 그대로 둔다."""
+    if concept.status in ("taught", "partial") and concept.source_weeks == 1 and concept.target_weeks >= 2:
+        concept.status = "partial"
+        concept.coverage = min(concept.coverage, SHALLOW_CAP)
+        concept.shallow = True
 
 
 def score_candidate(

@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 
 from backend.ai import injection
-from backend.ai.evidence import Span, teaching_evidence, verify_quotes
+from backend.ai.evidence import QuoteCounts, Span, teaching_evidence, verify_quotes, weeks_of
 from backend.ai.llm_client import LLMClient, LLMResult
 from backend.ai.prompts_loader import load_prompt
 from backend.schemas.evaluation import CandidateJudgment, EvaluationOutput
@@ -74,10 +74,12 @@ def concept_results(
     student_text: str,
     student_syllabus_id: int,
     non_teaching: list[Span] | None = None,
+    counts: QuoteCounts | None = None,
 ) -> tuple[list[ConceptResult], list[VerifiedSpan]]:
     """대상 과목의 필수 개념 순서대로 판단을 정리한다. coverage는 AI가 매긴 원점수(0~1)이고,
     근거 검증에 따른 보정은 services/scoring.py가 한다. 응답에 빠진 개념은 판단 불가로 둔다.
-    non_teaching은 학생 강의계획서의 선수과목·교재 칸 위치(evidence.non_teaching_regions)."""
+    non_teaching은 학생 강의계획서의 선수과목·교재 칸 위치(evidence.non_teaching_regions), counts는 받은·버린 인용 수.
+    source_weeks·target_weeks는 검증된 근거가 걸친 주차 수(깊이 비교, services/scoring.apply_depth)."""
     by_name = {c.concept.strip().lower(): c for c in judgment.concepts}
     results: list[ConceptResult] = []
     spans: list[VerifiedSpan] = []
@@ -97,9 +99,9 @@ def concept_results(
             )
             continue
         context = f"{ref.code}|{concept}"[:255]
-        src = verify_quotes(student_text, j.source_quotes, context=context)
-        src = teaching_evidence(student_text, src, non_teaching or [], context=context)
-        tgt = verify_quotes(ref.text, j.target_quotes, context=context)
+        src = verify_quotes(student_text, j.source_quotes, context=context, counts=counts)
+        src = teaching_evidence(student_text, src, non_teaching or [], context=context, counts=counts)
+        tgt = verify_quotes(ref.text, j.target_quotes, context=context, counts=counts)
         spans += [VerifiedSpan("source", student_syllabus_id, s.start, s.end, context) for s in src]
         spans += [VerifiedSpan("target", ref.syllabus_id, s.start, s.end, context) for s in tgt]
         results.append(
@@ -110,6 +112,8 @@ def concept_results(
                 reason=j.reason,
                 reason_en=j.reason_en,
                 verified=bool(src),
+                source_weeks=weeks_of(student_text, src),
+                target_weeks=weeks_of(ref.text, tgt),
                 source_evidence=[
                     EvidenceView(side="source", text=student_text[s.start : s.end], char_start=s.start, char_end=s.end)
                     for s in src

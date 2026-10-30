@@ -37,10 +37,11 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.schemas.extraction import SyllabusExtraction
-from backend.schemas.results import CandidateResult, EvaluationResult
+from backend.schemas.results import CandidateResult, EvaluationResult, EvidenceView
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import accounts as account_service
 from backend.services import appeals as appeal_service
+from backend.services import evidence_feedback as feedback_service
 from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
 from backend.services import notes as note_service
@@ -82,6 +83,12 @@ class EvaluationView:
     notes: list[EvaluationNote] = field(default_factory=list)  # 내부 메모 (교직원만, 오래된 순)
     comparison: version_service.Comparison | None = None  # 바로 앞 분석과 비교 (강의계획서 버전 비교)
     users: dict[int, User] = field(default_factory=dict)  # 판정자·요청자 이름 표시용
+    # 담당 교수 화면의 근거 맞음·틀림: (쪽, 시작, 끝, "과목코드|개념") -> 구절 id, 구절 id -> 이 교수가 누른 값
+    span_ids: dict[tuple[str, int, int, str], int] = field(default_factory=dict)
+    feedback: dict[int, str] = field(default_factory=dict)
+
+    def span_id(self, side: str, evidence: EvidenceView, course_code: str, concept: str) -> int | None:
+        return self.span_ids.get((side, evidence.char_start, evidence.char_end, f"{course_code}|{concept}"[:255]))
 
     @property
     def primary(self) -> CandidateResult | None:
@@ -185,6 +192,11 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.audit = audit_repo.for_target(session, "course_evaluation", str(evaluation.id))
     if user.role == "professor":
         view.target_courses = catalog_repo.courses_of(session, request.target_institution_id)
+        view.span_ids = {
+            (s.side, s.char_start, s.char_end, s.concept): s.id
+            for s in evaluation_repo.spans_of(session, evaluation.id)
+        }
+        view.feedback = feedback_service.mine(session, user, evaluation.id)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
     view.grade_failed = syllabus.id in request_repo.grade_failed_syllabus_ids(session, [syllabus.id])
     # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)
