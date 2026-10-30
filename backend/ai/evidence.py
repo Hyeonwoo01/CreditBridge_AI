@@ -147,14 +147,16 @@ _TEACHING_HEADING = re.compile(
 )
 _BLANK_LINE = re.compile(r"\n[ \t]*\n")
 MAX_SECTION_CHARS = 600
-# 구절 안에 있으면 '가르치지 않음'·'다른 과목에서'·'이미 알아야 함'을 뜻하는 표현
+# 구절 안에 있으면 '가르치지 않음'·'다른 과목에서'·'이미 알아야 함'을 뜻하는 표현. 동사까지 함께 봐서
+# "quiz in the following class", "will not only ... but also", "이미 배운 미분을 응용" 같은 수업 문장은 남긴다
 _NEGATION = re.compile(
-    r"\bnot\s+(?:be\s+)?(?:covered|taught|included|discussed|addressed|part\s+of)\b|\bwill\s+not\b|\bwon'?t\b|"
-    r"\bexclud(?:e|es|ed|ing)\b|\b(?:outside|beyond|out\s+of)\s+(?:the\s+)?scope\b|"
-    r"\b(?:next|following|later|subsequent|follow-?up)\s+(?:course|semester|term|class)\b|"
-    r"\b(?:assumed|prior|assumes)\s+knowledge\b|\bshould\s+(?:already\s+)?(?:know|be\s+familiar)\b|"
-    r"다루지\s*않|가르치지\s*않|포함(?:하지|되지)\s*않|제외|다음\s*학기|후속\s*(?:과목|강의|수업)|범위\s*(?:밖|외)|"
-    r"사전\s*지식|선수\s*지식|이미\s*(?:알고|배운|이수)",
+    r"(?:\bnot|n't|\bnever)\s+(?:be\s+)?(?:cover(?:ed|s)?|taught|teach(?:es)?|include[ds]?|discuss(?:ed|es)?|"
+    r"address(?:ed|es)?|part\s+of)\b|\bexclud(?:e|es|ed|ing)\b|\b(?:outside|beyond|out\s+of)\s+(?:the\s+)?scope\b|"
+    r"\b(?:covered|taught|discussed|addressed|introduced|treated|deferred|left)\s+(?:in|to|for|until)\s+(?:a\s+|the\s+)?"
+    r"(?:next|following|later|subsequent|follow-?up)\s+(?:course|semester|term|class)\b|"
+    r"\bassum(?:es|ed)\s+(?:knowledge|familiarity)\b|\bshould\s+(?:already\s+)?(?:know|be\s+familiar)\b|"
+    r"다루지\s*않|가르치지\s*않|포함(?:하지|되지)\s*않|제외|다음\s*학기(?:에|로|에서)|후속\s*(?:과목|강의|수업)(?:에서|으로)|"
+    r"범위\s*(?:밖|외)|사전\s*지식|선수\s*지식|알고\s*있다고\s*가정|이미\s*이수",
     re.IGNORECASE,
 )
 
@@ -174,6 +176,10 @@ def non_teaching_regions(text: str, items: list[str]) -> list[Span]:
             nxt = _TEACHING_HEADING.search(text, line_end + 1, end)
             if nxt:
                 end = nxt.start()
+        # 두 단 표를 글로 옮기면 "Prerequisites: MATH 101   Week 1: Limits"처럼 한 줄에 붙는다: 주차 표시에서 끊는다
+        week = _WEEK_MARK.search(text, heading.end(), end)
+        if week:
+            end = week.start()
         regions.append(Span(start, end))
     for item in items:
         span = locate(text, item)

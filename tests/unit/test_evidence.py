@@ -178,3 +178,38 @@ def test_quote_counts_track_unmatched_and_non_teaching() -> None:
     spans = verify_quotes(SYLLABUS, ["Regression analysis (STAT 201)", "made up", "Week 1"], context="t", counts=counts)
     teaching_evidence(SYLLABUS, spans, non_teaching_regions(SYLLABUS, []), context="t", counts=counts)
     assert (counts.total, counts.unmatched, counts.non_teaching) == (3, 1, 1)
+
+
+def test_negation_filter_keeps_ordinary_teaching_sentences() -> None:
+    from backend.ai.evidence import _NEGATION
+
+    # 시뮬레이션에서 잘못 버리던 수업 문장들
+    for kept in (
+        "Week 5: Derivatives; quiz in the following class",
+        "This course covers limits and derivatives and prepares students for the next course in the sequence",
+        "Students will not only learn regression but also classification",
+        "Students won't need prior experience; week 2 introduces loops",
+        "Pauli exclusion principle and electron configuration",
+        "미적분학 II 등 후속 과목의 기초가 되는 극한과 미분을 다룬다",
+        "9주차: 이미 배운 미분을 응용하여 최적화 문제를 푼다",
+    ):
+        assert not _NEGATION.search(kept), kept
+    for dropped in (
+        "We will not cover eigenvalues",
+        "Integration won't be taught until Calculus II",
+        "Series are covered in the next course (MATH 102)",
+        "Proofs are deferred to the next course",
+        "Lab work is not part of this course",
+        "This course assumes knowledge of linear algebra",
+        "적분은 후속 과목에서 다룬다",
+        "다중회귀는 다음 학기에 배운다",
+        "선형대수 기초는 알고 있다고 가정한다",
+    ):
+        assert _NEGATION.search(dropped), dropped
+
+
+def test_prerequisite_region_stops_at_inline_week_marker() -> None:
+    text = "Prerequisites: MATH 101   Week 1: Limits and continuity\nWeek 2: Derivatives"
+    spans = verify_quotes(text, ["MATH 101", "Week 1: Limits and continuity"], context="t")
+    kept = teaching_evidence(text, spans, non_teaching_regions(text, []), context="t")
+    assert [text[s.start : s.end] for s in kept] == ["Week 1: Limits and continuity"]

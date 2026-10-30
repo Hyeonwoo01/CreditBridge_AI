@@ -86,8 +86,11 @@ class DemoLLM(LLMClient):
     MODEL = "demo-ai"
     REASON = "예시 AI 판단: 학생 강의계획서 구절과 기준 개념의 낱말이 겹치는 정도로 정했어요."
     REASON_EN = "Example AI judgment: based on word overlap between the student syllabus and the reference concept."
-    SUMMARY = "예시 AI 요약이에요. 실제 서비스에서는 Claude가 개념별 근거를 읽고 요약해요."
-    SUMMARY_EN = "Example AI summary. In the real service, Claude reads the evidence for each concept and sums it up."
+    SUMMARY = "예시 AI 요약이에요. 실제 서비스에서는 AI(Claude 또는 GPT)가 개념별 근거를 읽고 요약해요."
+    SUMMARY_EN = (
+        "Example AI summary. In the real service, the AI (Claude or GPT) reads the evidence for each concept "
+        "and sums it up."
+    )
 
     def __init__(self) -> None:  # Claude 클라이언트를 만들지 않는다
         self._model = self.MODEL
