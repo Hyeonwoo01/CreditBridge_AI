@@ -61,7 +61,7 @@ EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 AI 
 
 지금 운영 중인 공개 데모는 없어요. 필요할 때 아래 방법으로 다시 올릴 수 있어요.
 
-컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(실제 AI API 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](demo-deploy.md).
+컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(실제 AI API 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(설정 값: `deploy/demo/render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](demo-deploy.md).
 
 ## 개발용: 인프라만 Docker, 앱은 uv로
 

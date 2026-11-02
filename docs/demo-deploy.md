@@ -23,15 +23,15 @@ CreditBridge AI를 **예시용으로만** 공개 주소에 올리는 방법입�
 
 ## Render에 올리기 (추천, 무료)
 
-저장소 루트의 `render.yaml`(Blueprint)이 설정을 담고 있어 버튼 몇 번이면 된다. 무료(Free) 웹 서비스로 띄운다(가입·결제 정보 요구 여부는 Render 정책을 따른다).
+무료(Free) 웹 서비스로 띄운다(가입·결제 정보 요구 여부는 Render 정책을 따른다). 설정 값은 `deploy/demo/render.yaml`(Blueprint 형식)에도 적어 두었다.
 
 1. https://render.com 에 **GitHub 계정으로 가입**한다(Sign up with GitHub).
-2. 대시보드 오른쪽 위 **New → Blueprint**를 누른다.
-3. **Connect a repository**에서 `Hyeonwoo01/CreditBridge_AI`를 고른다. 목록에 없으면 "Configure GitHub App"에서 이 저장소 접근을 허용한다(비공개 저장소도 된다).
-4. Blueprint 이름을 적고(예: `creditbridge-demo`) **Deploy Blueprint**(또는 Apply)를 누른다. `render.yaml`에 적힌 대로 무료(Free) Docker 웹 서비스 `creditbridge-demo`가 만들어진다.
+2. 대시보드 오른쪽 위 **New → Web Service**를 누르고 `Hyeonwoo01/CreditBridge_AI`를 고른다. 목록에 없으면 "Configure GitHub App"에서 이 저장소 접근을 허용한다(비공개 저장소도 된다).
+3. 이렇게 채운다: Language **Docker**, Branch `main`, Dockerfile Path `./deploy/demo/Dockerfile`, Docker Build Context Directory `.`, Instance Type **Free**, (Advanced) Health Check Path `/login`, Auto-Deploy 켬. 이름은 예: `creditbridge-demo`.
+4. **Create Web Service**를 누른다. (Blueprint로 만들고 싶으면 New → Blueprint에서 Blueprint 파일 경로를 `deploy/demo/render.yaml`로 지정한다.)
 5. 서비스 화면의 **Logs**에서 빌드가 진행된다(처음 5~10분). `demo scenario ready`와 `Uvicorn running` 이 보이고 상태가 **Live**가 되면 화면 위쪽 `https://creditbridge-demo-xxxx.onrender.com` 주소로 열린다.
 
-고친 뒤 다시 올리기: 변경을 main에 push하면 Render가 자동으로 다시 빌드한다(`autoDeploy: true`). 빌드 중에도 이전 버전이 계속 열려 있다가 새 버전이 준비되면 바뀐다. push 없이 다시 빌드하려면 서비스 화면에서 **Manual Deploy → Deploy latest commit**을 누른다. 문서만 고친 push도 다시 빌드하므로, 무료 빌드 시간을 아끼려면 서비스 **Settings → Build & Deploy**의 Build Filters에서 `docs/**` 등을 빼도 된다.
+고친 뒤 다시 올리기: 변경을 main에 push하면 Render가 자동으로 다시 빌드한다(Auto-Deploy). 빌드 중에도 이전 버전이 계속 열려 있다가 새 버전이 준비되면 바뀐다. push 없이 다시 빌드하려면 서비스 화면에서 **Manual Deploy → Deploy latest commit**을 누른다. 문서만 고친 push도 다시 빌드하므로, 무료 빌드 시간을 아끼려면 서비스 **Settings → Build & Deploy**의 Build Filters에서 `docs/**` 등을 빼도 된다.
 
 Render 무료 웹 서비스 참고:
 - 15분 동안 접속이 없으면 잠든다. 다시 열면 깨어나는 데 1~2분 걸리고(무료 CPU 0.1개 기준 데모 준비 약 30초 + Render 기동), 이때 데이터가 처음 상태로 돌아간다. 깨어나는 동안 "502 Bad Gateway"가 보이면 1~2분 뒤 새로 고침한다.

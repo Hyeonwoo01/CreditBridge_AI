@@ -1,4 +1,5 @@
 # Render Blueprint: 예시용 공개 데모 (docs/demo-deploy.md). 운영 배포용이 아니다.
+# 지금 운영 중인 데모는 없어 저장소 루트에서 여기로 옮겼다. 경로는 저장소 루트 기준이다.
 services:
   - type: web
     name: creditbridge-demo
