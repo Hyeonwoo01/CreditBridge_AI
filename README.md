@@ -1,10 +1,34 @@
 # CreditBridge AI
 
-**배포 사이트**: https://creditbridge-hw.duckdns.org
+**편입생의 강의계획서를 AI가 분석해 "어떤 과목으로 학점이 인정될지"를 원문 근거와 함께 추천하고, 최종 판정은 학과 교수가 내리는 편입 학점 심사 플랫폼**
 
-배포 사이트에는 데모 계정이 없습니다. 기관 관리자가 만들어 준 계정으로만 로그인할 수 있고, 데모 계정(`demo1234`)은 [내 PC에서 실행](#데모-계정)했을 때와 공개 데모 모드로 직접 올렸을 때만 씁니다.
+**배포 사이트**: https://creditbridge-hw.duckdns.org (테스트 계정은 [아래](#사이트-둘러보기))
 
-**배포 사이트 테스트 계정** (대상 대학 NYU Stern, 비밀번호는 공개하지 않습니다. 필요하면 관리자에게 받으세요)
+`Python 3.12` `FastAPI` `PostgreSQL 17` `Celery + Redis` `Jinja2 + HTMX + Tailwind` `Claude / GPT` `AWS EC2·RDS·S3` `Docker`
+
+| 학생: 성적표를 올리면 과목마다 요청이 생기고 예상 인정 학점을 미리 봄 | 교수: 양쪽 강의계획서의 원문 근거를 나란히 보고 판정 |
+| --- | --- |
+| ![학생 홈](docs/images/student-home.png) | ![근거 비교](docs/images/evidence.png) |
+| **심사관: 신뢰도·정보 부족·일관성 경보로 걸러 교수에게 배정** | **관리자: 지어낸 인용 비율·교수 확인 정확도 같은 AI 근거 품질 지표** |
+| ![심사 대기열](docs/images/review-queue.png) | ![AI 근거 품질](docs/images/ai-quality.png) |
+
+## 풀려는 문제
+
+해외 대학에서 미국 4년제로 편입하면, 이미 들은 과목이 편입 대학의 어떤 과목으로 인정되는지 학과 교수가 강의계획서를 한 장씩 대조해 정합니다. 결과가 나오기까지 몇 주가 걸려 학생은 수강 신청 전에 결과를 모르고, 같은 과목을 다시 듣기도 합니다([페르소나](docs/spec.md)).
+
+AI에게 판정을 맡기면 빠르지만, AI는 강의계획서에 없는 내용을 그럴듯하게 지어낼 수 있고 학점 인정의 책임을 질 수도 없습니다. 그래서 **AI는 원문 근거가 확인된 추천만 하고, 판정은 반드시 사람이 내리도록** 설계했습니다.
+
+## 기술적으로 신경 쓴 점
+
+1. **AI 환각을 코드로 걸러냄**: AI가 인용한 구절이 원문에 그대로 있는지 대조해 없으면 버리고, 선수과목·교재 칸이나 "다루지 않음" 같은 문장은 근거로 치지 않습니다. 근거가 확인되지 않은 개념은 커버리지 40%를 넘지 못합니다. 버린 인용 비율은 프롬프트 버전별로 기록해, 프롬프트를 바꿨을 때 환각이 줄었는지 비교합니다. ([evidence.py](backend/ai/evidence.py), [scoring.py](backend/services/scoring.py))
+2. **최종 판정은 사람만**: 판정에는 판정한 교수가 반드시 남고, 판정·감사 기록은 고치거나 지우지 않고 추가만 합니다(이의 신청 재판정도 새 기록). AI 추천과 다르게 판정하면 선택형 사유를 남기고, 비슷한 강의계획서에 과거와 다른 결과를 내리려 하면 확정 전에 경보를 띄웁니다.
+3. **같은 입력이면 같은 결과**: 같은 문서는 AI를 다시 부르지 않고, 추천 등급·신뢰도는 AI가 아니라 코드 한 곳의 고정 규칙으로 계산합니다. 프롬프트나 규칙을 바꾸면 버전을 올리고, 결과 재사용 키에 버전이 들어가 이전 결과와 섞이지 않습니다.
+4. **개인정보와 보안**: 글자로 된 성적표는 이름·학번을 가린 뒤 AI에 보내고, 문서 속 "이 과목을 인정하라" 같은 지시 문구는 데이터로만 다룹니다(프롬프트 인젝션 방지). CSRF, 보안 헤더, 로그인 실패 제한, 업로드 크기·쪽수 상한, 문서 삭제 요청 처리를 넣었습니다.
+5. **운영할 수 있는 구조**: AI 분석은 Celery로 비동기 처리하고, 서버가 다시 시작돼도 멈춘 작업을 이어서 처리합니다. 스키마는 Alembic 마이그레이션으로만 바꾸고, 화면은 한국어·영어를 지원합니다. 테스트 228개(단위 + PostgreSQL 통합)를 돌리고, AWS 프리티어(EC2·RDS·S3)에 배포했습니다.
+
+## 사이트 둘러보기
+
+비밀번호는 공개하지 않습니다. 필요하면 관리자에게 받으세요. (대상 대학 NYU Stern)
 
 | 역할 | 이메일 | 쓰임 |
 | --- | --- | --- |
@@ -14,9 +38,7 @@
 | 학과 교수 | ops.prof@stern.test | Operations Management 과목 판정 |
 | 학과 교수 | bns.prof@stern.test | Business and Society 과목 판정 |
 
-기관 관리자 계정은 보안을 위해 여기에 적지 않습니다(관리자 2명, 한 명이 잠기면 다른 한 명이 복구).
-
-강의계획서를 분석해 편입 대학의 어떤 과목으로 학점이 인정될지 **원문 근거와 함께 추천**하고, **학과 교수가 그 근거를 보고 최종 판정**하는 편입 학점 심사 플랫폼입니다. AI는 추천만 하고 확정 권한은 사람에게만 있습니다.
+기관 관리자 계정은 보안을 위해 적지 않습니다(관리자 2명, 한 명이 잠기면 다른 한 명이 복구). 데모 계정(`demo1234`)은 [내 PC에서 실행](#데모-계정)했을 때와 공개 데모 모드로 직접 올렸을 때만 씁니다.
 
 ## 할 수 있는 것
 
@@ -29,7 +51,7 @@
 
 역할별 화면과 메뉴는 아래 [주요 화면](#주요-화면), 화면별 세부는 [화면 명세서](docs/screens/README.md)에 있습니다.
 
-기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·화면 버튼 대응) · [ERD](docs/ERD.md)(엔티티·속성·관계) · [미결 사항](docs/open-issues.md)(확정 안 된 규칙·지금 어려운 일)
+기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·화면 버튼 대응) · [ERD](docs/ERD.md)(엔티티·속성·관계) · [미결 사항](docs/open-issues.md)(확정 안 된 규칙·지금 어려운 일) · [실행·배포 자세히](docs/setup.md) · [운영 가이드](docs/operations.md)
 
 ## AI가 판정을 추천하는 방식
 
@@ -79,7 +101,7 @@ AI가 지어낸 인용(원문에 없어 버린 구절) 비율은 분석마다 �
 
 ## 실행
 
-### 가장 쉬운 방법: Docker로 한 번에 (내 컴퓨터에서만 접속)
+### Docker로 한 번에 (내 컴퓨터에서만 접속)
 
 사전 설치: [Docker Desktop](https://www.docker.com/products/docker-desktop/), Git
 
@@ -93,75 +115,16 @@ cp .env.example .env                      # (선택) Windows PowerShell: copy .e
 docker compose up -d --build              # 프론트엔드·백엔드·DB·작업 큐·파일 저장소를 한 번에
 ```
 
-`docker-compose.yml` 하나에 서비스 6개가 들어 있습니다: `web`(FastAPI 백엔드가 `frontend/` 화면까지 함께 그려 보냄, :8000), `worker`(AI 분석 등 오래 걸리는 작업), `beat`(매일 기한 알림), `db`(PostgreSQL 17), `redis`(작업 큐), `s3`(파일 저장소). 모두 `restart: unless-stopped`라 PC를 다시 켜도 Docker Desktop만 실행하면 직접 끄지 않은 서비스는 다시 켜집니다.
+처음에는 빌드에 몇 분 걸려요. 브라우저에서 http://localhost:8000 을 열고 아래 [데모 계정](#데모-계정)으로 로그인합니다(비밀번호 `demo1234`). 끄기는 `docker compose down`이에요.
 
-처음에는 이미지 내려받기와 빌드에 몇 분 걸립니다. DB(PostgreSQL 17)는 볼륨이 비어 있을 때 `db/init.sql`(테이블)과 `db/data.sql`(데모 계정·과목 초기 데이터)로 한 번 초기화되고, 웹 컨테이너가 시작하면서 문서 버킷을 만듭니다.
-브라우저에서 http://localhost:8000 을 엽니다. 모든 포트를 127.0.0.1에만 열어 같은 네트워크의 다른 기기에서는 접속할 수 없습니다.
+서비스 구성, 내 이메일로 계정 만들기, 막힐 때, AWS 배포, 개발용 실행(uv)은 [docs/setup.md](docs/setup.md)에 있어요.
 
-- 로그인: 아래 [데모 계정](#데모-계정) 중 하나로 들어갑니다(비밀번호 `demo1234`).
-- 끄기: `docker compose down` (데이터는 남음, 모두 지우려면 `down -v`)
-- 다시 켜기: Docker Desktop을 켜면 자동으로 다시 켜짐(`docker compose down`으로 끈 뒤에는 `docker compose up -d`) / 코드를 새로 받은 뒤(`git pull`)에는 `docker compose up -d --build`
-- 예전 명령 `docker compose --profile app ...`도 그대로 동작합니다(이제 프로필 없이 전부 뜸).
-- 상태·로그 보기: `docker compose ps`, `docker compose logs -f web worker`
-- 파일 저장소는 S3 호환 SeaweedFS 컨테이너(`s3`)를 씁니다. 운영에서는 AWS S3로 바꿉니다.
-
-#### 내 이메일로 계정 만들기
-
-회원가입 화면은 없습니다. 기관 관리자가 명단으로 계정을 만들어 주는 방식입니다.
-
-1. 관리자(`admin@msu.example`)로 로그인 → **계정·과목** → **③ 계정 CSV**에서 "예시 파일 받기"
-2. `email,name,role,department,source_institution` 형식으로 적고 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장 (role은 student·evaluator·professor·admin, 교수는 과목에 있는 학과명 필수, 학생은 department에 편입 전공·source_institution에 출신 대학)
-3. 올리면 새 계정마다 임시 비밀번호가 화면에 한 번만 나옵니다. 그 비밀번호로 로그인하면 새 비밀번호로 바꾸는 화면이 먼저 나옵니다.
-
-메일 발송(`SMTP_HOST`)을 설정하지 않았으면 메일은 보내지 않으므로 실제로 없는 주소여도 됩니다. 이미 만든 계정의 이메일은 바꿀 수 없고(교직원은 이름·학과, 학생은 편입 전공·출신 대학만 수정), 바꾸려면 새 계정을 만들고 이전 계정을 비활성화합니다.
-
-#### 막힐 때
-
-| 증상 | 원인과 해결 |
-| --- | --- |
-| `failed to connect to the docker API ... dockerDesktopLinuxEngine` | Docker Desktop이 꺼져 있습니다. 실행하고 Engine running이 보이면 다시 실행하세요. `docker info`에 `Server:` 정보가 나오면 준비된 것입니다 |
-| `fatal: not a git repository`, `no configuration file provided` | 저장소 폴더 밖에서 실행했습니다. `cd CreditBridge_AI`로 들어가서 실행하세요 |
-| 브라우저에 "localhost 연결을 거부했습니다" | 아직 빌드·시작 중이거나 웹 컨테이너가 멈췄습니다. `up` 명령이 끝날 때까지 기다린 뒤 `docker compose ps`로 `web`이 실행 중인지 보고, 아니면 `docker compose logs web --tail 40`으로 오류를 확인하세요 |
-| 예전(MariaDB) 버전으로 띄운 적이 있고 DB가 시작되지 않음 | 이전 DB 볼륨이 남아 있습니다. `docker compose down -v`로 지우고 다시 `up -d --build` 하세요 (데이터도 지워짐) |
-| WSL 관련 오류로 Docker Desktop이 켜지지 않음 | 관리자 PowerShell에서 `wsl --update` 후 Docker Desktop을 다시 실행하세요 |
-| "AI 분석 중"이 몇 분 넘게 그대로 | 서버를 다시 띄운 직후라면 작업이 대기열로 돌아가 곧 다시 처리됩니다(최대 15분). 8분이 넘는 분석은 "너무 오래 걸려 멈췄어요"로 바뀌고, 같은 파일을 다시 올리면 다시 분석합니다. `docker compose logs --tail 40 worker`로 오류를 확인하세요 |
-| 강의계획서를 올리면 "AI 분석 설정(API 키)이 아직 없어 분석하지 못했어요" | `.env`에 쓰는 AI의 키·모델이 없습니다. Claude면 `ANTHROPIC_API_KEY`·`CLAUDE_MODEL`, GPT면 `LLM_PROVIDER=openai`와 `OPENAI_API_KEY`·`OPENAI_MODEL`을 넣고 `docker compose up -d`를 다시 실행하세요 |
-| 학생으로 로그인하면 "내 성적표" 화면만 나옴 | 정상이에요. 학생은 성적표를 먼저 올려야 해요(데모는 `scripts/demo_data/transcript.pdf`). 올리면 내 편입 요청으로 넘어가요 |
-| 성적표를 올렸는데 과목 카드가 안 생김 | ① 내 성적표 화면이 "읽지 못함"이면 AI 설정(API 키)·파일 상태를 확인하고 다시 올리세요. ② 학생 계정에 출신 대학·편입 전공이 없으면 요청을 만들 수 없어요. 관리자가 계정 목록에서 정한 뒤 성적표를 다시 올리세요. ③ 성적이 모두 C 미만이면 만들 과목이 없어요 |
-| 파일(강의계획서·기준 강의계획서)을 올리면 `Internal Server Error` | 파일 저장소 키가 비어 있던 예전 설정입니다. `git pull` 후 `docker compose up -d`를 다시 실행하세요 (지금은 `.env`에 `S3_ACCESS_KEY`가 없어도 기본값으로 동작) |
-
-### 실제 서비스로 올리기 (AWS 프리티어)
-
-EC2 한 대(docker compose + Caddy https) + RDS PostgreSQL 17 + S3로 실제 AI 분석(Claude 또는 GPT)을 쓰는 사이트를 띄워요. `docker-compose.prod.yml`과 `deploy/aws/`를 쓰고, AWS 콘솔에서 누를 순서와 프리티어 설정은 [docs/deploy-aws.md](docs/deploy-aws.md)에 있어요.
-
-### 예시용 공개 데모로 올리기 (Render 무료)
-
-지금 운영 중인 공개 데모는 없어요. 필요할 때 아래 방법으로 다시 올릴 수 있어요.
-
-컨테이너 하나에 앱과 PostgreSQL을 넣고 예시 AI(실제 AI API 미사용, 비용 없음)로 돌리는 데모 모드(`DEMO_MODE=true`)가 있어요. Render 무료 웹 서비스에 올리면(`render.yaml`) 누구나 데모 계정 버튼으로 둘러볼 수 있고, 다시 시작하면 처음 상태로 돌아가요. 방법은 [docs/demo-deploy.md](docs/demo-deploy.md).
-
-### 개발용: 인프라만 Docker, 앱은 uv로
-
-사전 설치: Docker, [uv](https://docs.astral.sh/uv/)
-
-```bash
-uv sync                                   # Python 3.12와 의존성 설치
-cp .env.example .env                      # ANTHROPIC_API_KEY 입력(CLAUDE_MODEL은 예시 값 있음. GPT면 LLM_PROVIDER=openai, OPENAI_API_KEY, OPENAI_MODEL)
-docker compose up -d db redis s3          # PostgreSQL 17(db/init.sql·data.sql로 초기화), Redis 7, S3 호환 저장소(SeaweedFS)
-uv run alembic upgrade head               # init.sql로 이미 최신이면 아무것도 안 함
-uv run python -m scripts.create_bucket
-uv run python -m scripts.seed_demo        # 데모 카탈로그·계정 (data.sql로 이미 있으면 건너뜀)
-uv run fastapi dev backend/main.py        # http://localhost:8000
-uv run celery -A backend.workers.celery_app worker --loglevel=info   # 별도 터미널 (Windows는 --pool=solo 추가)
-uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 터미널: 매일 기한 알림 (하나만 띄움)
-```
-
-#### 데모 계정
+### 데모 계정
 
 내 PC에서 실행(Docker 또는 uv)하면 아래 계정이 미리 만들어져 있습니다. **비밀번호는 모두 `demo1234`** 입니다.
 
-- 배포 사이트(https://creditbridge-hw.duckdns.org)에는 이 계정들이 없습니다. 운영에서는 `SEED_DEMO=false`로 데모 계정을 만들지 않고, 기관 관리자가 [계정 CSV](#내-이메일로-계정-만들기)로 계정을 만들어 줍니다.
-- [공개 데모](#예시용-공개-데모로-올리기-render-무료)를 직접 올리면 로그인 화면의 역할 버튼을 누르면 비밀번호 없이 바로 들어갑니다.
+- 배포 사이트(https://creditbridge-hw.duckdns.org)에는 이 계정들이 없습니다. 운영에서는 `SEED_DEMO=false`로 데모 계정을 만들지 않고, 기관 관리자가 [계정 CSV](docs/setup.md#내-이메일로-계정-만들기)로 계정을 만들어 줍니다.
+- [공개 데모](docs/setup.md#예시용-공개-데모로-올리기-render-무료)를 직접 올리면 로그인 화면의 역할 버튼을 누르면 비밀번호 없이 바로 들어갑니다.
 
 | 역할 | 이메일 | 둘러볼 것 |
 | --- | --- | --- |
@@ -188,30 +151,6 @@ uv run celery -A backend.workers.celery_app beat --loglevel=info     # 별도 �
 - **사람이 최종 판정**: AI는 추천만 합니다. 판정 확률(%)은 계산·표시하지 않고, 확정 판정에는 `decided_by`가 필수이며, `decisions`·`audit_logs`는 INSERT만 합니다(재판정도 새 행).
 - **개인정보·보안**: 로그·예외·알림에 이름·학번·성적을 쓰지 않습니다. 문서 안 지시 문구는 데이터로만 다루고, 상태를 바꾸는 POST는 CSRF 토큰을 검증합니다.
 - **작업 완료 전**: 아래 품질 검사를 모두 통과시키고, 스키마를 바꾸면 Alembic 마이그레이션을, 새 Tailwind 클래스를 쓰면 `app.css` 재빌드를 함께 커밋합니다.
-
-## 실제 데이터로 시작하기
-
-데모 데이터 없이(`SEED_DEMO=false`) 실제 기관에서 쓸 때의 순서입니다.
-
-1. **첫 관리자 만들기** (서버에서 한 번):
-   ```bash
-   uv run python -m scripts.create_admin --institution "대학 이름" --country KR \
-       --email admin@univ.ac.kr --name "학사정보처 관리자" --tuition 1350 --degree 130
-   # Docker: docker compose exec web uv run --no-group dev python -m scripts.create_admin ...
-   ```
-   임시 비밀번호가 한 번만 출력됩니다. 첫 로그인 때 새 비밀번호(10자 이상)로 바꿔야 다른 화면을 쓸 수 있습니다.
-2. **과목 CSV** (`/admin/data`): `code,title,credits,department,level,concepts`. `concepts`는 학과가 정한 필수 개념을 `;`로 구분해 적습니다. 과목 코드가 이미 있으면 새 값으로 고칩니다.
-3. **과목별 기준 강의계획서**: 같은 화면의 과목 목록에서 PDF·JPG·PNG를 올립니다. **기준 강의계획서가 없는 과목은 AI 비교 후보에서 빠집니다.**
-4. **출신 대학 등록**: 학생 계정에 정해 두는 출신 대학 목록입니다. 학생 계정을 가져오기 전에 먼저 등록하세요. 대학마다 자기가 등록한 출신 대학만 보이고, 쓰지 않는 대학은 지울 수 있습니다. 계정 CSV의 `source_institution`과 동등 과목표 CSV의 출신 대학 이름은 여기 등록된 이름과 똑같아야 합니다.
-5. **계정 CSV**: `email,name,role,department,source_institution`. 학생은 `department`에 편입 전공(과목 CSV의 학과명), `source_institution`에 출신 대학(4번에서 등록한 이름, 등록하지 않은 대학이면 가져오기가 거절됨)을 적습니다. 학생이 처음 로그인해 성적표를 올리면 이 두 값으로 성적 C 이상 과목마다 편입 요청이 만들어지고(학생이 직접 고르지 않음), 비워 두면 계정 목록에서 나중에 정할 수 있습니다(관리자 메뉴 '계정 목록' 숫자 배지에 표시). role은 student·evaluator·professor·admin(또는 학생·심사관·교수·관리자). 교수의 department는 과목 CSV의 학과명과 똑같아야 그 학과 과목이 배정됩니다. 메일 발송이 설정돼 있으면 새 계정마다 본인 메일로 비밀번호 설정 링크(72시간)를 자동으로 보내고, 없으면 임시 비밀번호를 만들어 가져온 직후 한 번만 보여 줍니다(CSV로 받기 가능, 저장하지 않음). 이미 있는 이메일은 건너뜁니다.
-
-비밀번호를 잊은 사용자는 로그인 화면의 "비밀번호를 잊으셨나요?"에서 메일로 재설정 링크(30분 동안, 한 번만 사용)를 받습니다. 관리자가 `/admin/data`의 "비밀번호 초기화"를 쓰면 사용자 메일로 설정 링크(72시간)가 자동으로 갑니다. 메일 발송(`SMTP_HOST`)이 설정되지 않은 서버에서는 대신 임시 비밀번호를 화면에 한 번만 보여 줍니다. **운영에서는 메일 발송을 설정하는 것을 권장합니다.** 그래야 관리자 없이 계정 만들기·비밀번호 찾기·잠금 해제가 모두 메일로 처리됩니다. 비밀번호가 바뀌면 다른 기기의 로그인은 끊깁니다.
-
-졸업·퇴직·휴학한 사람은 `/admin/data`의 "계정 비활성화"로 막아요. 계정은 지우지 않아 판정·감사 기록은 남고, 교수였다면 진행 중인 심사가 같은 학과 다른 교수에게 넘어가요(없으면 심사관이 다시 배정). 언제든 다시 활성화할 수 있어요.
-
-비밀번호를 연속 5번 틀리면 1분 동안 로그인할 수 없고, 그 뒤로도 틀려 연속 10번이 되면 비밀번호가 초기화되어 메일로 받은 재설정 링크(메일 미설정 시 관리자 재발급)로만 새 비밀번호를 정할 수 있습니다. 관리자 화면에 이렇게 초기화된 계정 수가 표시됩니다.
-
-CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니다(한국어 엑셀 기본 CSV도 읽습니다). 한 줄이라도 틀리면 아무것도 저장하지 않고 틀린 행 번호와 이유를 보여 줍니다. 예시 파일은 화면의 "예시 파일 받기" 또는 `frontend/static/samples/`에 있습니다.
 
 ## 품질 검사
 
@@ -240,6 +179,7 @@ backend/         ← 백엔드 (Python, import 이름도 backend)
                  push(웹 푸시 구독·발송) · calibration(추천 기준값 보정 계산)
                  institution_data(계정·과목 CSV, 기준 강의계획서, 출신 대학, 편입 학점 상한, 첫 관리자) · csv_import(CSV 공통)
                  accounts · auth · audit · notes(내부 메모) · originals(원본 열람) · reminders(기한 알림) · versions(버전 비교)
+                 evidence_feedback(교수 근거 맞음·틀림, AI 근거 품질 지표)
   repositories/  SQL은 여기만
   models/        SQLAlchemy 2.0, 테이블당 1파일
   workers/       Celery 작업
@@ -259,21 +199,6 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋)
 
 화면 CSS는 `frontend/tailwind/input.css`(DESIGN.md 토큰)에서 Tailwind standalone CLI로 빌드합니다(`scripts/build_css.sh`). 빌드된 `frontend/static/css/app.css`가 커밋되어 있어 CLI 없이도 실행됩니다. 템플릿에 새 Tailwind 클래스를 쓰면 `scripts/build_css.sh`로 다시 빌드해 함께 커밋하세요.
 
-## 운영 시 확인할 것
+## 운영
 
-- 보안: 앱은 보안 헤더·운영 비밀값 검사·로그인 실패 제한(같은 IP 10분 30번)·학생별 하루 업로드 횟수(성적표 10, 강의계획서 60, 보완 자료 30)·PDF 60쪽·이미지 해상도·CSV 수식 주입 방지를 기본으로 갖고, 컨테이너는 root가 아닌 사용자로 돌아요. AWS 콘솔에서 할 일(루트 MFA, SSH 제한, IMDSv2, S3·RDS 공개 차단, AI 키 한도)은 [docs/deploy-aws.md](docs/deploy-aws.md)의 "보안 점검"을 따르세요. `SESSION_SECRET`가 32자보다 짧으면 운영 서버가 시작하지 않아요.
-- 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 실제 AI 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
-- 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
-- `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](docs/db-grants.sql)을 따르세요.
-- 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
-- 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.
-- 기한 알림은 `beat` 서비스(개발 환경은 `celery beat`)가 매일 `REMINDER_HOUR_UTC`시(기본 13시 UTC = 미국 동부 오전 9시)에 보내요. 판정 기한이 지났거나 하루 남은 심사(교수), 기한이 지난 심사(심사관), 교수 배정이 밀린 과목(심사관), 처리 기한이 다가온 삭제 요청(심사관·관리자), 답이 없는 보완 자료 요청(학생)을 알려요. beat는 반드시 하나만 띄우세요(여러 개면 알림이 겹쳐 쌓여요). 오늘 대상 건수는 운영 통계의 "기한 알림" 카드에서 볼 수 있어요.
-- 알림 메일과 비밀번호 재설정 메일을 보내려면 `SMTP_HOST` 등과 `APP_BASE_URL`(메일 속 링크 주소)을 설정하세요. 비워 두면 화면 알림만 쓰고, 비밀번호는 관리자가 초기화합니다.
-- 휴대폰·컴퓨터 브라우저 푸시 알림을 켜려면 `uv run python -m scripts.generate_vapid_keys`로 만든 `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`를 `.env`에 넣고 `VAPID_SUBJECT`를 관리자 메일(`mailto:...`)로 바꾸세요. 각 사용자가 알림 화면에서 "푸시 알림 받기"를 누르면 그 기기로 와요. https 주소(또는 localhost)에서만 동작하고, iPhone·iPad는 홈 화면에 추가한 앱으로 열어야 해요. 개인 키를 바꾸면 모두 다시 구독해야 해요.
-- JSON API는 `/api/v1/...`입니다. 버전 없는 옛 경로(`/api/sis/decisions` 등)도 당분간 같은 응답을 주지만 폐기 예정이니 연동 시스템 주소를 바꿔 주세요.
-- `SESSION_SECRET`은 길고 무작위인 값으로 정하고 바꾸지 마세요. 바꾸면 모든 로그인과 아직 쓰지 않은 재설정 링크가 무효가 됩니다.
-- 웹 서버 접근 로그는 쿼리 문자열을 지우고 경로만 남깁니다(심사 대기열 검색어에 학생 이름이 들어갈 수 있음). 앞에 리버스 프록시를 둘 때도 접근 로그에서 쿼리 문자열을 빼세요.
-- 관리자 콘솔의 "데이터 보존 및 파기 정책" 카드는 [docs/privacy.md](docs/privacy.md)를 요약한 것입니다. 삭제 처리 기한은 `PRIVACY_DELETION_DAYS`(기본 30일)로 바꿉니다.
-- 일관성 경보의 유사도 기준(`SIMILARITY_MIN = 0.80`)은 첫 측정 후 확정하는 임시값입니다.
-- 추천 등급 기준값(직접 인정 0.75·선택 인정 0.40)도 임시값입니다. 교수 판정이 쌓이면 `uv run python -m scripts.calibrate_scoring --institution "대학 이름"`(또는 전문가 라벨 CSV `--csv`)으로 지금 값의 일치율·오인정률과 제안값을 보고, 사람이 승인하면 `backend/services/scoring.py`를 고치고 `RULES_VERSION`을 올리세요(자동으로 바꾸지 않아요).
-- 화면 문구를 추가·수정하면 `backend/locales/en.json`에 영어를 함께 넣고 `uv run python -m scripts.i18n_check`로 빠진 번역이 없는지 확인하세요. AI 근거 설명은 한 번의 분석으로 한국어(학생용)와 영어(교직원용)를 함께 받아 화면 언어에 맞춰 보여 줘요(프롬프트 `evaluation-v2`). 그 전에 분석한 결과는 다시 분석하기 전까지 한국어로만 보여요.
+실제 기관 데이터로 시작하는 순서(첫 관리자·과목·기준 강의계획서·계정 CSV)와 운영할 때 확인할 것(보안·환경 변수·알림·임시 기준값)은 [docs/operations.md](docs/operations.md)에 있어요. AWS에 올리는 순서는 [docs/deploy-aws.md](docs/deploy-aws.md)에 있어요.

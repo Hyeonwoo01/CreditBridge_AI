@@ -129,7 +129,7 @@ docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python 
   --institution "NYU Stern" --country US --email admin@example.com --name "Stern Admin"
 ```
 
-임시 비밀번호가 한 번만 나온다. 로그인 → 새 비밀번호로 바꾸기 → `/admin/data`에서 README "실제 데이터로 시작하기" 순서(과목 CSV → 기준 강의계획서 → 출신 대학 → 계정 CSV)로 넣는다. 데모 계정은 만들지 않는다(`SEED_DEMO=false`).
+임시 비밀번호가 한 번만 나온다. 로그인 → 새 비밀번호로 바꾸기 → `/admin/data`에서 [운영 가이드](operations.md#실제-데이터로-시작하기)의 "실제 데이터로 시작하기" 순서(과목 CSV → 기준 강의계획서 → 출신 대학 → 계정 CSV)로 넣는다. 데모 계정은 만들지 않는다(`SEED_DEMO=false`).
 
 비밀번호를 잊을 때를 대비해 관리자를 하나 더 만들어 두면 서로 초기화할 수 있다.
 
