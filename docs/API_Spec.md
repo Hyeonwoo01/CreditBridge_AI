@@ -291,7 +291,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 | 화면 | 버튼·링크 | API |
 | --- | --- | --- |
-| P11 | 심사 건 행 | F3 |
+| P11 | 심사 건 행 · 최근 판정한 심사 행 | F3 |
 | P11 | 부재 설정 [저장] | F2 |
 | P12 | 판정 칩(승인·수정·반려) · 등급·대상 과목 선택 | 화면 안 (F4 입력값) |
 | P12 | 판정 확정 · 하단 바 판정 확정 · 재판정 확정 | F4 |
@@ -353,7 +353,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P08 | R8 · M9 | `privacy.rows` | 삭제 요청(요청 #·학생 이메일·기한·상태·기한 초과) |
 | P09 | R10 | `equivalencies.search` | 가져온 동등 과목표 검색 (출신 대학·출신 과목·대상 과목·판정, 50건씩) |
 | P10 | M1 · R12 | `stats.institution_stats`, `stats.recent_audit`(관리자), `views.reminder_preview` | 수용률·불일치율, 개인정보, SIS 상태, 처리 현황, 기한 알림, 학과별 지표, AI 근거 품질(프롬프트 버전별 인용 수·원문에 없어 버림·가르친 근거 아님·교수 확인 맞음 비율, `evidence_feedback.quality_by_prompt`), 월별 판정, 판정 구성, 최근 감사 로그 8건(관리자), 보존 정책 |
-| P11 | F1 | `views.professor_items`, `views.colleagues` | 배정된 심사(재판정·대리 표시), 부재 설정·대리 교수 후보 |
+| P11 | F1 | `views.professor_items`, `views.professor_recent`, `views.colleagues` | 배정된 심사(재판정·대리 표시), 최근 판정한 심사 20건(판정 결과·재판정 결과·문서 삭제 종료), 부재 설정·대리 교수 후보 |
 | P13 | C1 · C2 | `views.evaluation_view(with_audit=True)` | 사람 판정·당시 AI 추천, 경과, AI 추천, 개념별 근거, 과거 판정, 감사 로그 |
 | P14 | A12 | `notifications.inbox`, `push.device_count` | 알림 50건씩 페이지 (저장된 한국어 원문을 화면 언어로), 푸시 받는 기기 수 |
 | P15 | M11 | `sis.has_token` | 토큰 상태 (발급 직후에만 원문) |

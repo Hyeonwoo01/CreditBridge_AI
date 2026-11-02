@@ -21,6 +21,30 @@
   {% endfor %}
 </section>
 
+{# 판정을 마친 심사는 배정 목록에서 빠지므로, 다시 열어 볼 수 있게 최근 판정을 따로 보여 준다 #}
+<section class="mt-10 grid gap-3" aria-labelledby="recent-title">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="recent-title" class="section-title">{{ _("최근 판정한 심사") }}{% if recent.total %} <span class="text-sm font-normal text-muted tabular-nums">{{ recent.total }}</span>{% endif %}</h2>
+    <span class="text-xs text-muted">{{ _("누르면 판정 화면과 근거를 다시 볼 수 있어요") }}</span>
+  </div>
+  {% if recent.items %}
+  <div class="card grid p-0">
+    {% for r in recent.items %}
+    <a href="/professor/evaluations/{{ r.evaluation.id }}" class="grid gap-1 border-b border-divider px-5 py-4 last:border-b-0 hover:bg-parchment">
+      <span class="flex flex-wrap items-center justify-between gap-2">
+        <span class="font-semibold">{{ r.syllabus.course_code }} {{ r.syllabus.course_title }}</span>
+        <span class="flex flex-wrap items-center gap-2">{{ rec_badge(r.decision.result) }}{% if r.later %}<span class="badge">{{ _("이의 신청 재판정 → {result}", result=(r.later.result | rec)) }}</span>{% endif %}{% if r.request.status == 'closed' %}<span class="badge text-muted">{{ _("문서 삭제로 종료") }}</span>{% endif %}</span>
+      </span>
+      <span class="text-sm text-muted">{{ _("→ {target} · {action} · {time}", target=(r.target.code if r.target else (_('일반 선택 학점') if r.decision.result == 'elective' else _('대상 과목 없음'))), action=(r.decision.action | action), time=(time(r.decision.decided_at, "date"))) }}{% if r.decision.appeal_id %} {{ _("· 이의 신청 재판정") }}{% endif %}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if recent.more %}<p class="text-xs text-muted">{{ _("최근 {shown}건만 보여요.", shown=(recent.items | length)) }}</p>{% endif %}
+  {% else %}
+  <p class="rounded-md bg-parchment p-6 text-center text-muted">{{ _("아직 판정한 심사가 없어요.") }}</p>
+  {% endif %}
+</section>
+
 <form method="post" action="/professor/away" class="card mt-10 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <p class="text-sm font-semibold md:col-span-3">{{ _("부재 설정") }}{% if user.away_until %} <span class="font-normal text-muted">{{ _("· {away_until}까지 부재", away_until=(user.away_until)) }}</span>{% endif %}</p>

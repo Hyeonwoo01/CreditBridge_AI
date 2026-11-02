@@ -498,6 +498,51 @@ def professor_items(session: Session, professor: User) -> list[ProfessorItem]:
     return items
 
 
+# 교수 홈 "최근 판정한 심사"에 보여 주는 건수
+RECENT_DECISIONS = 20
+
+
+@dataclass(frozen=True)
+class RecentDecision:
+    decision: Decision  # 이 교수의 판정 (그 심사 건에서 이 교수가 내린 가장 최근 판정)
+    evaluation: CourseEvaluation
+    syllabus: Syllabus
+    request: TransferRequest
+    target: Course | None  # 인정한 대상 과목 (불인정이면 없음)
+    later: Decision | None = None  # 그 뒤 다른 판정(이의 신청 재판정)이 있으면 지금 유효한 판정
+
+
+@dataclass(frozen=True)
+class RecentDecisions:
+    items: list[RecentDecision]
+    total: int  # 이 교수가 판정한 심사 건 전체 수
+
+    @property
+    def more(self) -> int:
+        return max(self.total - len(self.items), 0)
+
+
+def professor_recent(session: Session, professor: User, limit: int = RECENT_DECISIONS) -> RecentDecisions:
+    """교수 홈의 최근 판정한 심사: 배정 목록에서 빠진 지난 판정을 다시 열어 보는 길."""
+    rows = decision_repo.recent_by(session, professor.id, limit)
+    current = decision_repo.for_evaluations(session, [e.id for _, e, _, _ in rows])
+    courses = catalog_repo.courses_by_ids(session, [d.target_course_id for d, _, _, _ in rows if d.target_course_id])
+    items = []
+    for d, e, s, r in rows:
+        latest = current.get(e.id)
+        items.append(
+            RecentDecision(
+                decision=d,
+                evaluation=e,
+                syllabus=s,
+                request=r,
+                target=courses.get(d.target_course_id) if d.target_course_id else None,
+                later=latest if latest is not None and latest.id != d.id else None,
+            )
+        )
+    return RecentDecisions(items, decision_repo.count_decided_by(session, professor.id))
+
+
 def colleagues(session: Session, professor: User) -> list[User]:
     return [
         p

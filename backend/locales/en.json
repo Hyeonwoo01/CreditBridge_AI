@@ -1523,5 +1523,13 @@
  "교수 확인 근거 맞음": "Confirmed correct by professors",
  "{correct}/{checked}건": "{correct}/{checked}",
  "원문에 없어 버림은 AI가 지어낸 인용이에요. 교수 확인은 담당 교수가 판정 화면의 근거 구절 옆에서 누른 맞음·틀림이에요.": "Not in source means quotes the AI made up. Professor checks are the Correct/Wrong marks assigned professors leave next to evidence quotes on the decision screen.",
- "아직 AI 비교 기록이 없어요.": "No AI comparisons yet."
+ "아직 AI 비교 기록이 없어요.": "No AI comparisons yet.",
+ "최근 판정한 심사": "Recently decided",
+ "누르면 판정 화면과 근거를 다시 볼 수 있어요": "Open one to see the decision and its evidence again",
+ "이의 신청 재판정 → {result}": "Re-decided on appeal → {result}",
+ "→ {target} · {action} · {time}": "→ {target} · {action} · {time}",
+ "대상 과목 없음": "No target course",
+ "최근 {shown}건만 보여요.": "Showing the {shown} most recent only.",
+ "아직 판정한 심사가 없어요.": "You haven't decided any cases yet.",
+ "일반 선택 학점": "General elective credit"
 }

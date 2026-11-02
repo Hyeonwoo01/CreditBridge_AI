@@ -29,6 +29,7 @@ def index(request: Request, user: User = Professor, session: Session = Depends(g
         "professor/index.html",
         user=user,
         items=views.professor_items(session, user),
+        recent=views.professor_recent(session, user),
         colleagues=views.colleagues(session, user),
     )
 

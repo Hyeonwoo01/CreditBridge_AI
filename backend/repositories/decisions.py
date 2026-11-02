@@ -69,6 +69,29 @@ def all_for_institution(
     return [(d, e, s) for d, e, s in session.execute(stmt)]
 
 
+def recent_by(
+    session: Session, user_id: int, limit: int
+) -> list[tuple[Decision, CourseEvaluation, Syllabus, TransferRequest]]:
+    """이 사용자가 내린 판정을 최근 순으로, 심사 건마다 이 사용자의 가장 최근 판정 한 건."""
+    latest = select(func.max(Decision.id)).where(Decision.decided_by == user_id).group_by(Decision.course_evaluation_id)
+    stmt = (
+        select(Decision, CourseEvaluation, Syllabus, TransferRequest)
+        .join(CourseEvaluation, CourseEvaluation.id == Decision.course_evaluation_id)
+        .join(Syllabus, Syllabus.id == CourseEvaluation.syllabus_id)
+        .join(TransferRequest, TransferRequest.id == CourseEvaluation.transfer_request_id)
+        .where(Decision.id.in_(latest))
+        .order_by(Decision.decided_at.desc(), Decision.id.desc())
+        .limit(limit)
+    )
+    return [(d, e, s, r) for d, e, s, r in session.execute(stmt)]
+
+
+def count_decided_by(session: Session, user_id: int) -> int:
+    """이 사용자가 판정한 심사 건 수 (재판정은 한 건으로)."""
+    stmt = select(func.count(func.distinct(Decision.course_evaluation_id))).where(Decision.decided_by == user_id)
+    return session.scalar(stmt) or 0
+
+
 def for_evaluation_all(session: Session, evaluation_id: int) -> list[Decision]:
     """한 심사 건의 판정 전체 (원 판정과 이의 신청 재판정), 오래된 순."""
     stmt = select(Decision).where(Decision.course_evaluation_id == evaluation_id).order_by(Decision.id)
