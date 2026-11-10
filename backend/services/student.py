@@ -27,6 +27,7 @@ from backend.models import (
     User,
 )
 from backend.models.enums import PASSING_GRADES, DecisionResult, RequestStatus, Role, SyllabusStatus, TranscriptStatus
+from backend.repositories import allocations as allocation_repo
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
@@ -532,6 +533,9 @@ class CourseRow:
     candidate_department: str | None = None
     reviewer: User | None = None  # 판정했으면 판정 교수, 아니면 배정된 교수
     conversion: credit_service.Conversion | None = None  # 출신 학점을 대상 대학 단위로 환산한 결과
+    # 승인된 배분 원장에서 이 과목에 배정된 학점 (없으면 None). 다른 과목과 합쳐 인정됐으면 그 대상 과목 코드
+    allocated: float | None = None
+    combined_into: str | None = None
 
     @property
     def grade_failed(self) -> bool:
@@ -541,6 +545,8 @@ class CourseRow:
     @property
     def group(self) -> str:
         """학생 화면 필터: approved(인정 확정) / supplement(보완 필요) / review(심사 중) / other."""
+        if self.decision is None and self.combined_into:
+            return "approved"  # 다른 과목과 합쳐 인정됨
         if self.decision is None and self.grade_failed:
             return "other"
         if self.decision is not None and not (self.appeal and self.appeal.status in ("submitted", "accepted")):
@@ -565,6 +571,19 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
         if m.status == "open":
             open_materials.setdefault(m.syllabus_id, []).append(m)
     converter = credit_service.for_request(session, request)
+    allocated: dict[int, float] = {}
+    combined_into: dict[int, str] = {}
+    # 과목마다 자기 심사 건의 판정 id (원장 줄이 다른 판정에서 왔으면 '다른 과목과 합쳐 인정')
+    own_decision = {
+        sid: decisions[ev.id].id for sid, ev in evaluations.items() if ev is not None and ev.id in decisions
+    }
+    ledger = allocation_repo.active_for_student(session, request.student_id)
+    ledger_targets = catalog_repo.courses_by_ids(session, [a.target_course_id for a, _ in ledger if a.target_course_id])
+    for a, _ in ledger:
+        allocated[a.syllabus_id] = round(allocated.get(a.syllabus_id, 0.0) + a.credits, 2)
+        if a.decision_id != own_decision.get(a.syllabus_id):  # 다른 심사 건의 판정이 이 과목 학점을 합쳐 썼다
+            course = ledger_targets.get(a.target_course_id) if a.target_course_id else None
+            combined_into[a.syllabus_id] = course.code if course else ""
     rows = []
     for s in syllabi:
         ev = evaluations[s.id]
@@ -604,6 +623,8 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
                 candidate_department=course.department_name if course else None,
                 reviewer=user_repo.get_by_id(session, reviewer_id) if reviewer_id else None,
                 conversion=converter.convert(s),
+                allocated=allocated.get(s.id),
+                combined_into=combined_into.get(s.id) if decision is None and s.id in combined_into else None,
             )
         )
     return rows
@@ -646,8 +667,9 @@ def simulate(
         if decision is None and row.grade_failed:
             continue
         accepted = decision is not None and decision.result in (DecisionResult.DIRECT, DecisionResult.ELECTIVE)
-        if decision is not None and decision.accepted_credits is not None:
-            gained = float(decision.accepted_credits) if accepted else 0.0
+        # 확정 인정 학점은 승인된 배분 원장의 합계만 센다 (합쳐 인정한 과목도 원장 기준이라 두 번 세지 않음)
+        if row.allocated is not None or (decision is not None and decision.accepted_credits is not None):
+            gained = row.allocated or 0.0
             low += gained
             high += gained
             source_total += conv.value if conv is not None and conv.value is not None else gained

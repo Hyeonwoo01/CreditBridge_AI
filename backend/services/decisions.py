@@ -4,7 +4,7 @@ AI에는 확정 경로가 없다. 판정은 배정된 교수 사용자만 저장
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Any
@@ -14,8 +14,17 @@ from sqlalchemy.orm import Session
 from backend.errors import DecisionValidationError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Course, CourseEvaluation, Decision, Syllabus, TransferRequest, User
-from backend.models.enums import AppealStatus, DecisionAction, DecisionResult, ReasonCode, RequestStatus, Role
+from backend.models import Course, CourseEvaluation, CreditAllocation, Decision, Syllabus, TransferRequest, User
+from backend.models.enums import (
+    AppealStatus,
+    DecisionAction,
+    DecisionResult,
+    ReasonCode,
+    RequestStatus,
+    Role,
+    SyllabusStatus,
+)
+from backend.repositories import allocations as allocation_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import equivalencies as equivalency_repo
@@ -184,6 +193,99 @@ def credit_conversion(session: Session, evaluation: CourseEvaluation) -> credit_
     return credit_service.for_request(session, request).convert(syllabus)
 
 
+def combinable_sources(
+    session: Session, evaluation: CourseEvaluation
+) -> list[tuple[Syllabus, credit_service.Conversion]]:
+    """이 심사 건과 합쳐 인정할 수 있는 같은 학생의 다른 출신 과목 (같은 편입 대학, 종료되지 않은 요청, 성적 기준 통과,
+    분석까지 끝난 강의계획서). 환산 결과도 함께 돌려준다."""
+    request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
+    if request is None:
+        return []
+    out: list[tuple[Syllabus, credit_service.Conversion]] = []
+    for other in request_repo.of_student(session, request.student_id):
+        if other.target_institution_id != request.target_institution_id or other.status == RequestStatus.CLOSED:
+            continue
+        syllabi = [
+            s
+            for s in syllabus_repo.of_request(session, other.id)
+            if s.id != evaluation.syllabus_id and s.status == SyllabusStatus.READY
+        ]
+        failed = request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
+        converter = credit_service.for_request(session, other)
+        out += [(s, converter.convert(s)) for s in syllabi if s.id not in failed]
+    return out
+
+
+def _combined_sources(
+    session: Session, evaluation: CourseEvaluation, syllabus_ids: list[int]
+) -> list[tuple[Syllabus, credit_service.Conversion]]:
+    if not syllabus_ids:
+        return []
+    allowed = {s.id: (s, c) for s, c in combinable_sources(session, evaluation)}
+    wanted = list(dict.fromkeys(syllabus_ids))
+    if any(i not in allowed for i in wanted):
+        raise DecisionValidationError(tr("함께 인정할 과목은 이 학생의 다른 출신 과목 목록에서 골라 주세요."))
+    return [allowed[i] for i in wanted]
+
+
+def _allocation_plan(
+    session: Session,
+    evaluation: CourseEvaluation,
+    request: TransferRequest | None,
+    primary: Syllabus | None,
+    combined: list[tuple[Syllabus, credit_service.Conversion]],
+    conversion: credit_service.Conversion,
+    final: str,
+    accepted: float,
+    target: Course | None,
+) -> list[tuple[Syllabus, float]]:
+    """원장에 남길 (출신 과목, 학점) 목록. 이중 사용·이중 인정이면 판정 오류 (리뷰 v3 13.2 무결성 규칙 1·2·7)."""
+    if final == DecisionResult.NONE or accepted <= 0 or request is None or primary is None:
+        return []
+    earlier = {d.id for d in decision_repo.for_evaluation_all(session, evaluation.id)}
+    active = [
+        (a, s)
+        for a, s in allocation_repo.active_for_student(session, request.student_id)
+        if a.decision_id not in earlier  # 재판정이면 이 심사 건의 이전 배분은 대체된다
+    ]
+    if target is not None and any(a.target_course_id == target.id for a, _ in active):
+        raise DecisionValidationError(
+            tr("이 학생은 이미 {code}로 인정받았어요. 같은 대상 과목을 두 번 인정할 수 없어요.", code=target.code)
+        )
+    # 과목마다 환산 학점(인정 가능한 상한). 합쳐 인정하면 모두 환산돼 있다 (decide에서 확인)
+    primary_value = credit_conversion(session, evaluation).value if combined else conversion.value
+    sources = [(primary, primary_value)] + [(s, c.value) for s, c in combined]
+    remaining: list[float] = []
+    for syllabus, capacity in sources:
+        key = credit_service.source_key(syllabus)
+        used = sum(a.credits for a, s in active if credit_service.source_key(s) == key)
+        if capacity is None:  # 환산을 모르는 한 과목: 교수가 적은 값을 쓰되, 이미 다른 판정에 쓰인 과목이면 막는다
+            if used > 0:
+                raise DecisionValidationError(
+                    tr(
+                        "{course}은(는) 이미 다른 판정에서 인정에 쓰인 과목이에요.",
+                        course=syllabus.course_code or syllabus.course_title,
+                    )
+                )
+            remaining.append(accepted)
+            continue
+        left = round(capacity - used, 2)
+        if left <= 0:
+            raise DecisionValidationError(
+                tr(
+                    "{course}의 학점은 이미 모두 다른 인정에 쓰였어요.",
+                    course=syllabus.course_code or syllabus.course_title,
+                )
+            )
+        remaining.append(left)
+    if sum(remaining) + 1e-9 < accepted:
+        raise DecisionValidationError(
+            tr("출신 과목에서 아직 쓰지 않은 학점({credits})보다 많이 인정할 수 없어요.", credits=f"{sum(remaining):g}")
+        )
+    shares = credit_service.split_credits(accepted, remaining)
+    return [(syllabus, share) for (syllabus, _), share in zip(sources, shares, strict=True) if share > 0]
+
+
 def decide(
     session: Session,
     professor: User,
@@ -195,9 +297,13 @@ def decide(
     reason_memo: str,
     acknowledge_conflict: bool,
     accepted_credits: float | None = None,
+    combined_syllabus_ids: list[int] | None = None,
 ) -> Decision:
     """accepted_credits: 교수가 적은 인정 학점(대상 대학 단위). 비우면 환산 규칙으로 계산한 제안값을 쓰고,
-    환산할 수 없으면 인정하는 판정은 직접 적어야 한다 (학점을 지어내지 않음)."""
+    환산할 수 없으면 인정하는 판정은 직접 적어야 한다 (학점을 지어내지 않음).
+    combined_syllabus_ids: 이 과목과 합쳐 하나로 인정할 같은 학생의 다른 출신 과목(N:1). 인정 학점은 과목별 남은
+    학점에 비례해 나눠 원장(credit_allocations)에 한 줄씩 남긴다. 한 출신 과목 학점의 이중 사용과 같은 대상 과목의
+    이중 인정은 막는다."""
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
         raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
@@ -237,6 +343,19 @@ def decide(
     codes, memo = _validate_reasons(reason_codes, reason_memo, required=action == DecisionAction.REJECT or differs)
 
     conversion = credit_conversion(session, evaluation)
+    request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
+    primary = syllabus_repo.get(session, evaluation.syllabus_id)
+    combined = _combined_sources(session, evaluation, combined_syllabus_ids or [])
+    if combined:
+        if final == DecisionResult.NONE:
+            raise DecisionValidationError(tr("불인정에는 함께 인정할 과목을 고를 수 없어요."))
+        if conversion.value is None or any(c.value is None for _, c in combined):
+            raise DecisionValidationError(
+                tr("학점을 환산할 수 없는 과목이 있어 합쳐 인정할 수 없어요. 학점 단위와 환산 규칙을 먼저 정해 주세요.")
+            )
+        values = [conversion.value or 0.0] + [c.value or 0.0 for _, c in combined]
+        sources = [conversion.source_credits or 0.0] + [c.source_credits or 0.0 for _, c in combined]
+        conversion = replace(conversion, value=round(sum(values), 2), source_credits=round(sum(sources), 2))
     if accepted_credits is None:
         accepted = credit_service.suggested_credits(final, conversion, target)
         if accepted is None:
@@ -250,6 +369,7 @@ def decide(
         message, value = problem
         raise DecisionValidationError(tr(message, credits=f"{value:g}") if value is not None else tr(message))
     basis = credit_service.basis_for(final, accepted, target)
+    plan = _allocation_plan(session, evaluation, request, primary, combined, conversion, final, accepted, target)
 
     found = conflicts(history(session, evaluation), final)
     if found and not acknowledge_conflict:
@@ -281,6 +401,21 @@ def decide(
             conversion_rule_id=conversion.rule.id if conversion.rule else None,
         ),
     )
+    allocation_repo.supersede_for_evaluation(session, evaluation.id, decision.id)
+    allocation_repo.add_all(
+        session,
+        [
+            CreditAllocation(
+                student_id=request.student_id if request else professor.id,
+                decision_id=decision.id,
+                syllabus_id=syllabus.id,
+                target_course_id=target.id if target else None,
+                credits=share,
+                credit_unit=conversion.target_unit,
+            )
+            for syllabus, share in plan
+        ],
+    )
     if appeal is not None:
         appeal.status = AppealStatus.REDECIDED
     audit.record(
@@ -299,6 +434,7 @@ def decide(
         accepted_credits=accepted,
         credit_basis=basis,
         conversion_rule=conversion.rule.id if conversion.rule else None,
+        combined_sources=[s.id for s, _ in combined],
     )
     _notify_student(session, evaluation, final, redecided=appeal is not None)
     if evaluation.transfer_request_id is not None:

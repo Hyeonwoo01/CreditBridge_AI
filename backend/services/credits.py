@@ -165,3 +165,21 @@ class RequestConverter:
     def convert(self, syllabus: Syllabus, on: date | None = None) -> Conversion:
         credits = source_credits_of(syllabus, self.transcript.get(syllabus.id))
         return convert(credits, self.source_unit, self.target_unit, self.rules, on or utcnow().date())
+
+
+# ---------- 학점 배분 (리뷰 v3 P0-3) ----------
+
+
+def source_key(syllabus: Syllabus) -> str:
+    """같은 출신 과목을 알아보는 키: 같은 출신 대학의 같은 과목 코드(공백·대소문자 무시), 코드가 없으면 같은 파일."""
+    code = "".join((syllabus.course_code or "").split()).upper()
+    return f"{syllabus.institution_id}:{code}" if code else f"hash:{syllabus.content_hash}"
+
+
+def split_credits(accepted: float, remaining: list[float]) -> list[float]:
+    """인정 학점을 출신 과목별 남은 학점에 비례해 나눈다 (0.01 단위, 마지막 과목이 나머지)."""
+    total = sum(remaining)
+    if len(remaining) == 1 or total <= 0:
+        return [accepted] + [0.0] * (len(remaining) - 1)
+    shares = [round(accepted * r / total, 2) for r in remaining[:-1]]
+    return [*shares, round(accepted - sum(shares), 2)]

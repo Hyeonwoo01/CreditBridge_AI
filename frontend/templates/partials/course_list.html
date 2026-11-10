@@ -18,6 +18,8 @@
             <span class="badge">{{ _("이의 신청 {status}", status=(row.appeal.status | appeal_status)) }}</span>
           {% elif row.decision %}
             <span class="{{ {'direct': 'badge-approve', 'elective': 'badge-approve', 'none': 'badge-reject'}.get(row.decision.result, 'badge') }}">{{ _('승인 완료') if row.decision.result in ('direct', 'elective') else _('불인정') }} · {{ row.decision.result | rec }}</span>
+          {% elif row.combined_into is not none %}
+            <span class="badge-approve">{{ _("다른 과목과 합쳐 인정") }}{% if row.combined_into %} → {{ row.combined_into }}{% endif %}</span>
           {% elif row.group == 'supplement' %}
             <span class="badge-elective">{{ _("보완 필요") }}</span>
           {% elif ev %}
@@ -35,6 +37,7 @@
       {% endif %}
     </div>
 
+    {% if row.combined_into is not none %}<p class="text-sm text-muted">{{ _("이 과목의 학점 {credits}이(가) 다른 출신 과목과 함께 하나의 과목으로 인정됐어요. 같은 학점을 두 번 쓰지 않아요.", credits=('%g' | format(row.allocated or 0))) }}</p>{% endif %}
     {% if row.syllabus.status == 'failed' %}<p class="text-sm text-reject">{{ row.syllabus.error_message | t }}</p>{% endif %}
     {% if row.grade_failed and not row.decision %}<p class="text-sm text-reject">{{ _("성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.") }}</p>{% endif %}
 

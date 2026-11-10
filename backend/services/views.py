@@ -16,6 +16,7 @@ from backend.models import (
     AuditLog,
     Course,
     CourseEvaluation,
+    CreditAllocation,
     Decision,
     EvaluationNote,
     Institution,
@@ -28,6 +29,7 @@ from backend.models import (
     User,
 )
 from backend.models.enums import EvaluationStatus, RequestStatus, Role
+from backend.repositories import allocations as allocation_repo
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -86,6 +88,9 @@ class EvaluationView:
     comparison: version_service.Comparison | None = None  # 바로 앞 분석과 비교 (강의계획서 버전 비교)
     users: dict[int, User] = field(default_factory=dict)  # 판정자·요청자 이름 표시용
     # 담당 교수 화면의 근거 맞음·틀림: (쪽, 시작, 끝, "과목코드|개념") -> 구절 id, 구절 id -> 이 교수가 누른 값
+    # 합쳐 인정할 수 있는 같은 학생의 다른 출신 과목 (교수, 판정 전·재판정), 현재 판정이 원장에 남긴 배분
+    combinable: list[tuple[Syllabus, credit_service.Conversion]] = field(default_factory=list)
+    allocations: list[tuple[CreditAllocation, Syllabus | None]] = field(default_factory=list)
     credit: credit_service.Conversion | None = None  # 교수 판정 화면: 출신 학점의 환산 결과 (인정 학점 안내)
     span_ids: dict[tuple[str, int, int, str], int] = field(default_factory=dict)
     feedback: dict[int, str] = field(default_factory=dict)
@@ -207,6 +212,12 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
     if not (user.role == Role.STUDENT and request.status == RequestStatus.CLOSED):
         view.appeals = appeal_service.for_evaluation(session, evaluation.id)
     view.appeal_files = appeal_service.files_for(session, [a.id for a in view.appeals])
+    if user.role == Role.PROFESSOR and (decision is None or view.awaiting_redecision):
+        view.combinable = decision_service.combinable_sources(session, evaluation)
+    if decision is not None:
+        rows = allocation_repo.for_decisions(session, [decision.id])
+        sources = {s.id: s for s in syllabus_repo.by_ids(session, [a.syllabus_id for a in rows])}
+        view.allocations = [(a, sources.get(a.syllabus_id)) for a in rows]
     view.material_requests = material_service.for_syllabi(session, [syllabus.id])
     suggested = view.result.missing_materials if view.result else []
     view.suggested_materials = list(dict.fromkeys([*suggested, *material_service.STANDARD_ITEMS]))

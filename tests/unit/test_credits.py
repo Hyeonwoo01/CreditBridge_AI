@@ -62,3 +62,14 @@ def test_suggestion_basis_and_validation() -> None:
     assert credits.validate_accepted("elective", 0, conv, None) is not None
     assert credits.validate_accepted("none", 1, conv, None) is not None
     assert credits.validate_accepted("elective", 2, unknown, None) is None  # 환산 모름: 교수 값을 받음
+
+
+def test_split_credits_and_source_key() -> None:
+    assert credits.split_credits(4, [3, 3]) == [2.0, 2.0]
+    assert credits.split_credits(5, [3, 1]) == [3.75, 1.25]
+    assert credits.split_credits(1, [3, 3, 3]) == [0.33, 0.33, 0.34]  # 합계는 그대로
+    assert credits.split_credits(3, [3]) == [3]
+    a: Any = type("S", (), {"course_code": "math 101", "institution_id": 2, "content_hash": "x"})()
+    b: Any = type("S", (), {"course_code": "MATH101", "institution_id": 2, "content_hash": "y"})()
+    c: Any = type("S", (), {"course_code": "", "institution_id": 2, "content_hash": "z"})()
+    assert credits.source_key(a) == credits.source_key(b) and credits.source_key(c) == "hash:z"

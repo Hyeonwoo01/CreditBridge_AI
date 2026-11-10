@@ -60,6 +60,7 @@
 {% for d in v.decisions | reverse %}
 <section class="mt-4 rounded-md border p-4 {{ 'border-ink/60 bg-white' if loop.first else 'border-hairline text-muted' }}">
   <p class="text-sm font-semibold">{% if not loop.first %}{{ _("이전 판정(이의 신청으로 대체됨):") }} {% elif d.appeal_id %}{{ _("이의 신청 재판정:") }} {% else %}{{ _("교수 최종 판정:") }} {% endif %}{{ d.result | rec }}{% if loop.first and v.decided_target %} · {{ v.decided_target.code }}{% endif %}{% if d.accepted_credits is not none and d.result != 'none' %} · {{ _("인정 {credits}학점", credits=('%g' | format(d.accepted_credits))) }}{% if d.credit_unit %} ({{ d.credit_unit | credit_unit }}){% endif %}{% if d.credit_basis == 'partial' %} · {{ d.credit_basis | credit_basis }}{% endif %}{% endif %}</p>
+  {% if loop.first and v.allocations | length > 1 %}<p class="text-sm text-muted">{{ _("출신 {n}과목을 합쳐 인정:", n=(v.allocations | length)) }} {% for a, src in v.allocations %}{{ (src.course_code or src.course_title) if src else '' }} {{ _("{credits}학점", credits=('%g' | format(a.credits))) }}{% if not loop.last %} + {% endif %}{% endfor %}</p>{% endif %}
   <p class="mt-1 text-sm text-muted">{{ v.users[d.decided_by].name if d.decided_by in v.users else '' }} · {{ time(d.decided_at) }} · {{ d.action | action }}</p>
   {% if d.reason_codes %}<p class="mt-2 text-sm">{{ _("사유:") }} {% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</p>{% endif %}
 </section>

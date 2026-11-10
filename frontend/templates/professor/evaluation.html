@@ -46,6 +46,19 @@
       {% else %}<span class="text-elective">{{ _("자동 계산할 수 없어요:") }} {{ (cr.reason if cr else '') | t }}.</span> {{ _("인정하는 판정이면 인정 학점을 직접 적어 주세요. 관리자는 계정·과목 화면에서 학점 단위와 환산 규칙을 정할 수 있어요.") }}{% endif %}
     </p>
   </div>
+  {% if v.combinable %}
+  {# N:1 — 이 학생의 다른 출신 과목과 합쳐 하나로 인정. 인정 학점은 과목별 남은 학점에 비례해 원장에 나눠 남는다 #}
+  <fieldset class="grid gap-2">
+    <legend class="mb-1 text-sm font-semibold">{{ _("함께 인정할 출신 과목") }} <span class="font-normal text-muted">{{ _("(선택 · 여러 과목을 합쳐 하나로 인정할 때)") }}</span></legend>
+    {% for s, c in v.combinable %}
+    <label class="flex flex-wrap items-center gap-2 text-sm"><input type="checkbox" name="combined_syllabus_ids" value="{{ s.id }}" class="size-4" {% if s.id in f.get('combined_syllabus_ids', []) %}checked{% endif %} {% if not c.known %}disabled{% endif %}>
+      <span>{{ s.course_code }} {{ s.course_title }}</span>
+      <span class="text-xs text-muted">{% if c.known %}{{ _("{credits}학점(환산)", credits=('%g' | format(c.value))) }}{% else %}{{ c.reason | t }}{% endif %}</span>
+    </label>
+    {% endfor %}
+    <p class="text-xs text-muted">{{ _("이미 다른 판정에 쓰인 학점은 다시 쓸 수 없고, 같은 대상 과목은 두 번 인정할 수 없어요.") }}</p>
+  </fieldset>
+  {% endif %}
   <p class="text-sm text-muted">{{ _("반려하거나 AI 추천과 다르게 판정하면 확정 전에 사유를 고르는 창이 열려요.") }}</p>
   <button class="btn-primary w-fit">{{ _("판정 확정") }}</button>
 

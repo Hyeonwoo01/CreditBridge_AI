@@ -714,5 +714,54 @@ ALTER TABLE decisions ADD CONSTRAINT ck_decisions_accepted_credits_range CHECK (
 
 UPDATE alembic_version SET version_num='0009' WHERE alembic_version.version_num = '0008';
 
+-- Running upgrade 0009 -> 0010
+
+CREATE TABLE credit_allocations (
+    student_id BIGINT NOT NULL, 
+    decision_id BIGINT NOT NULL, 
+    syllabus_id BIGINT NOT NULL, 
+    target_course_id BIGINT, 
+    credits NUMERIC(5, 2) NOT NULL, 
+    credit_unit VARCHAR(20), 
+    status VARCHAR(12) NOT NULL, 
+    superseded_by_decision_id BIGINT, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_credit_allocations PRIMARY KEY (id), 
+    CONSTRAINT ck_credit_allocations_credit_unit_valid CHECK (credit_unit IS NULL OR credit_unit IN ('kr_credit', 'us_semester', 'us_quarter', 'ects', 'other')), 
+    CONSTRAINT ck_credit_allocations_status_valid CHECK (status IN ('active', 'superseded')), 
+    CONSTRAINT ck_credit_allocations_credits_positive CHECK (credits > 0), 
+    CONSTRAINT fk_credit_allocations_decision_id_decisions FOREIGN KEY(decision_id) REFERENCES decisions (id), 
+    CONSTRAINT fk_credit_allocations_student_id_users FOREIGN KEY(student_id) REFERENCES users (id), 
+    CONSTRAINT fk_credit_allocations_superseded_by_decision_id_decisions FOREIGN KEY(superseded_by_decision_id) REFERENCES decisions (id), 
+    CONSTRAINT fk_credit_allocations_syllabus_id_syllabi FOREIGN KEY(syllabus_id) REFERENCES syllabi (id), 
+    CONSTRAINT fk_credit_allocations_target_course_id_courses FOREIGN KEY(target_course_id) REFERENCES courses (id)
+);
+
+CREATE INDEX ix_credit_allocations_decision_id ON credit_allocations (decision_id);
+
+CREATE INDEX ix_credit_allocations_status ON credit_allocations (status);
+
+CREATE INDEX ix_credit_allocations_student_id ON credit_allocations (student_id);
+
+CREATE INDEX ix_credit_allocations_syllabus_id ON credit_allocations (syllabus_id);
+
+INSERT INTO credit_allocations
+            (student_id, decision_id, syllabus_id, target_course_id, credits, credit_unit, status,
+             superseded_by_decision_id, created_at)
+        SELECT r.student_id, d.id, e.syllabus_id, d.target_course_id, d.accepted_credits, d.credit_unit,
+               CASE WHEN nxt.id IS NULL THEN 'active' ELSE 'superseded' END, nxt.id, d.decided_at
+        FROM decisions d
+        JOIN course_evaluations e ON e.id = d.course_evaluation_id
+        JOIN transfer_requests r ON r.id = e.transfer_request_id
+        LEFT JOIN LATERAL (
+            SELECT d2.id FROM decisions d2
+            WHERE d2.course_evaluation_id = d.course_evaluation_id AND d2.id > d.id
+            ORDER BY d2.id LIMIT 1
+        ) nxt ON true
+        WHERE d.accepted_credits > 0 AND d.result IN ('direct', 'elective');
+
+UPDATE alembic_version SET version_num='0010' WHERE alembic_version.version_num = '0009';
+
 COMMIT;
 

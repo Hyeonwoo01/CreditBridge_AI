@@ -15,6 +15,7 @@ def row(
     grade: str | None = None,
     decided: str | None = None,
     accepted: float | None = None,
+    allocated: float | None = None,
 ) -> CourseRow:
     ev: Any = SimpleNamespace(status="done", recommendation=rec, confidence=conf)
     syl: Any = SimpleNamespace(credits=source)
@@ -30,6 +31,7 @@ def row(
         candidate_credits=target,
         transcript_grade=grade,
         conversion=conv,
+        allocated=allocated,
     )
 
 
@@ -61,11 +63,17 @@ def test_unknown_credits_are_left_out_not_guessed() -> None:
 
 def test_professor_accepted_credits_win_over_estimates() -> None:
     # 교수가 부분 인정 2학점으로 확정했으면 대상 과목 4학점이 아니라 2학점을 쓴다
-    sim = simulate([row("direct", "high", 3, 4, decided="direct", accepted=2)], 120, 1000)
+    # (확정 학점은 승인된 배분 원장의 합계로 센다)
+    sim = simulate([row("direct", "high", 3, 4, decided="direct", accepted=2, allocated=2)], 120, 1000)
     assert (sim.credits_low, sim.credits_high) == (2, 2)
     # 환산할 수 없는 과목이어도 교수가 확정한 값은 쓴다
-    sim = simulate([row("direct", "high", None, 4, decided="elective", accepted=3)], 120, 1000)
+    sim = simulate([row("direct", "high", None, 4, decided="elective", accepted=3, allocated=3)], 120, 1000)
     assert (sim.credits_low, sim.credits_high, sim.unknown) == (3, 3, 0)
+    # 다른 과목과 합쳐 인정돼 이 과목 판정은 없지만 원장에 배분이 있으면 그 값을 쓴다 (두 번 세지 않음)
+    sim = simulate(
+        [row("direct", "high", 3, 4, allocated=2), row("none", "low", 3, 4, decided="none", accepted=0)], 120, 1000
+    )
+    assert (sim.credits_low, sim.credits_high) == (2, 2)
 
 
 def test_transcript_link_score() -> None:

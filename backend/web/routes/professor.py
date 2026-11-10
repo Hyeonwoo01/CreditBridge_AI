@@ -64,6 +64,7 @@ def decide(
     reason_memo: str = Form(""),
     acknowledge_conflict: bool = Form(False),
     accepted_credits: str = Form(""),
+    combined_syllabus_ids: list[int] = Form([]),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
@@ -71,6 +72,7 @@ def decide(
     check_csrf(request, csrf_token)
     form = {
         "accepted_credits": accepted_credits,
+        "combined_syllabus_ids": combined_syllabus_ids,
         "action": action,
         "result": result,
         "target_course_id": target_course_id,
@@ -89,6 +91,7 @@ def decide(
             reason_memo,
             acknowledge_conflict,
             accepted_credits=_credits(accepted_credits),
+            combined_syllabus_ids=combined_syllabus_ids,
         )
     except decision_service.ConflictNeedsAcknowledgement as exc:
         session.rollback()

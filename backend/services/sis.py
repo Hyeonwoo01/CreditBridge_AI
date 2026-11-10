@@ -14,9 +14,11 @@ from backend.errors import PermissionDeniedError
 from backend.i18n import gettext as tr
 from backend.models import Decision, Institution, User
 from backend.models.enums import Role
+from backend.repositories import allocations as allocation_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import requests as request_repo
+from backend.repositories import syllabi as syllabus_repo
 from backend.services import audit
 
 FIELDS = [
@@ -32,6 +34,7 @@ FIELDS = [
     "credit_basis",
     "source_credits",
     "source_credit_unit",
+    "combined_source_courses",
     "decided_at",
 ]
 
@@ -52,6 +55,12 @@ def export_rows(session: Session, institution_id: int, since: datetime | None = 
     courses = catalog_repo.courses_by_ids(
         session, [d.target_course_id for d, _, _ in latest.values() if d.target_course_id]
     )
+    # 여러 출신 과목을 합쳐 인정한 판정(N:1): 원장에 남은 출신 과목들
+    ledger: dict[int, list[int]] = {}
+    for a in allocation_repo.for_decisions(session, [d.id for d, _, _ in latest.values()]):
+        ledger.setdefault(a.decision_id, []).append(a.syllabus_id)
+    combined_ids = sorted({sid for ids in ledger.values() if len(ids) > 1 for sid in ids})
+    names = {x.id: x.course_code or x.course_title for x in syllabus_repo.by_ids(session, combined_ids)}
     out = []
     for d, e, s in latest.values():
         if since is not None and d.decided_at < since:
@@ -72,6 +81,9 @@ def export_rows(session: Session, institution_id: int, since: datetime | None = 
                 "credit_basis": d.credit_basis or "",
                 "source_credits": d.source_credits if d.source_credits is not None else (s.credits or ""),
                 "source_credit_unit": d.source_credit_unit or "",
+                "combined_source_courses": " + ".join(names.get(i, "") for i in ledger.get(d.id, []))
+                if len(ledger.get(d.id, [])) > 1
+                else "",
                 "decided_at": d.decided_at.isoformat(timespec="seconds") + "Z",
             }
         )

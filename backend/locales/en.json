@@ -1598,5 +1598,20 @@
  "인정하는 판정이면 인정 학점을 직접 적어 주세요. 관리자는 계정·과목 화면에서 학점 단위와 환산 규칙을 정할 수 있어요.": "For an accepting decision, enter the accepted credits. Admins can set credit units and conversion rules on the Accounts & courses page.",
  "· 인정 {credits}학점": "· {credits} credits accepted",
  "{n}과목은 학점 단위나 환산 규칙이 정해지지 않아 예상치에서 뺐어요({reason}). 학사처가 정하면 다시 계산돼요.": "{n} course(s) were left out of the estimate because a credit unit or conversion rule isn't set ({reason}). They'll be included once the registrar sets them.",
- "계산 보류": "On hold"
+ "계산 보류": "On hold",
+ "함께 인정할 과목은 이 학생의 다른 출신 과목 목록에서 골라 주세요.": "Choose combined courses from this student's other source courses.",
+ "이 학생은 이미 {code}로 인정받았어요. 같은 대상 과목을 두 번 인정할 수 없어요.": "This student already has credit for {code}. The same target course can't be credited twice.",
+ "출신 과목에서 아직 쓰지 않은 학점({credits})보다 많이 인정할 수 없어요.": "You can't accept more than the source credits not yet used ({credits}).",
+ "{course}의 학점은 이미 모두 다른 인정에 쓰였어요.": "All credits of {course} are already used by another credit decision.",
+ "불인정에는 함께 인정할 과목을 고를 수 없어요.": "Combined courses can't be chosen for a rejection.",
+ "학점을 환산할 수 없는 과목이 있어 합쳐 인정할 수 없어요. 학점 단위와 환산 규칙을 먼저 정해 주세요.": "Some courses can't be converted, so they can't be combined. Set credit units and conversion rules first.",
+ "{course}은(는) 이미 다른 판정에서 인정에 쓰인 과목이에요.": "{course} is already used by another decision.",
+ "이 과목의 학점 {credits}이(가) 다른 출신 과목과 함께 하나의 과목으로 인정됐어요. 같은 학점을 두 번 쓰지 않아요.": "{credits} credits of this course were accepted together with another source course as one course. The same credits aren't used twice.",
+ "다른 과목과 합쳐 인정": "Accepted with another course",
+ "출신 {n}과목을 합쳐 인정:": "Accepted by combining {n} source courses:",
+ "{credits}학점": "{credits} credits",
+ "함께 인정할 출신 과목": "Source courses to combine",
+ "(선택 · 여러 과목을 합쳐 하나로 인정할 때)": "(optional · when several courses together count as one)",
+ "{credits}학점(환산)": "{credits} credits (converted)",
+ "이미 다른 판정에 쓰인 학점은 다시 쓸 수 없고, 같은 대상 과목은 두 번 인정할 수 없어요.": "Credits already used by another decision can't be reused, and the same target course can't be credited twice."
 }

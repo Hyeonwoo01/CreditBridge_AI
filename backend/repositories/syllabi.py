@@ -99,3 +99,9 @@ def without_page_offsets(session: Session) -> list[Syllabus]:
             .order_by(Syllabus.id)
         )
     )
+
+
+def by_ids(session: Session, syllabus_ids: list[int]) -> list[Syllabus]:
+    if not syllabus_ids:
+        return []
+    return list(session.scalars(select(Syllabus).where(Syllabus.id.in_(syllabus_ids))))

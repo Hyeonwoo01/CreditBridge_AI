@@ -86,6 +86,11 @@ class CreditBasis(StrEnum):
     NOT_ACCEPTED = "not_accepted"
 
 
+class AllocationStatus(StrEnum):
+    ACTIVE = "active"  # 지금 유효한 배분 (확정 인정 학점에 들어감)
+    SUPERSEDED = "superseded"  # 재판정으로 대체됨 (기록으로만 남음)
+
+
 class EvidenceSide(StrEnum):
     SOURCE = "source"  # 학생 강의계획서
     TARGET = "target"  # 대상 대학 기준 강의계획서
