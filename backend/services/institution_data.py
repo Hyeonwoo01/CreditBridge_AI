@@ -10,6 +10,7 @@ CSV 파일 검사·인코딩은 services/csv_import.py. 한 줄이라도 틀리�
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -22,8 +23,8 @@ from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, LLMError, LLMNotConfiguredError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Assignment, Course, Department, Institution, Syllabus, User
-from backend.models.enums import Role, SyllabusStatus
+from backend.models import Assignment, Course, CreditConversionRule, Department, Institution, Syllabus, User
+from backend.models.enums import ConversionMethod, CreditSystem, Role, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import syllabi as syllabus_repo
@@ -647,3 +648,115 @@ def bootstrap_admin(
     audit.record(session, None, "account.bootstrap", "user", str(admin.id), institution=institution.id)
     session.commit()
     return institution, CreatedAccount(email, name, Role.ADMIN, password)
+
+
+# ---------- 학점 단위와 환산 규칙 (리뷰 v3 P0-1) ----------
+
+MAX_FACTOR = 5.0
+
+
+def conversion_rules(session: Session, admin: User) -> list[CreditConversionRule]:
+    return catalog_repo.conversion_rules(session, ensure_admin(admin))
+
+
+def set_credit_systems(session: Session, admin: User, values: dict[int, str]) -> int:
+    """우리 대학과 우리 목록의 출신 대학 학점 단위를 정한다 (빈 값은 모름). 바뀐 대학 수를 돌려준다."""
+    institution_id = ensure_admin(admin)
+    allowed = {institution_id} | {i.id for i in catalog_repo.source_institutions(session, institution_id)}
+    changed = 0
+    for target_id, value in values.items():
+        if target_id not in allowed:
+            raise NotFoundError(tr("대학을 찾을 수 없어요."))
+        value = value.strip()
+        if value and value not in set(CreditSystem):
+            raise CreditBridgeError(tr("학점 단위를 목록에서 골라 주세요."))
+        institution = catalog_repo.get_institution(session, target_id)
+        if institution is None or (institution.credit_system or "") == value:
+            continue
+        before = institution.credit_system
+        institution.credit_system = value or None
+        changed += 1
+        audit.record(
+            session, admin, "institution.credit_system", "institution", str(target_id), before=before, after=value
+        )
+    session.commit()
+    return changed
+
+
+def add_conversion_rule(
+    session: Session, admin: User, source_system: str, factor: str, method: str, effective_from: str, note: str
+) -> CreditConversionRule:
+    """승인된 환산 규칙을 추가한다. 같은 단위 쌍에서 끝나는 날이 없던 이전 규칙은 새 규칙 전날로 끝낸다
+    (규칙 행은 지우지 않아 지난 판정이 쓴 규칙이 남는다). 같은 날 시작하는 규칙이 이미 있으면 충돌이라 거절한다."""
+    institution_id = ensure_admin(admin)
+    institution = catalog_repo.get_institution(session, institution_id)
+    if institution is None:
+        raise NotFoundError(tr("소속 대학을 찾을 수 없어요."))
+    if not institution.credit_system:
+        raise CreditBridgeError(tr("먼저 우리 대학의 학점 단위를 정해 주세요."))
+    if source_system not in set(CreditSystem):
+        raise CreditBridgeError(tr("출신 학점 단위를 목록에서 골라 주세요."))
+    if source_system == institution.credit_system:
+        raise CreditBridgeError(tr("같은 학점 단위끼리는 환산 규칙 없이 그대로 써요."))
+    if method not in set(ConversionMethod):
+        raise CreditBridgeError(tr("환산 방식을 목록에서 골라 주세요."))
+    try:
+        value = float(factor.strip().replace(",", "."))
+        start = date.fromisoformat(effective_from.strip()) if effective_from.strip() else utcnow().date()
+    except ValueError as exc:
+        raise CreditBridgeError(tr("환산 비율은 숫자로, 시작일은 날짜로 적어 주세요.")) from exc
+    if not 0 < value <= MAX_FACTOR:
+        raise CreditBridgeError(tr("환산 비율은 0보다 크고 {max} 이하로 적어 주세요.", max=f"{MAX_FACTOR:g}"))
+    same_pair = [
+        r
+        for r in catalog_repo.conversion_rules(session, institution_id)
+        if r.source_system == source_system and r.target_system == institution.credit_system
+    ]
+    if any(r.effective_from == start for r in same_pair):
+        raise CreditBridgeError(
+            tr("같은 날 시작하는 환산 규칙이 이미 있어요. 그 규칙을 끝낸 뒤 다른 날짜로 추가해 주세요.")
+        )
+    for previous in same_pair:
+        if previous.effective_from < start and (previous.effective_to is None or previous.effective_to >= start):
+            previous.effective_to = start - timedelta(days=1)
+    rule = catalog_repo.add_conversion_rule(
+        session,
+        CreditConversionRule(
+            target_institution_id=institution_id,
+            source_system=source_system,
+            target_system=institution.credit_system,
+            factor=round(value, 3),
+            method=method,
+            effective_from=start,
+            approved_by=admin.id,
+            note=note.strip()[:500],
+        ),
+    )
+    audit.record(
+        session,
+        admin,
+        "credit_rule.create",
+        "credit_conversion_rule",
+        str(rule.id),
+        source=source_system,
+        target=rule.target_system,
+        factor=rule.factor,
+        method=method,
+        effective_from=start.isoformat(),
+    )
+    session.commit()
+    return rule
+
+
+def end_conversion_rule(session: Session, admin: User, rule_id: int) -> CreditConversionRule:
+    """규칙을 오늘까지로 끝낸다 (지우지 않는다). 그 뒤로는 새 규칙이 없으면 환산을 보류한다."""
+    institution_id = ensure_admin(admin)
+    rule = catalog_repo.get_conversion_rule(session, rule_id)
+    if rule is None or rule.target_institution_id != institution_id:
+        raise NotFoundError(tr("환산 규칙을 찾을 수 없어요."))
+    today = utcnow().date()
+    if rule.effective_to is None or rule.effective_to > today:
+        rule.effective_to = max(today, rule.effective_from)
+        audit.record(session, admin, "credit_rule.end", "credit_conversion_rule", str(rule.id), until=today.isoformat())
+    session.commit()
+    return rule

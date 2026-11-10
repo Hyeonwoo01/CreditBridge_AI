@@ -33,7 +33,8 @@
   <a href="/student" class="btn-secondary btn-sm w-fit">{{ _("내 편입 요청으로") }}</a>
 </section>
 {% else %}
-{% set cr = (sim.credits_low | round(1)) ~ ('' if sim.credits_high == sim.credits_low else '~' ~ (sim.credits_high | round(1))) %}
+{% set held = sim.unknown and not sim.source_credits %}
+{% set cr = _('계산 보류') if held else (sim.credits_low | round(1)) ~ ('' if sim.credits_high == sim.credits_low else '~' ~ (sim.credits_high | round(1))) %}
 {% set max_pct = ((sim.credits_high / sim.source_credits * 100) | round | int) if sim.source_credits else 0 %}
 <section class="tile-dark mt-6 grid gap-8" aria-label="{{ _('예상 결과') }}">
   <div class="flex flex-wrap items-end justify-between gap-6">
@@ -47,15 +48,16 @@
       <span class="grid"><span class="text-xs text-on-dark-muted">{{ _("{name} 인정", name=(req.target_institution.name)) }}</span><strong class="text-primary-on-dark tabular-nums">{{ _("{cr}학점", cr=(cr)) }}</strong></span>
     </div>
   </div>
+  {% if sim.unknown %}<p class="text-sm text-on-dark-muted">{{ _("{n}과목은 학점 단위나 환산 규칙이 정해지지 않아 예상치에서 뺐어요({reason}). 학사처가 정하면 다시 계산돼요.", n=(sim.unknown), reason=(sim.unknown_reason | t)) }}</p>{% endif %}
   <div class="grid gap-3 sm:grid-cols-3">
     <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
       <span class="text-sm text-on-dark-muted">{{ _("졸업까지 남은 학기") }}</span>
-      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}<span class="text-base font-normal text-on-dark-muted"> {{ _("학기") }}</span></span>
+      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{% if held %}–{% else %}{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}<span class="text-base font-normal text-on-dark-muted"> {{ _("학기") }}</span>{% endif %}</span>
       <span class="text-xs text-on-dark-muted">{{ _("졸업 {degree_credits}학점 · 학기당 15학점 기준", degree_credits=(sim.degree_credits)) }}</span>
     </div>
     <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
       <span class="text-sm text-on-dark-muted">{{ _("미인정 시 추가 비용") }}</span>
-      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">${{ '{:,}'.format(sim.extra_cost_low) }}{% if sim.extra_cost_high != sim.extra_cost_low %}<span class="text-[0.6em]">~{{ '{:,}'.format(sim.extra_cost_high) }}</span>{% endif %}</span>
+      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{% if held %}–{% else %}${{ '{:,}'.format(sim.extra_cost_low) }}{% if sim.extra_cost_high != sim.extra_cost_low %}<span class="text-[0.6em]">~{{ '{:,}'.format(sim.extra_cost_high) }}</span>{% endif %}{% endif %}</span>
       <span class="text-xs text-on-dark-muted">{{ _("인정되면 최대 ${format} 절감 · 학점당 ${format2}", format=('{:,}'.format((sim.credits_high * sim.tuition_per_credit) | round | int)), format2=('{:,}'.format(sim.tuition_per_credit))) }}</span>
     </div>
     <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">

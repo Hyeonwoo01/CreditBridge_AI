@@ -23,6 +23,7 @@ class DecisionIn(BaseModel):
     reason_codes: list[str] = []
     reason_memo: str = ""
     acknowledge_conflict: bool = False
+    accepted_credits: float | None = None  # 대상 대학 단위, 비우면 환산 규칙으로 계산
 
 
 @router.post("/decisions", status_code=201)
@@ -42,10 +43,18 @@ def create_decision(
             body.reason_codes,
             body.reason_memo,
             body.acknowledge_conflict,
+            accepted_credits=body.accepted_credits,
         )
     except decision_service.ConflictNeedsAcknowledgement as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except DecisionValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     send_notifications()
-    return {"id": decision.id, "result": decision.result, "decided_by": user.id}
+    return {
+        "id": decision.id,
+        "result": decision.result,
+        "decided_by": user.id,
+        "accepted_credits": decision.accepted_credits,
+        "credit_unit": decision.credit_unit,
+        "credit_basis": decision.credit_basis,
+    }

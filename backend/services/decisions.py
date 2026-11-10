@@ -25,6 +25,7 @@ from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
 from backend.services import audit, notifications
+from backend.services import credits as credit_service
 
 # 강의계획서 내용이 이 비율 이상 같으면 '같은 강의계획서'로 본다. 첫 측정 후 확정한다 (기능명세서 FR-11).
 SIMILARITY_MIN = 0.80
@@ -174,6 +175,15 @@ def _validate_reasons(codes: list[str], memo: str, required: bool) -> tuple[list
     return codes, memo
 
 
+def credit_conversion(session: Session, evaluation: CourseEvaluation) -> credit_service.Conversion:
+    """이 심사 건의 출신 학점을 대상 대학 단위로 환산한 결과 (판정 화면 안내·판정 저장에 같이 쓴다)."""
+    request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
+    syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
+    if request is None or syllabus is None:
+        return credit_service.Conversion(None, None, None, None, reason=credit_service.NO_SOURCE_CREDITS)
+    return credit_service.for_request(session, request).convert(syllabus)
+
+
 def decide(
     session: Session,
     professor: User,
@@ -184,7 +194,10 @@ def decide(
     reason_codes: list[str],
     reason_memo: str,
     acknowledge_conflict: bool,
+    accepted_credits: float | None = None,
 ) -> Decision:
+    """accepted_credits: 교수가 적은 인정 학점(대상 대학 단위). 비우면 환산 규칙으로 계산한 제안값을 쓰고,
+    환산할 수 없으면 인정하는 판정은 직접 적어야 한다 (학점을 지어내지 않음)."""
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
         raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
@@ -223,6 +236,21 @@ def decide(
     )
     codes, memo = _validate_reasons(reason_codes, reason_memo, required=action == DecisionAction.REJECT or differs)
 
+    conversion = credit_conversion(session, evaluation)
+    if accepted_credits is None:
+        accepted = credit_service.suggested_credits(final, conversion, target)
+        if accepted is None:
+            raise DecisionValidationError(
+                tr("학점 단위나 환산 규칙이 없어 인정 학점을 자동으로 계산할 수 없어요. 인정 학점을 직접 적어 주세요.")
+            )
+    else:
+        accepted = round(float(accepted_credits), 2)
+    problem = credit_service.validate_accepted(final, accepted, conversion, target)
+    if problem is not None:
+        message, value = problem
+        raise DecisionValidationError(tr(message, credits=f"{value:g}") if value is not None else tr(message))
+    basis = credit_service.basis_for(final, accepted, target)
+
     found = conflicts(history(session, evaluation), final)
     if found and not acknowledge_conflict:
         raise ConflictNeedsAcknowledgement(
@@ -245,6 +273,12 @@ def decide(
             ai_recommendation_snapshot=snapshot(evaluation, ai_course),
             conflict_acknowledged=bool(found),
             appeal_id=appeal.id if appeal else None,
+            accepted_credits=accepted,
+            credit_unit=conversion.target_unit,
+            credit_basis=basis,
+            source_credits=conversion.source_credits,
+            source_credit_unit=conversion.source_unit,
+            conversion_rule_id=conversion.rule.id if conversion.rule else None,
         ),
     )
     if appeal is not None:
@@ -262,6 +296,9 @@ def decide(
         reason_codes=codes,
         conflicts=len(found),
         appeal=appeal.id if appeal else None,
+        accepted_credits=accepted,
+        credit_basis=basis,
+        conversion_rule=conversion.rule.id if conversion.rule else None,
     )
     _notify_student(session, evaluation, final, redecided=appeal is not None)
     if evaluation.transfer_request_id is not None:

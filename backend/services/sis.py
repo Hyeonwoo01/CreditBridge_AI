@@ -27,7 +27,11 @@ FIELDS = [
     "source_course",
     "result",
     "target_course",
-    "credits",
+    "accepted_credits",
+    "credit_unit",
+    "credit_basis",
+    "source_credits",
+    "source_credit_unit",
     "decided_at",
 ]
 
@@ -62,7 +66,12 @@ def export_rows(session: Session, institution_id: int, since: datetime | None = 
                 "source_course": s.course_code or s.course_title,
                 "result": d.result,
                 "target_course": courses[d.target_course_id].code if d.target_course_id in courses else "",
-                "credits": s.credits if s.credits is not None else "",
+                # 교수가 확정한 인정 학점 (0009 이전 판정은 비어 있음 — 학사처가 확인해 입력)
+                "accepted_credits": d.accepted_credits if d.accepted_credits is not None else "",
+                "credit_unit": d.credit_unit or "",
+                "credit_basis": d.credit_basis or "",
+                "source_credits": d.source_credits if d.source_credits is not None else (s.credits or ""),
+                "source_credit_unit": d.source_credit_unit or "",
                 "decided_at": d.decided_at.isoformat(timespec="seconds") + "Z",
             }
         )

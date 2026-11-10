@@ -61,6 +61,31 @@ class DecisionResult(StrEnum):
     NONE = "none"
 
 
+class CreditSystem(StrEnum):
+    """대학의 학점 단위. 서로 다른 단위는 관리자가 승인한 환산 규칙이 있을 때만 비교한다."""
+
+    KR_CREDIT = "kr_credit"  # 한국 학점
+    US_SEMESTER = "us_semester"  # 미국 학기제 학점(semester credit hour)
+    US_QUARTER = "us_quarter"  # 미국 쿼터제 학점
+    ECTS = "ects"
+    OTHER = "other"
+
+
+class ConversionMethod(StrEnum):
+    APPROVED_TABLE = "approved_table"  # 대학이 승인한 환산표
+    CONTACT_HOURS = "contact_hours"  # 수업 시간 기준
+    MANUAL = "manual"  # 그 밖의 명시적 규칙
+
+
+class CreditBasis(StrEnum):
+    """교수가 확정한 인정 학점의 근거."""
+
+    FULL = "full"  # 대상 과목 학점 전부
+    PARTIAL = "partial"  # 대상 과목 학점보다 적게 (부분 인정)
+    ELECTIVE = "elective"  # 일반 선택 학점
+    NOT_ACCEPTED = "not_accepted"
+
+
 class EvidenceSide(StrEnum):
     SOURCE = "source"  # 학생 강의계획서
     TARGET = "target"  # 대상 대학 기준 강의계획서

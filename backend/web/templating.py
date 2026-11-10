@@ -11,6 +11,7 @@ from markupsafe import Markup, escape
 from backend.config import get_settings
 from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
+from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).resolve().parents[2] / "frontend" / "templates")
@@ -33,6 +34,12 @@ FIELD_LABEL = {
     "credits": N_("학점·시수"),
 }
 ACTION_LABEL = {"approve": N_("승인"), "modify": N_("수정"), "reject": N_("반려")}
+BASIS_LABEL = {
+    "full": N_("전부 인정"),
+    "partial": N_("부분 인정"),
+    "elective": N_("선택 학점"),
+    "not_accepted": N_("불인정"),
+}
 APPEAL_LABEL = {
     "submitted": N_("접수됨"),
     "accepted": N_("재판정 중"),
@@ -145,6 +152,8 @@ TEMPLATES.env.filters.update(
     level=lambda v: _label(LEVEL_LABEL, v),
     field=lambda v: _label(FIELD_LABEL, v),
     action=lambda v: _label(ACTION_LABEL, v),
+    credit_unit=lambda v: _label(CREDIT_UNIT_LABEL, v, N_("단위 모름")),
+    credit_basis=lambda v: _label(BASIS_LABEL, v),
     pct=pct,
     iso=iso,
     utc=utc,

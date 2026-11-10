@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (26개)
+## 1. 엔티티 한눈에 보기 (27개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -23,6 +23,7 @@
 | AI 분석 | `course_evaluations` | 강의계획서 한 건의 AI 분석 결과(재분석마다 새 행) | FR-05~08·16 |
 | | `evidence_spans` | 원문 검증을 통과한 근거 구절 위치 | FR-06·25 |
 | | `evidence_feedback` | 교수가 근거 구절마다 누른 맞음·틀림 (AI 근거 정확도) | FR-06 |
+| | `credit_conversion_rules` | 대상 대학이 승인한 학점 환산 규칙 (출신 단위 → 대상 단위, 유효기간) | 리뷰 v3 P0-1 |
 | 심사 | `assignments` | 교수 배정·대리 재배정 이력 | FR-18·19 |
 | | `decisions` | 교수 최종 판정 (추가 전용) | FR-09·10·11 |
 | | `material_requests` | 보완 자료 요청 | FR-22 |
@@ -309,6 +310,7 @@ erDiagram
 | is_target | BOOLEAN | NN | 대상 대학 여부 |
 | tuition_per_credit | INT | null | 학점당 등록금 (FR-15 시뮬레이션 기본값) |
 | degree_credits | INT | null | 졸업 학점 (FR-15) |
+| credit_system | VARCHAR(20) | null, CHECK | 학점 단위: kr_credit · us_semester · us_quarter · ects · other. 비우면 모름 — 환산하지 않고 예상치 보류 (P18, Alembic 0009) |
 | max_transfer_credits | INT | null | 편입 학점 상한 (비우면 60). 넘으면 학생이 졸업 학점에 넣을 과목을 고른다 (P18에서 관리자가 정함, Alembic 0007) |
 | sis_token_hash | VARCHAR(64) | null | 학사정보시스템 연동 토큰의 해시 (원문은 저장하지 않음, FR-24) |
 
@@ -472,6 +474,13 @@ erDiagram
 | conflict_acknowledged | BOOLEAN | NN | 과거 판정과 다른 결과임을 확인했는지 (FR-11) |
 | appeal_id | BIGINT | FK→appeals, null | 재판정이면 그 이의 신청 |
 | decided_at | TIMESTAMP | NN | 판정 시각 (`created_at` 대신) |
+| accepted_credits | DECIMAL(5,2) | null, ≥0 | 교수가 확정한 인정 학점 (대상 대학 단위, 0009부터. 그 전 판정은 비어 있음) |
+| credit_unit · source_credit_unit | VARCHAR(20) | null, CHECK | 인정 학점·출신 학점의 단위 |
+| credit_basis | VARCHAR(12) | null, CHECK | full · partial · elective · not_accepted |
+| source_credits | DECIMAL(5,2) | null | 판정 때 쓴 출신 학점 (성적표 값이 먼저, 없으면 강의계획서) |
+| conversion_rule_id | BIGINT | FK→credit_conversion_rules, null | 적용한 환산 규칙 (같은 단위거나 교수가 직접 적었으면 비움) |
+
+**credit_conversion_rules** — `target_institution_id` FK(IX), `source_system`·`target_system` VARCHAR(20)(CHECK), `factor` DECIMAL(6,3)(>0, 출신 1학점 = factor × 대상 학점), `method` VARCHAR(20)(approved_table·contact_hours·manual), `effective_from` DATE NN, `effective_to` DATE null(≥ from), `approved_by` FK→users, `note` TEXT, `created_at`. 고치지 않고 끝내는 날을 정한 뒤 새 규칙을 추가한다(지난 판정이 쓴 규칙이 남음). 그 날짜에 유효한 규칙이 없거나 둘 이상(같은 시작일)이면 환산을 보류한다.
 
 **material_requests** — `syllabus_id` FK(IX), `course_evaluation_id` FK, `requested_by` FK→users, `items` JSONB(요청 항목, 한국어 원문), `note` TEXT, `status` VARCHAR(20)(open·fulfilled, IX), `fulfilled_at` TIMESTAMP null.
 
@@ -542,6 +551,7 @@ erDiagram
 | 25-1 | 사용자 – 푸시 구독 | 1 : N (기기마다) | push_subscriptions.user_id | FR-20 |
 | 26 | 사용자 – 감사 로그 | 0..1 : N | audit_logs.actor_id | FR-10 |
 | 27 | 대상·출신 대학, 과목 – 동등 과목표 | 1 : N | equivalencies.* | FR-11·26 |
+| 28 | 대상 대학 – 환산 규칙 – 판정 | 1 : N · 0..1 : N | credit_conversion_rules.target_institution_id, decisions.conversion_rule_id | 리뷰 v3 P0-1·2 |
 
 ### 4.1 API가 쓰는 데이터 (API_Spec.md 연결)
 

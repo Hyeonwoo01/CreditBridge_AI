@@ -42,6 +42,17 @@ def evaluation_page(
     return render(request, "professor/evaluation.html", user=user, v=view)
 
 
+def _credits(value: str) -> float | None:
+    """인정 학점 입력: 비우면 None(환산 규칙으로 자동 계산), 숫자가 아니면 판정 오류."""
+    value = value.strip().replace(",", ".")
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise DecisionValidationError(tr("인정 학점은 숫자로 적어 주세요.")) from exc
+
+
 @router.post("/evaluations/{evaluation_id}/decision")
 def decide(
     request: Request,
@@ -52,12 +63,14 @@ def decide(
     reason_codes: list[str] = Form([]),
     reason_memo: str = Form(""),
     acknowledge_conflict: bool = Form(False),
+    accepted_credits: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
 ) -> Response:
     check_csrf(request, csrf_token)
     form = {
+        "accepted_credits": accepted_credits,
         "action": action,
         "result": result,
         "target_course_id": target_course_id,
@@ -75,6 +88,7 @@ def decide(
             reason_codes,
             reason_memo,
             acknowledge_conflict,
+            accepted_credits=_credits(accepted_credits),
         )
     except decision_service.ConflictNeedsAcknowledgement as exc:
         session.rollback()

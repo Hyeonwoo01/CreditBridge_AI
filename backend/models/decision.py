@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, IdMixin, IdType, one_of, utcnow
 from backend.db.types import JSONB
-from backend.models.enums import DecisionAction, DecisionResult
+from backend.models.enums import CreditBasis, CreditSystem, DecisionAction, DecisionResult
 
 
 class Decision(IdMixin, Base):
@@ -16,6 +16,9 @@ class Decision(IdMixin, Base):
     __table_args__ = (
         CheckConstraint(one_of("action", DecisionAction), name="action_valid"),
         CheckConstraint(one_of("result", DecisionResult), name="result_valid"),
+        CheckConstraint(one_of("credit_basis", CreditBasis, nullable=True), name="credit_basis_valid"),
+        CheckConstraint(one_of("credit_unit", CreditSystem, nullable=True), name="credit_unit_valid"),
+        CheckConstraint("accepted_credits IS NULL OR accepted_credits >= 0", name="accepted_credits_range"),
     )
 
     course_evaluation_id: Mapped[int] = mapped_column(IdType, ForeignKey("course_evaluations.id"), index=True)
@@ -31,3 +34,13 @@ class Decision(IdMixin, Base):
     # 이의 신청으로 다시 내린 판정이면 그 이의 신청 (FR-23). 이전 판정은 지우지 않고 그대로 남는다
     appeal_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("appeals.id", use_alter=True))
     decided_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # 교수가 확정한 인정 학점 (0009부터, 그 전 판정은 비어 있음). 단위는 대상 대학 학점 단위,
+    # 출신 학점과 적용한 환산 규칙을 함께 남겨 나중에 같은 계산을 다시 할 수 있게 한다
+    accepted_credits: Mapped[float | None] = mapped_column(Numeric(5, 2, asdecimal=False), default=None)
+    credit_unit: Mapped[str | None] = mapped_column(String(20), default=None)
+    credit_basis: Mapped[str | None] = mapped_column(String(12), default=None)
+    source_credits: Mapped[float | None] = mapped_column(Numeric(5, 2, asdecimal=False), default=None)
+    source_credit_unit: Mapped[str | None] = mapped_column(String(20), default=None)
+    conversion_rule_id: Mapped[int | None] = mapped_column(
+        IdType, ForeignKey("credit_conversion_rules.id"), default=None
+    )

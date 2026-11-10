@@ -10,7 +10,7 @@
 
 <h2>{{ _("사람 판정") }}</h2>
 {% if v.decision %}
-<p>{{ _("결과") }} <b>{{ v.decision.result | rec }}</b>{% if v.decided_target %} ({{ v.decided_target.code }} {{ v.decided_target.title }}){% endif %} {{ _("· {action} · 판정자 {decided_by} · {decided_at}", action=(v.decision.action | action), decided_by=(v.decided_by.name if v.decided_by else ''), decided_at=(v.decision.decided_at | utc)) }}</p>
+<p>{{ _("결과") }} <b>{{ v.decision.result | rec }}</b>{% if v.decided_target %} ({{ v.decided_target.code }} {{ v.decided_target.title }}){% endif %}{% if v.decision.accepted_credits is not none and v.decision.result != 'none' %} {{ _("· 인정 {credits}학점", credits=('%g' | format(v.decision.accepted_credits))) }}{% if v.decision.credit_unit %}({{ v.decision.credit_unit | credit_unit }}){% endif %}{% if v.decision.credit_basis %} · {{ v.decision.credit_basis | credit_basis }}{% endif %}{% endif %} {{ _("· {action} · 판정자 {decided_by} · {decided_at}", action=(v.decision.action | action), decided_by=(v.decided_by.name if v.decided_by else ''), decided_at=(v.decision.decided_at | utc)) }}</p>
 <p>{{ _("사유:") }} {% if v.decision.reason_codes %}{% for c in v.decision.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if v.decision.reason_memo %} — {{ v.decision.reason_memo }}{% endif %}{% else %}{{ _("없음 (AI 추천과 동일)") }}{% endif %}</p>
 {% set snap = v.decision.ai_recommendation_snapshot %}
 <p class="muted">{{ _("판정 당시 AI 추천: {recommendation} · 커버리지 {coverage} · 신뢰도 {confidence} · {prompt_version}", recommendation=(snap.recommendation | rec), coverage=(snap.coverage | pct), confidence=(snap.confidence | conf), prompt_version=(snap.prompt_version)) }}</p>

@@ -4,7 +4,7 @@
 비밀번호는 모두 demo1234 — 로컬 데모 전용이다.
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from sqlalchemy import select
@@ -16,6 +16,7 @@ from backend.db.session import SessionLocal
 from backend.models import (
     Course,
     CourseEvaluation,
+    CreditConversionRule,
     Decision,
     Institution,
     InstitutionSource,
@@ -24,6 +25,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
+from backend.models.enums import ConversionMethod, CreditSystem
 from backend.services.analysis import content_hash
 from backend.services.auth import hash_password
 from backend.services.institution_data import department_named
@@ -65,9 +67,16 @@ def seed(session: Session) -> None:
         print("already seeded")
         return
     msu = Institution(
-        name="Midwest State University", country="US", is_target=True, tuition_per_credit=1350, degree_credits=120
+        name="Midwest State University",
+        country="US",
+        is_target=True,
+        tuition_per_credit=1350,
+        degree_credits=120,
+        credit_system=CreditSystem.US_SEMESTER,
     )
-    hankuk = Institution(name="Hankuk University (한국대학교)", country="KR", is_target=False)
+    hankuk = Institution(
+        name="Hankuk University (한국대학교)", country="KR", is_target=False, credit_system=CreditSystem.KR_CREDIT
+    )
     session.add_all([msu, hankuk])
     session.flush()
     session.add(InstitutionSource(institution_id=msu.id, source_institution_id=hankuk.id))
@@ -115,7 +124,20 @@ def seed(session: Session) -> None:
     cse = "Computer Science and Engineering"
     _user(session, "jiwon@student.example", "이지원", "student", msu, cse, hankuk)
     _user(session, "rachel@msu.example", "Rachel Morgan", "evaluator", msu)
-    _user(session, "admin@msu.example", "MSU Admin", "admin", msu)
+    admin = _user(session, "admin@msu.example", "MSU Admin", "admin", msu)
+    # 예시 환산 규칙: 한국 1학점 = 미국 학기제 1학점 (실제 운영에서는 대학이 승인한 규칙을 관리자가 넣는다)
+    session.add(
+        CreditConversionRule(
+            target_institution_id=msu.id,
+            source_system=CreditSystem.KR_CREDIT,
+            target_system=CreditSystem.US_SEMESTER,
+            factor=1.0,
+            method=ConversionMethod.APPROVED_TABLE,
+            effective_from=date(2020, 1, 1),
+            approved_by=admin.id,
+            note="데모용 예시 규칙",
+        )
+    )
     professors = {
         "Mathematics": [("dkim@msu.example", "Daniel Kim"), ("lchen@msu.example", "Laura Chen")],
         "Computer Science and Engineering": [("oali@msu.example", "Omar Ali"), ("spark@msu.example", "Sarah Park")],

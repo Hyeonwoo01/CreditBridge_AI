@@ -31,6 +31,9 @@ def get_evaluation(
             "reason_codes": v.decision.reason_codes,
             "decided_at": v.decision.decided_at.isoformat(),
             "target_course": v.decided_target.code if v.decided_target else None,
+            "accepted_credits": v.decision.accepted_credits,
+            "credit_unit": v.decision.credit_unit,
+            "credit_basis": v.decision.credit_basis,
         }
         if v.decision
         else None,

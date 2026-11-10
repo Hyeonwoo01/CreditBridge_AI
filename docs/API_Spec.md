@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 84개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 87개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -112,7 +112,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | F1 | GET | `/professor` | 교수 | – | HTML | P11 | FR-18·19 |
 | F2 | POST | `/professor/away` | 교수 | `days`(0=복귀), `delegate_id`, `csrf_token` | 303→F1 | P11 | FR-19 |
 | F3 | GET | `/professor/evaluations/{id}` | 교수(배정·판정 건) | – | HTML | P12 | FR-05~11·16·20·25 |
-| F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `csrf_token` | 303→F1 / 409(경보 확인 필요)·422 HTML | P12 | FR-09·10·11 |
+| F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `accepted_credits`(인정 학점·대상 대학 단위, 비우면 승인된 환산 규칙으로 계산 — 환산할 수 없으면 인정 판정은 필수), `csrf_token` | 303→F1 / 409(경보 확인 필요)·422 HTML | P12 | FR-09·10·11 |
 | F5 | POST | `/professor/evaluations/{id}/materials` | 교수(배정 건) | `items[]`, `note`, `csrf_token` | 303→F3 | P12 | FR-22 |
 | F6 | POST | `/professor/evaluations/{id}/evidence/{span_id}` | 교수(배정·판정 건) | `verdict`(correct·wrong), `csrf_token`(또는 `X-CSRF-Token` 헤더) | HTMX면 버튼 조각 HTML, 아니면 303→F3 / 404(다른 분석의 구절·알 수 없는 값) | P12 | FR-06 (AI 근거 정확도) |
 
@@ -140,6 +140,9 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M8 | POST | `/admin/data/institutions` | 관리자 | `name`, `country`, `csrf_token` | 303→M2`#institutions` (우리 대학 목록에 추가. 다른 대학이 만든 같은 이름 행은 함께 씀) | P18 | – |
 | M20 | POST | `/admin/data/courses/{id}/reference/remove` | 관리자 | `csrf_token` | 303→M2`#courses` + 플래시 (과목 연결만 끊음, 강의계획서 행은 남김) | P18 | FR-05 |
 | M22 | POST | `/admin/data/transfer-cap` | 관리자 | `cap`(1~300, 빈 값=기본 60), `csrf_token` | 303→M2`#transfer-cap` + 플래시 | P18 | FR-15 |
+| M23 | POST | `/admin/data/credit-systems` | 관리자 | `institution_ids[]`, `systems[]`(같은 순서, 빈 값=모름), `csrf_token` | 303→M2`#credit-units` + 플래시 (우리 대학과 우리 목록의 출신 대학만) | P18 | 리뷰 v3 P0-1 |
+| M24 | POST | `/admin/data/conversion-rules` | 관리자 | `source_system`, `factor`(0~5), `method`, `effective_from`, `note`, `csrf_token` | 303→M2`#credit-units` (같은 단위 쌍의 열린 규칙은 전날로 끝냄, 같은 날 시작 규칙은 충돌로 거절) | P18 | 리뷰 v3 P0-1 |
+| M25 | POST | `/admin/data/conversion-rules/{id}/end` | 관리자 | `csrf_token` | 303→M2`#credit-units` (오늘까지로 끝냄, 지우지 않음) | P18 | 리뷰 v3 P0-1 |
 | M21 | POST | `/admin/data/institutions/{id}/delete` | 관리자 | `csrf_token` | 303→M2`#institutions` + 플래시 (우리 대학 목록에서 지움. 우리 학생 계정·편입 요청·동등 과목표가 가리키면 거절, 다른 대학도 안 쓰면 행까지 삭제) | P18 | – |
 | M9 | GET | `/admin/privacy` | 관리자 | – | HTML | P08 | FR-13 |
 | M10 | POST | `/admin/privacy/{id}` | 관리자 | `csrf_token` | 303→M9 | P08 | FR-13 |
@@ -189,12 +192,13 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 ```json
 { "evaluation_id": 6, "action": "reject", "result": null, "target_course_id": null,
-  "reason_codes": ["level_difference"], "reason_memo": "", "acknowledge_conflict": false }
+  "reason_codes": ["level_difference"], "reason_memo": "", "acknowledge_conflict": false,
+  "accepted_credits": null }
 ```
 
-- 201: `{"id": 31, "result": "none", "decided_by": 7}` — `decided_by`는 로그인한 교수 id로 서버가 정한다 (요청으로 받지 않음).
+- 201: `{"id": 31, "result": "none", "decided_by": 7, "accepted_credits": 0.0, "credit_unit": "us_semester", "credit_basis": "not_accepted"}` — `decided_by`는 로그인한 교수 id로 서버가 정한다 (요청으로 받지 않음).
 - 409: 같은 강의계획서 과거 판정과 결과가 달라 확인이 필요 (`acknowledge_conflict: true`로 다시).
-- 422: 사유 누락(반려·추천과 다른 판정), '기타'인데 메모 없음, 정보 부족 건을 그대로 승인 등.
+- 422: 사유 누락(반려·추천과 다른 판정), '기타'인데 메모 없음, 정보 부족 건을 그대로 승인, 인정 학점이 대상 과목·환산 학점보다 많음, 환산할 수 없는데 인정 학점을 비움 등.
 - 403: 배정 교수가 아님.
 
 ### J3 `GET /api/v1/sis/decisions?since=2026-10-01T00:00:00Z`
@@ -203,10 +207,11 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 { "institution": "Midwest State University", "count": 1,
   "decisions": [ { "decision_id": 31, "replaces_decision_id": 12, "student_id": 1,
     "source_institution": "Hankuk University (한국대학교)", "source_course": "PHY 101",
-    "result": "direct", "target_course": "PHYSICS 1250", "credits": 4.0, "decided_at": "2026-10-13T09:00:00" } ] }
+    "result": "direct", "target_course": "PHYSICS 1250", "accepted_credits": 3.0, "credit_unit": "us_semester",
+    "credit_basis": "partial", "source_credits": 3.0, "source_credit_unit": "kr_credit", "decided_at": "2026-10-13T09:00:00" } ] }
 ```
 
-심사 건마다 현재 유효한 판정 한 줄. 이의 신청 재판정이면 `replaces_decision_id`에 대체한 판정. 이름·학번은 보내지 않고 내부 번호(`student_id`)만. 401: 토큰 없음·폐기됨.
+심사 건마다 현재 유효한 판정 한 줄. `accepted_credits`는 교수가 확정한 인정 학점(대상 대학 단위)이고, 0009 이전 판정은 비어 있어 학사처가 확인해 넣는다. (예전 `credits` 열은 출신 학점이었어서 `source_credits`로 바꿨다.) 이의 신청 재판정이면 `replaces_decision_id`에 대체한 판정. 이름·학번은 보내지 않고 내부 번호(`student_id`)만. 401: 토큰 없음·폐기됨.
 
 ## 4. 화면별 버튼 ↔ API 매칭
 
@@ -318,6 +323,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P18 | 설정 링크 메일 보내기 / 임시 비밀번호 발급 (확인창) | M6 |
 | P18 | 비활성화 (확인창) · 다시 활성화 | M7 `action=deactivate` · `action=reactivate` |
 | P18 | 편입 학점 상한 저장 | M22 |
+| P18 | 학점 단위 저장 · 환산 규칙 추가 · 끝내기(확인창) | M23 · M24 · M25 |
 | P18 | 출신 대학 추가 | M8 |
 | P18 | 출신 대학 지우기 (확인창, 쓰지 않는 대학만) | M21 |
 | P18 | 이메일을 모르면 계정 목록에서 찾기 | M14 |

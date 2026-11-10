@@ -19,6 +19,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON transcript_entries TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON course_evaluations TO creditbridge_app;
 GRANT SELECT, INSERT                 ON evidence_spans     TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON evidence_feedback  TO creditbridge_app;
+GRANT SELECT, INSERT, UPDATE         ON credit_conversion_rules TO creditbridge_app;
 GRANT SELECT, INSERT, UPDATE         ON assignments        TO creditbridge_app;
 GRANT SELECT, INSERT                 ON decisions          TO creditbridge_app;
 GRANT SELECT, INSERT                 ON audit_logs         TO creditbridge_app;

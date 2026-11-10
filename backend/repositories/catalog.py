@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.models import (
     Course,
+    CreditConversionRule,
     Department,
     Equivalency,
     Institution,
@@ -213,3 +214,20 @@ def institution_referenced(session: Session, institution_id: int) -> bool:
 def delete_institution(session: Session, institution: Institution) -> None:
     session.delete(institution)
     session.flush()
+
+
+def conversion_rules(session: Session, target_institution_id: int) -> list[CreditConversionRule]:
+    stmt = select(CreditConversionRule).where(CreditConversionRule.target_institution_id == target_institution_id)
+    return list(
+        session.scalars(stmt.order_by(CreditConversionRule.effective_from.desc(), CreditConversionRule.id.desc()))
+    )
+
+
+def get_conversion_rule(session: Session, rule_id: int) -> CreditConversionRule | None:
+    return session.get(CreditConversionRule, rule_id)
+
+
+def add_conversion_rule(session: Session, rule: CreditConversionRule) -> CreditConversionRule:
+    session.add(rule)
+    session.flush()
+    return rule

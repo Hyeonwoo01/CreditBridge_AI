@@ -207,6 +207,44 @@
   </form>
 </section>
 
+{# 학점 단위와 환산 규칙: 단위나 승인된 규칙이 없으면 예상 학점을 계산하지 않고, 교수가 인정 학점을 직접 적는다 #}
+<section id="credit-units" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="credit-title">
+  <h2 id="credit-title" class="section-title">{{ _("학점 단위와 환산 규칙") }}</h2>
+  <p class="text-sm text-muted">{{ _("대학마다 학점 단위가 달라 숫자를 그대로 비교하지 않아요. 단위가 정해지지 않았거나 승인된 환산 규칙이 없으면 학생 예상치에서 그 과목을 빼고, 교수는 인정 학점을 직접 적어요. 같은 단위끼리는 규칙 없이 그대로 써요.") }}</p>
+  <form method="post" action="/admin/data/credit-systems" class="card grid gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% for inst in [o.institution] + o.source_institutions %}
+    <label class="flex flex-wrap items-center justify-between gap-3 text-sm">
+      <span>{{ inst.name }}{% if loop.first %} <span class="badge">{{ _("우리 대학") }}</span>{% endif %}</span>
+      <input type="hidden" name="institution_ids" value="{{ inst.id }}">
+      <select name="systems" class="input h-11 w-fit"><option value="">{{ _("모름") }}</option>{% for c in credit_systems %}<option value="{{ c }}" {% if inst.credit_system == c %}selected{% endif %}>{{ c | credit_unit }}</option>{% endfor %}</select>
+    </label>
+    {% endfor %}
+    <button class="btn-secondary h-11 w-fit">{{ _("학점 단위 저장") }}</button>
+  </form>
+  <div class="card grid gap-0 p-0 text-sm">
+    {% for r in credit_rules %}
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0">
+      <span>{{ _("#{id} · 1 {source} = {factor} {target}", id=(r.id), source=(r.source_system | credit_unit), factor=(r.factor), target=(r.target_system | credit_unit)) }} <span class="text-xs text-muted">{{ _("· {start}부터", start=(r.effective_from)) }}{% if r.effective_to %} {{ _("{end}까지", end=(r.effective_to)) }}{% endif %}{% if r.note %} · {{ r.note }}{% endif %}</span></span>
+      {% if not r.effective_to or r.effective_to > today %}<form method="post" action="/admin/data/conversion-rules/{{ r.id }}/end" data-confirm="{{ _('이 환산 규칙을 오늘까지로 끝낼까요? 새 규칙이 없으면 환산을 보류해요.') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn-text btn-sm text-xs">{{ _("끝내기") }}</button>
+      </form>{% else %}<span class="text-xs text-muted">{{ _("끝남") }}</span>{% endif %}
+    </div>
+    {% else %}<p class="px-5 py-6 text-center text-muted">{{ _("아직 환산 규칙이 없어요.") }}</p>{% endfor %}
+  </div>
+  <form method="post" action="/admin/data/conversion-rules" class="card grid gap-3 md:grid-cols-2">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p class="text-sm font-semibold md:col-span-2">{{ _("환산 규칙 추가 (출신 1학점 = 비율 × 우리 대학 학점)") }}</p>
+    <label class="field"><span>{{ _("출신 학점 단위") }}</span><select name="source_system" class="input h-11" required>{% for c in credit_systems %}<option value="{{ c }}">{{ c | credit_unit }}</option>{% endfor %}</select></label>
+    <label class="field"><span>{{ _("비율") }}</span><input class="input h-11" type="number" name="factor" min="0.01" max="5" step="0.001" required placeholder="1"></label>
+    <label class="field"><span>{{ _("환산 방식") }}</span><select name="method" class="input h-11">{% for m in conversion_methods %}<option value="{{ m }}">{{ {'approved_table': _('대학 승인 환산표'), 'contact_hours': _('수업 시간 기준'), 'manual': _('그 밖의 명시적 규칙')}[m] }}</option>{% endfor %}</select></label>
+    <label class="field"><span>{{ _("시작일") }}</span><input class="input h-11" type="date" name="effective_from" value="{{ today.isoformat() }}"></label>
+    <label class="field md:col-span-2"><span>{{ _("근거 메모 (학칙 조항 등)") }}</span><input class="input h-11" name="note" maxlength="500"></label>
+    <button class="btn-primary h-11 w-fit">{{ _("규칙 추가") }}</button>
+  </form>
+</section>
+
 <section id="institutions" class="mt-10 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
   <div class="grid gap-3">
     <h2 class="section-title">{{ _("④ 출신 대학") }}</h2>

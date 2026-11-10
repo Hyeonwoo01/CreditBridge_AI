@@ -662,5 +662,57 @@ ALTER TABLE course_evaluations ADD COLUMN quotes_non_teaching INTEGER;
 
 UPDATE alembic_version SET version_num='0008' WHERE alembic_version.version_num = '0007';
 
+-- Running upgrade 0008 -> 0009
+
+CREATE TABLE credit_conversion_rules (
+    target_institution_id BIGINT NOT NULL, 
+    source_system VARCHAR(20) NOT NULL, 
+    target_system VARCHAR(20) NOT NULL, 
+    factor NUMERIC(6, 3) NOT NULL, 
+    method VARCHAR(20) NOT NULL, 
+    effective_from DATE NOT NULL, 
+    effective_to DATE, 
+    approved_by BIGINT NOT NULL, 
+    note TEXT NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_credit_conversion_rules PRIMARY KEY (id), 
+    CONSTRAINT ck_credit_conversion_rules_method_valid CHECK (method IN ('approved_table', 'contact_hours', 'manual')), 
+    CONSTRAINT ck_credit_conversion_rules_source_system_valid CHECK (source_system IN ('kr_credit', 'us_semester', 'us_quarter', 'ects', 'other')), 
+    CONSTRAINT ck_credit_conversion_rules_target_system_valid CHECK (target_system IN ('kr_credit', 'us_semester', 'us_quarter', 'ects', 'other')), 
+    CONSTRAINT ck_credit_conversion_rules_effective_range CHECK (effective_to IS NULL OR effective_to >= effective_from), 
+    CONSTRAINT ck_credit_conversion_rules_factor_positive CHECK (factor > 0), 
+    CONSTRAINT fk_credit_conversion_rules_approved_by_users FOREIGN KEY(approved_by) REFERENCES users (id), 
+    CONSTRAINT fk_credit_conversion_rules_target_institution_id_institutions FOREIGN KEY(target_institution_id) REFERENCES institutions (id)
+);
+
+CREATE INDEX ix_credit_conversion_rules_target_institution_id ON credit_conversion_rules (target_institution_id);
+
+ALTER TABLE decisions ADD COLUMN accepted_credits NUMERIC(5, 2);
+
+ALTER TABLE decisions ADD COLUMN credit_unit VARCHAR(20);
+
+ALTER TABLE decisions ADD COLUMN credit_basis VARCHAR(12);
+
+ALTER TABLE decisions ADD COLUMN source_credits NUMERIC(5, 2);
+
+ALTER TABLE decisions ADD COLUMN source_credit_unit VARCHAR(20);
+
+ALTER TABLE decisions ADD COLUMN conversion_rule_id BIGINT;
+
+ALTER TABLE decisions ADD CONSTRAINT fk_decisions_conversion_rule_id_credit_conversion_rules FOREIGN KEY(conversion_rule_id) REFERENCES credit_conversion_rules (id);
+
+ALTER TABLE institutions ADD COLUMN credit_system VARCHAR(20);
+
+ALTER TABLE institutions ADD CONSTRAINT ck_institutions_credit_system_valid CHECK (credit_system IS NULL OR credit_system IN ('kr_credit', 'us_semester', 'us_quarter', 'ects', 'other'));
+
+ALTER TABLE decisions ADD CONSTRAINT ck_decisions_credit_unit_valid CHECK (credit_unit IS NULL OR credit_unit IN ('kr_credit', 'us_semester', 'us_quarter', 'ects', 'other'));
+
+ALTER TABLE decisions ADD CONSTRAINT ck_decisions_credit_basis_valid CHECK (credit_basis IS NULL OR credit_basis IN ('full', 'partial', 'elective', 'not_accepted'));
+
+ALTER TABLE decisions ADD CONSTRAINT ck_decisions_accepted_credits_range CHECK (accepted_credits IS NULL OR accepted_credits >= 0);
+
+UPDATE alembic_version SET version_num='0009' WHERE alembic_version.version_num = '0008';
+
 COMMIT;
 

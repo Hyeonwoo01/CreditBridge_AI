@@ -26,7 +26,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import PASSING_GRADES, RequestStatus, Role, SyllabusStatus, TranscriptStatus
+from backend.models.enums import PASSING_GRADES, DecisionResult, RequestStatus, Role, SyllabusStatus, TranscriptStatus
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
@@ -39,6 +39,7 @@ from backend.repositories import transcripts as transcript_repo
 from backend.repositories import users as user_repo
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import analysis, audit, materials, notifications
+from backend.services import credits as credit_service
 
 
 @dataclass(frozen=True)
@@ -530,6 +531,7 @@ class CourseRow:
     candidate_title: str | None = None
     candidate_department: str | None = None
     reviewer: User | None = None  # 판정했으면 판정 교수, 아니면 배정된 교수
+    conversion: credit_service.Conversion | None = None  # 출신 학점을 대상 대학 단위로 환산한 결과
 
     @property
     def grade_failed(self) -> bool:
@@ -562,6 +564,7 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
     for m in material_repo.for_syllabi(session, [s.id for s in syllabi]):
         if m.status == "open":
             open_materials.setdefault(m.syllabus_id, []).append(m)
+    converter = credit_service.for_request(session, request)
     rows = []
     for s in syllabi:
         ev = evaluations[s.id]
@@ -600,6 +603,7 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
                 candidate_title=course.title if course else None,
                 candidate_department=course.department_name if course else None,
                 reviewer=user_repo.get_by_id(session, reviewer_id) if reviewer_id else None,
+                conversion=converter.convert(s),
             )
         )
     return rows
@@ -610,6 +614,8 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
 
 @dataclass(frozen=True)
 class Simulation:
+    """예상치 (대상 대학 학점 단위). 학점 단위·환산 규칙을 모르는 과목은 숫자를 지어내지 않고 빼고 unknown에 센다."""
+
     credits_low: float
     credits_high: float
     semesters_low: int
@@ -619,25 +625,44 @@ class Simulation:
     source_credits: float
     degree_credits: int
     tuition_per_credit: int
+    unknown: int = 0  # 환산하지 못해 계산에서 뺀 과목 수
+    unknown_reason: str | None = None  # 그중 첫 과목의 이유 (화면에서 | t)
 
 
 def simulate(
     rows: list[CourseRow], degree_credits: int, tuition_per_credit: int, credits_per_semester: int = 15
 ) -> Simulation:
-    """예상 인정 학점·남은 학기·미인정 학점의 추가 비용을 범위값으로 계산한다 (예상치)."""
+    """예상 인정 학점·남은 학기·미인정 학점의 추가 비용을 범위값으로 계산한다 (예상치).
+
+    - 교수가 인정 학점을 확정했으면 그 값을 그대로 쓴다 (판정 화면·리포트·내보내기와 같은 값).
+    - 그 밖에는 승인된 환산 규칙으로 바꾼 출신 학점만 쓴다. 학점이 없거나 환산할 수 없으면 기본값을 쓰지 않고 뺀다.
+    - 성적 기준 미달로 심사에서 빠진 과목은 출신 학점 합계에도 넣지 않는다.
+    """
     low = high = source_total = 0.0
+    unknown = 0
+    unknown_reason: str | None = None
     for row in rows:
-        ev = row.evaluation
-        source = row.syllabus.credits or row.candidate_credits or 3.0
+        ev, decision, conv = row.evaluation, row.decision, row.conversion
+        if decision is None and row.grade_failed:
+            continue
+        accepted = decision is not None and decision.result in (DecisionResult.DIRECT, DecisionResult.ELECTIVE)
+        if decision is not None and decision.accepted_credits is not None:
+            gained = float(decision.accepted_credits) if accepted else 0.0
+            low += gained
+            high += gained
+            source_total += conv.value if conv is not None and conv.value is not None else gained
+            continue
+        if conv is None or conv.value is None:
+            unknown += 1
+            unknown_reason = unknown_reason or (conv.reason if conv else None)
+            continue
+        source = conv.value
         source_total += source
         if ev is None or ev.status != "done":
             continue
-        if row.grade_failed:
-            continue
         credit = min(source, row.candidate_credits) if row.candidate_credits else source
-        decided = row.decision.result if row.decision else None
-        if decided:
-            gained = credit if decided in ("direct", "elective") else 0.0
+        if decision is not None:  # 0009 이전 판정: 인정 학점이 저장돼 있지 않아 같은 규칙으로 계산
+            gained = (credit if decision.result == DecisionResult.DIRECT else source) if accepted else 0.0
             low += gained
             high += gained
         elif ev.recommendation == "direct":
@@ -655,11 +680,13 @@ def simulate(
         credits_high=high,
         semesters_low=math.ceil(remaining_low / credits_per_semester),
         semesters_high=math.ceil(remaining_high / credits_per_semester),
-        extra_cost_low=round((source_total - high) * tuition_per_credit),
-        extra_cost_high=round((source_total - low) * tuition_per_credit),
+        extra_cost_low=round(max(source_total - high, 0) * tuition_per_credit),
+        extra_cost_high=round(max(source_total - low, 0) * tuition_per_credit),
         source_credits=source_total,
         degree_credits=degree_credits,
         tuition_per_credit=tuition_per_credit,
+        unknown=unknown,
+        unknown_reason=unknown_reason,
     )
 
 

@@ -6,6 +6,7 @@ from backend.models.assignment import Assignment
 from backend.models.audit_log import AuditLog
 from backend.models.course import Course
 from backend.models.course_evaluation import CourseEvaluation
+from backend.models.credit_conversion_rule import CreditConversionRule
 from backend.models.decision import Decision
 from backend.models.department import Department
 from backend.models.equivalency import Equivalency
@@ -33,6 +34,7 @@ __all__ = [
     "AuditLog",
     "Course",
     "CourseEvaluation",
+    "CreditConversionRule",
     "Decision",
     "Department",
     "Equivalency",

@@ -41,6 +41,8 @@ from backend.schemas.results import CandidateResult, EvaluationResult, EvidenceV
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import accounts as account_service
 from backend.services import appeals as appeal_service
+from backend.services import credits as credit_service
+from backend.services import decisions as decision_service
 from backend.services import evidence_feedback as feedback_service
 from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
@@ -84,6 +86,7 @@ class EvaluationView:
     comparison: version_service.Comparison | None = None  # 바로 앞 분석과 비교 (강의계획서 버전 비교)
     users: dict[int, User] = field(default_factory=dict)  # 판정자·요청자 이름 표시용
     # 담당 교수 화면의 근거 맞음·틀림: (쪽, 시작, 끝, "과목코드|개념") -> 구절 id, 구절 id -> 이 교수가 누른 값
+    credit: credit_service.Conversion | None = None  # 교수 판정 화면: 출신 학점의 환산 결과 (인정 학점 안내)
     span_ids: dict[tuple[str, int, int, str], int] = field(default_factory=dict)
     feedback: dict[int, str] = field(default_factory=dict)
 
@@ -197,6 +200,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
             for s in evaluation_repo.spans_of(session, evaluation.id)
         }
         view.feedback = feedback_service.mine(session, user, evaluation.id)
+        view.credit = decision_service.credit_conversion(session, evaluation)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
     view.grade_failed = syllabus.id in request_repo.grade_failed_syllabus_ids(session, [syllabus.id])
     # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)

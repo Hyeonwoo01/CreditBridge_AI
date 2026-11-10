@@ -3,15 +3,23 @@ from typing import Any
 
 from backend.ai.prompts_loader import load_prompt
 from backend.services.analysis import link_score
+from backend.services.credits import Conversion
 from backend.services.student import CourseRow, simulate
 
 
 def row(
-    rec: str, conf: str, source: float, target: float, grade: str | None = None, decided: str | None = None
+    rec: str,
+    conf: str,
+    source: float | None,
+    target: float,
+    grade: str | None = None,
+    decided: str | None = None,
+    accepted: float | None = None,
 ) -> CourseRow:
     ev: Any = SimpleNamespace(status="done", recommendation=rec, confidence=conf)
     syl: Any = SimpleNamespace(credits=source)
-    dec: Any = SimpleNamespace(result=decided) if decided else None
+    dec: Any = SimpleNamespace(result=decided, accepted_credits=accepted) if decided else None
+    conv = Conversion(source, "kr_credit", "us_semester", source, reason=None if source else "no credits")
     return CourseRow(
         syllabus=syl,
         evaluation=ev,
@@ -21,6 +29,7 @@ def row(
         candidate_code="X",
         candidate_credits=target,
         transcript_grade=grade,
+        conversion=conv,
     )
 
 
@@ -41,6 +50,22 @@ def test_simulation_ranges_and_cost() -> None:
 def test_failing_grade_and_decisions_override_ai() -> None:
     sim = simulate([row("direct", "high", 3, 3, grade="D"), row("direct", "high", 3, 3, decided="none")], 120, 1000)
     assert sim.credits_high == 0
+
+
+def test_unknown_credits_are_left_out_not_guessed() -> None:
+    # 예전에는 학점이 없으면 3.0을 넣었다: 이제는 계산에서 빼고 몇 과목을 뺐는지 알린다
+    sim = simulate([row("direct", "high", None, 3), row("direct", "high", 3, 3)], 120, 1000)
+    assert (sim.credits_low, sim.credits_high, sim.source_credits) == (3, 3, 3)
+    assert sim.unknown == 1 and sim.unknown_reason == "no credits"
+
+
+def test_professor_accepted_credits_win_over_estimates() -> None:
+    # 교수가 부분 인정 2학점으로 확정했으면 대상 과목 4학점이 아니라 2학점을 쓴다
+    sim = simulate([row("direct", "high", 3, 4, decided="direct", accepted=2)], 120, 1000)
+    assert (sim.credits_low, sim.credits_high) == (2, 2)
+    # 환산할 수 없는 과목이어도 교수가 확정한 값은 쓴다
+    sim = simulate([row("direct", "high", None, 4, decided="elective", accepted=3)], 120, 1000)
+    assert (sim.credits_low, sim.credits_high, sim.unknown) == (3, 3, 0)
 
 
 def test_transcript_link_score() -> None:

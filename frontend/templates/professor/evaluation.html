@@ -35,6 +35,17 @@
       <select name="target_course_id" class="input h-11"><option value="">{{ _("선택") }}</option>{% for c in v.target_courses %}<option value="{{ c.id }}" {% if f.get('target_course_id') == c.id|string or (not f.get('target_course_id') and v.candidate and c.id == v.candidate.id) %}selected{% endif %}>{{ c.code }} {{ c.title }}</option>{% endfor %}</select>
     </label>
   </div>
+  {# 인정 학점: 대상 대학 단위. 비우면 승인된 환산 규칙으로 계산하고, 환산할 수 없으면 직접 적어야 한다 #}
+  {% set cr = v.credit %}
+  <div class="grid gap-2 md:grid-cols-2 md:items-end">
+    <label class="field"><span>{{ _("인정 학점") }} {% if cr and cr.target_unit %}<span class="text-muted">({{ cr.target_unit | credit_unit }})</span>{% endif %}</span>
+      <input class="input h-11" type="number" name="accepted_credits" min="0" max="30" step="0.5" inputmode="decimal" value="{{ f.get('accepted_credits', '') }}" placeholder="{{ _('비우면 자동 계산') }}">
+    </label>
+    <p class="text-sm text-muted" data-credit-hint>
+      {% if cr and cr.known %}{{ _("출신 {source}학점({source_unit}) → {value}학점({target_unit})", source=('%g' | format(cr.source_credits)), source_unit=(cr.source_unit | credit_unit), value=('%g' | format(cr.value)), target_unit=(cr.target_unit | credit_unit)) }}{% if cr.rule %} {{ _("· 환산 규칙 #{id} (×{factor})", id=(cr.rule.id), factor=(cr.rule.factor)) }}{% endif %}. {{ _("비우면 직접 인정은 대상 과목 학점까지, 선택 인정은 환산 학점, 불인정은 0으로 저장해요.") }}
+      {% else %}<span class="text-elective">{{ _("자동 계산할 수 없어요:") }} {{ (cr.reason if cr else '') | t }}.</span> {{ _("인정하는 판정이면 인정 학점을 직접 적어 주세요. 관리자는 계정·과목 화면에서 학점 단위와 환산 규칙을 정할 수 있어요.") }}{% endif %}
+    </p>
+  </div>
   <p class="text-sm text-muted">{{ _("반려하거나 AI 추천과 다르게 판정하면 확정 전에 사유를 고르는 창이 열려요.") }}</p>
   <button class="btn-primary w-fit">{{ _("판정 확정") }}</button>
 

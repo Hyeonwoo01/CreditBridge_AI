@@ -9,12 +9,13 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
+from backend.db.base import utcnow
 from backend.db.session import get_db
 from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError
 from backend.i18n import gettext as tr
 from backend.models import User
-from backend.models.enums import Role
+from backend.models.enums import ConversionMethod, CreditSystem, Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import accounts as account_service
@@ -257,6 +258,10 @@ def _data_page(request: Request, user: User, session: Session, status_code: int 
         account_columns=institution_data.ACCOUNT_COLUMNS,
         course_columns=institution_data.COURSE_COLUMNS,
         email_enabled=notifications.email_enabled(),
+        credit_rules=institution_data.conversion_rules(session, user),
+        credit_systems=list(CreditSystem),
+        conversion_methods=list(ConversionMethod),
+        today=utcnow().date(),
         **context,
     )
 
@@ -353,6 +358,62 @@ def transfer_cap(
     else:
         flash(request, tr("편입 학점 상한을 {cap}학점으로 정했어요.", cap=saved or DEFAULT_TRANSFER_CAP))
     return RedirectResponse("/admin/data#transfer-cap", status_code=303)
+
+
+@router.post("/data/credit-systems")
+def credit_systems(
+    request: Request,
+    institution_ids: list[int] = Form([]),
+    systems: list[str] = Form([]),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """우리 대학·출신 대학의 학점 단위 (대학 id와 단위를 같은 순서로 받는다)."""
+    check_csrf(request, csrf_token)
+    try:
+        if len(institution_ids) != len(systems):
+            raise CreditBridgeError(tr("학점 단위를 목록에서 골라 주세요."))
+        changed = institution_data.set_credit_systems(session, user, dict(zip(institution_ids, systems, strict=True)))
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        flash(request, tr("학점 단위를 저장했어요 ({n}곳 바뀜).", n=changed))
+    return RedirectResponse("/admin/data#credit-units", status_code=303)
+
+
+@router.post("/data/conversion-rules")
+def add_conversion_rule(
+    request: Request,
+    source_system: str = Form(""),
+    factor: str = Form(""),
+    method: str = Form(""),
+    effective_from: str = Form(""),
+    note: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        institution_data.add_conversion_rule(session, user, source_system, factor, method, effective_from, note)
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        flash(request, tr("환산 규칙을 추가했어요. 새로 계산하는 예상치와 판정부터 적용돼요."))
+    return RedirectResponse("/admin/data#credit-units", status_code=303)
+
+
+@router.post("/data/conversion-rules/{rule_id}/end")
+def end_conversion_rule(
+    request: Request, rule_id: int, csrf_token: str = Form(""), user: User = Admin, session: Session = Depends(get_db)
+) -> Response:
+    check_csrf(request, csrf_token)
+    institution_data.end_conversion_rule(session, user, rule_id)
+    flash(request, tr("환산 규칙을 오늘까지로 끝냈어요. 지난 판정에 쓴 기록은 그대로 남아요."))
+    return RedirectResponse("/admin/data#credit-units", status_code=303)
 
 
 @router.post("/data/institutions")
