@@ -43,7 +43,7 @@ from backend.schemas.results import CandidateResult, EvaluationResult, EvidenceV
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import accounts as account_service
 from backend.services import appeals as appeal_service
-from backend.services import case_state
+from backend.services import case_state, review_frameworks
 from backend.services import credits as credit_service
 from backend.services import decisions as decision_service
 from backend.services import evidence_feedback as feedback_service
@@ -118,6 +118,7 @@ class EvaluationView:
     case_state: str = ""  # 상태 머신의 지금 상태 (case_state.CaseState)
     case_token: str = ""  # 화면을 열 때의 상태 토큰. 저장 폼에 실어 동시 수정을 막는다
     appeal_deadline: appeal_service.Deadline | None = None  # 이의 신청 기한 (학칙 정책, 판정이 있을 때만)
+    framework: review_frameworks.Framework | None = None  # 교수 판정 화면: 분야별 심사 체크리스트 (리뷰 v3 P1-1)
 
     def span_id(self, side: str, evidence: EvidenceView, course_code: str, concept: str) -> int | None:
         return self.span_ids.get((side, evidence.char_start, evidence.char_end, f"{course_code}|{concept}"[:255]))
@@ -231,6 +232,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         }
         view.feedback = feedback_service.mine(session, user, evaluation.id)
         view.credit = decision_service.credit_conversion(session, evaluation)
+        view.framework = review_frameworks.for_department(view.candidate.department_name if view.candidate else None)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
     view.case_state = case_state.state_of(session, evaluation)
     if decision is not None:

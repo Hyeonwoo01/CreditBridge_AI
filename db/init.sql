@@ -907,5 +907,11 @@ CREATE INDEX ix_sis_syncs_status ON sis_syncs (status);
 
 UPDATE alembic_version SET version_num='0015' WHERE alembic_version.version_num = '0014';
 
+-- Running upgrade 0015 -> 0016
+
+ALTER TABLE decisions ADD COLUMN review_checklist JSONB;
+
+UPDATE alembic_version SET version_num='0016' WHERE alembic_version.version_num = '0015';
+
 COMMIT;
 

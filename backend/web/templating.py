@@ -11,6 +11,7 @@ from markupsafe import Markup, escape
 from backend.config import get_settings
 from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
+from backend.services import review_frameworks
 from backend.services.case_state import LABELS as CASE_STATE_LABELS
 from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
@@ -171,6 +172,7 @@ TEMPLATES.env.filters.update(
     source_kind=lambda v: _label(SOURCE_LABELS, v),
     authenticity=lambda v: _label(AUTHENTICITY_LABELS, v),
     case_state=lambda v: _label(CASE_STATE_LABELS, v),
+    checklist_item=lambda item, framework: gettext(review_frameworks.label(framework, item)),
     applicability=lambda v: _label(APPLICABILITY_LABELS, v),
     policy_value=policy_value,
     pct=pct,

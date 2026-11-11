@@ -66,12 +66,16 @@ def decide(
     accepted_credits: str = Form(""),
     combined_syllabus_ids: list[int] = Form([]),
     case_token: str = Form(""),
+    checklist: list[str] = Form([]),
+    missing_evidence: list[str] = Form([]),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
 ) -> Response:
     check_csrf(request, csrf_token)
     form = {
+        "checklist": checklist,
+        "missing_evidence": missing_evidence,
         "accepted_credits": accepted_credits,
         "combined_syllabus_ids": combined_syllabus_ids,
         "action": action,
@@ -94,6 +98,8 @@ def decide(
             accepted_credits=_credits(accepted_credits),
             combined_syllabus_ids=combined_syllabus_ids,
             case_token=case_token or None,
+            checklist=checklist,
+            missing_evidence=missing_evidence,
         )
     except ConcurrentChangeError as exc:
         session.rollback()

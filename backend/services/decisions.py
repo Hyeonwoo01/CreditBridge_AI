@@ -33,7 +33,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
-from backend.services import audit, case_state, notifications, scoring
+from backend.services import audit, case_state, notifications, review_frameworks, scoring
 from backend.services import credits as credit_service
 from backend.services import evidence_status as evidence_service
 from backend.services import policy as policy_service
@@ -353,6 +353,8 @@ def decide(
     accepted_credits: float | None = None,
     combined_syllabus_ids: list[int] | None = None,
     case_token: str | None = None,
+    checklist: list[str] | None = None,
+    missing_evidence: list[str] | None = None,
 ) -> Decision:
     """accepted_credits: 교수가 적은 인정 학점(대상 대학 단위). 비우면 환산 규칙으로 계산한 제안값을 쓰고,
     환산할 수 없으면 인정하는 판정은 직접 적어야 한다 (학점을 지어내지 않음).
@@ -443,6 +445,7 @@ def decide(
             )
         )
 
+    framework_course = target or ai_course  # 분야별 체크리스트: 인정 대상 과목, 없으면 AI 후보 과목의 학과
     decision = decision_repo.add(
         session,
         Decision(
@@ -473,6 +476,11 @@ def decide(
             )
             if primary is not None
             else None,
+            review_checklist=review_frameworks.record(
+                review_frameworks.for_department(framework_course.department_name if framework_course else None),
+                checklist or [],
+                missing_evidence or [],
+            ),
         ),
     )
     allocation_repo.supersede_for_evaluation(session, evaluation.id, decision.id)

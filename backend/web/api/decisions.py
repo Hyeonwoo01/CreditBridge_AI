@@ -26,6 +26,8 @@ class DecisionIn(BaseModel):
     accepted_credits: float | None = None  # 대상 대학 단위, 비우면 환산 규칙으로 계산
     combined_syllabus_ids: list[int] = []  # 합쳐 하나로 인정할 같은 학생의 다른 출신 과목 (N:1)
     case_token: str | None = None  # 조회 때 받은 상태 토큰. 그 사이 바뀌었으면 409 (낙관적 잠금)
+    checklist: list[str] = []  # 분야별 심사 체크리스트에서 확인한 항목 키 (리뷰 v3 P1-1)
+    missing_evidence: list[str] = []  # 자료가 없어 확인하지 못한 항목 키
 
 
 @router.post("/decisions", status_code=201)
@@ -48,6 +50,8 @@ def create_decision(
             accepted_credits=body.accepted_credits,
             combined_syllabus_ids=body.combined_syllabus_ids,
             case_token=body.case_token,
+            checklist=body.checklist,
+            missing_evidence=body.missing_evidence,
         )
     except (decision_service.ConflictNeedsAcknowledgement, ConcurrentChangeError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

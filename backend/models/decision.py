@@ -50,3 +50,5 @@ class Decision(IdMixin, Base):
     evidence_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
     # 판정 때 대상·출신 과목, 환산 규칙, 추천 규칙 버전 (0013부터). 카탈로그가 바뀌어도 내보내기·리포트는 이 값을 쓴다
     course_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # 분야별 심사 체크리스트 (0016부터, 리뷰 v3 P1-1): 분야·확인한 항목·자료 없는 항목. 판정을 대신하지 않는 기록
+    review_checklist: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

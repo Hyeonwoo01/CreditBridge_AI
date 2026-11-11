@@ -492,6 +492,7 @@ erDiagram
 | source_credits | DECIMAL(5,2) | null | 판정 때 쓴 출신 학점 (성적표 값이 먼저, 없으면 강의계획서) |
 | evidence_snapshot | JSONB | null | 판정 때 증거 상태 (강의계획서 id·출처·진위·적용 학기·학기·수강 학기·파일 해시, 0012부터) |
 | course_snapshot | JSONB | null | 판정 때 대상 과목(id·코드·이름·학점·학과)·출신 과목들(강의계획서 id·코드·이름·학점·파일 해시)·출신 대학·환산(출신 학점·단위·환산값·규칙 id·비율·방법·보류 이유)·추천 규칙 버전 (0013부터, 리뷰 v3 P0-8). 내보내기·리포트·학생 화면·API는 대상 과목 코드를 여기서 먼저 읽는다. 0013 이전 판정은 비어 있어 지금 카탈로그 값을 쓴다 |
+| review_checklist | JSONB | null | 분야별 심사 체크리스트 기록: `version`·`framework`(math·computing·lab_science·physics·business·health·humanities·common)·`checked`(확인한 항목 키)·`missing_evidence`(자료가 없어 확인 못 한 항목 키) (0016부터, 리뷰 v3 P1-1). 판정을 대신하지 않는 기록, 교직원 화면에만 표시 |
 | policy_snapshot | JSONB | null | 판정 때 적용한 학칙 정책 (규칙 종류 → 상태·규칙 id·값, 0011부터). 정책이 바뀌어도 그대로 |
 | conversion_rule_id | BIGINT | FK→credit_conversion_rules, null | 적용한 환산 규칙 (같은 단위거나 교수가 직접 적었으면 비움) |
 

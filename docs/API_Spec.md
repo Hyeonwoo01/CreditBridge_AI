@@ -114,7 +114,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | F1 | GET | `/professor` | 교수 | – | HTML | P11 | FR-18·19 |
 | F2 | POST | `/professor/away` | 교수 | `days`(0=복귀), `delegate_id`, `csrf_token` | 303→F1 | P11 | FR-19 |
 | F3 | GET | `/professor/evaluations/{id}` | 교수(배정·판정 건) | – | HTML | P12 | FR-05~11·16·20·25 |
-| F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `accepted_credits`(인정 학점·대상 대학 단위, 비우면 승인된 환산 규칙으로 계산 — 환산할 수 없으면 인정 판정은 필수), `combined_syllabus_ids[]`(합쳐 하나로 인정할 같은 학생의 다른 출신 과목, N:1), `case_token`(화면을 열 때의 상태 토큰), `csrf_token` | 303→F1 / 409(경보 확인 필요·화면을 연 뒤 다른 사람이 바꿈)·422(지금 상태에서 판정 불가: 이전 분석·판정 완료 등, 이의 신청 재판정을 원 판정 교수가 하려 함) HTML | P12 | FR-09·10·11 |
+| F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `accepted_credits`(인정 학점·대상 대학 단위, 비우면 승인된 환산 규칙으로 계산 — 환산할 수 없으면 인정 판정은 필수), `combined_syllabus_ids[]`(합쳐 하나로 인정할 같은 학생의 다른 출신 과목, N:1), `case_token`(화면을 열 때의 상태 토큰), `checklist[]`·`missing_evidence[]`(분야별 확인 항목 키, 선택), `csrf_token` | 303→F1 / 409(경보 확인 필요·화면을 연 뒤 다른 사람이 바꿈)·422(지금 상태에서 판정 불가: 이전 분석·판정 완료 등, 이의 신청 재판정을 원 판정 교수가 하려 함) HTML | P12 | FR-09·10·11 |
 | F5 | POST | `/professor/evaluations/{id}/materials` | 교수(배정 건) | `items[]`, `note`, `case_token`, `csrf_token` | 303→F3 | P12 | FR-22 |
 | F6 | POST | `/professor/evaluations/{id}/evidence/{span_id}` | 교수(배정·판정 건) | `verdict`(correct·wrong), `csrf_token`(또는 `X-CSRF-Token` 헤더) | HTMX면 버튼 조각 HTML, 아니면 303→F3 / 404(다른 분석의 구절·알 수 없는 값) | P12 | FR-06 (AI 근거 정확도) |
 
@@ -200,7 +200,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 ```json
 { "evaluation_id": 6, "action": "reject", "result": null, "target_course_id": null,
   "reason_codes": ["level_difference"], "reason_memo": "", "acknowledge_conflict": false,
-  "accepted_credits": null, "combined_syllabus_ids": [], "case_token": "3f9a0c1e7b2d4a58" }
+  "accepted_credits": null, "combined_syllabus_ids": [], "case_token": "3f9a0c1e7b2d4a58",
+  "checklist": ["outcomes", "weeks", "proofs"], "missing_evidence": ["problem_types"] }
 ```
 
 - 201: `{"id": 31, "result": "none", "decided_by": 7, "accepted_credits": 0.0, "credit_unit": "us_semester", "credit_basis": "not_accepted"}` — `decided_by`는 로그인한 교수 id로 서버가 정한다 (요청으로 받지 않음).
