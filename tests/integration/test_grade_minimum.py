@@ -45,8 +45,8 @@ def test_failing_course_is_excluded_from_review(client: TestClient, seeded: Sess
     calc = latest(seeded, "calculus.txt", rid)
 
     page = client.get(f"/student/requests/{rid}").text
-    assert "성적 기준 미달" in page and "성적이 C 미만(C- 이하)이라 인정 대상이 아니에요" in page
-    assert "성적이 C 미만" in client.get(f"/student/evaluations/{calc.id}").text
+    assert "성적 기준 미달" in page and "인정 최저 성적에 못 미쳐 인정 대상이 아니에요" in page
+    assert "인정 최저 성적에 못 미쳐" in client.get(f"/student/evaluations/{calc.id}").text
 
     client.post(f"/student/requests/{rid}/submit", data={"csrf_token": token})
     seeded.expire_all()

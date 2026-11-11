@@ -39,7 +39,7 @@
 
     {% if row.combined_into is not none %}<p class="text-sm text-muted">{{ _("이 과목의 학점 {credits}이(가) 다른 출신 과목과 함께 하나의 과목으로 인정됐어요. 같은 학점을 두 번 쓰지 않아요.", credits=('%g' | format(row.allocated or 0))) }}</p>{% endif %}
     {% if row.syllabus.status == 'failed' %}<p class="text-sm text-reject">{{ row.syllabus.error_message | t }}</p>{% endif %}
-    {% if row.grade_failed and not row.decision %}<p class="text-sm text-reject">{{ _("성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.") }}</p>{% endif %}
+    {% if row.grade_failed and not row.decision %}<p class="text-sm text-reject">{{ _("성적이 학칙의 인정 최저 성적에 못 미쳐 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.") }}</p>{% endif %}
 
     {% if row.candidate_code %}
     <div class="grid gap-3 rounded-md bg-parchment px-4 py-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">

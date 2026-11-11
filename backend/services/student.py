@@ -125,10 +125,11 @@ def course_key(code: str | None, title: str | None) -> str:
 
 
 def sync_course_requests(session: Session, student: User, transcript: StudentTranscript | None) -> int:
-    """성적이 C 이상인 성적표 과목마다 편입 요청을 만든다 (학생이 '새 요청'을 누르지 않는다). 만든 수를 돌려준다.
+    """학칙 정책의 인정 최저 성적을 넘긴 성적표 과목마다 편입 요청을 만든다 (학생이 '새 요청'을 누르지 않는다).
 
-    이미 있는 과목 요청은 다시 만들지 않고, 아직 제출하지 않았으면 성적표 줄(성적·학점)을 새 값으로 바꾼다.
-    새 성적표에서 빠졌거나 C 미만이 된 과목은 강의계획서를 올리기 전이면 요청을 지운다."""
+    만든 수를 돌려준다. 이미 있는 과목 요청은 다시 만들지 않고,
+    아직 제출하지 않았으면 성적표 줄(성적·학점)을 새 값으로 바꾼다.
+    새 성적표에서 빠졌거나 최저 성적 미달이 된 과목은 강의계획서를 올리기 전이면 요청을 지운다."""
     if transcript is None or transcript.status != TranscriptStatus.READY:
         return 0
     target = catalog_repo.get_institution(session, student.institution_id) if student.institution_id else None

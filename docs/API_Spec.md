@@ -69,7 +69,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | # | 메서드 | 경로 | 역할 | 입력 | 응답 | 화면 | FR |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S1 | GET | `/student` | 학생 | – | HTML / 303→S2(계정 성적표가 없으면) | P02 | FR-15·21 |
-| S2 | GET | `/student/transcript` | 학생 | – | HTML (계정 성적표 상태·과목 줄·C 미만 표시) | P26 | FR-02 |
+| S2 | GET | `/student/transcript` | 학생 | – | HTML (계정 성적표 상태·과목 줄·인정 최저 성적 미달 표시) | P26 | FR-02 |
 | S2-1 | POST | `/student/requests/{id}/delete` | 학생(본인) | `csrf_token` | 303→`/student` / 303→S3 + 빨강 플래시(서류가 있거나 제출한 요청) | P02·P03 | FR-15 |
 | S3 | GET | `/student/requests/{id}` | 학생(본인) | `show`(all·approved·supplement·review), `tuition`, `degree` | HTML | P03 | FR-01·02·15·21 |
 | S4 | POST | `/student/requests/{id}/syllabi` | 학생(본인) | `files[]`(최대 30), `csrf_token` | 303→S3 | P03 | FR-01 |

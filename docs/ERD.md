@@ -311,9 +311,9 @@ erDiagram
 | country | VARCHAR(2) | NN | 국가 코드 (KR, US) |
 | is_target | BOOLEAN | NN | 대상 대학 여부 |
 | tuition_per_credit | INT | null | 학점당 등록금 (FR-15 시뮬레이션 기본값) |
-| degree_credits | INT | null | 졸업 학점 (FR-15) |
+| degree_credits | INT | null | 예전 졸업 학점 설정. 0011부터 쓰지 않음 — 값은 `policy_rules`(degree_credits)로 옮겼고 기관을 새로 만들 때 첫 정책을 만드는 데만 씀 |
 | credit_system | VARCHAR(20) | null, CHECK | 학점 단위: kr_credit · us_semester · us_quarter · ects · other. 비우면 모름 — 환산하지 않고 예상치 보류 (P18, Alembic 0009) |
-| max_transfer_credits | INT | null | 편입 학점 상한 (비우면 60). 넘으면 학생이 졸업 학점에 넣을 과목을 고른다 (P18에서 관리자가 정함, Alembic 0007) |
+| max_transfer_credits | INT | null | 예전 편입 학점 상한 설정 (Alembic 0007). 0011부터 쓰지 않음 — 값은 `policy_rules`(transfer_cap)로 옮겼다. 상한은 학칙 정책에서 정하고, 정책이 없으면 자르지 않는다 |
 | sis_token_hash | VARCHAR(64) | null | 학사정보시스템 연동 토큰의 해시 (원문은 저장하지 않음, FR-24) |
 
 **institution_sources** — 대상 대학이 ④ 출신 대학 목록에 올린 출신 대학(Alembic 0004). `(institution_id, source_institution_id)` UNIQUE. 출신 대학 행(`institutions`, `is_target=false`)은 같은 이름이면 한 줄을 함께 쓰고, 이 표가 대학별 목록을 정한다. 계정 CSV·계정 수정·동등 과목표 CSV·학생 과목 검색은 자기 대학 목록의 출신 대학만 쓴다. 목록에서 지우면 연결만 지우고, 다른 대학도 어떤 행도 가리키지 않으면 출신 대학 행까지 지운다(그 대학 학생 계정·편입 요청·동등 과목표가 가리키면 지우지 않음).

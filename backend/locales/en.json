@@ -497,7 +497,6 @@
  "높은 수준": "Higher level",
  "다니던 대학": "Previous institution",
  "다니던 대학과 편입 전공은 학사처가 등록한 정보예요. 다르면 학사처에 수정을 요청해 주세요.": "Your previous institution and transfer major were set by the registrar. If they're wrong, ask the registrar to fix them.",
- "다니던 대학의 성적표를 한 번 올리면 모든 편입 요청에 함께 쓰여요. 성적이 C 미만(C- 이하)인 과목은 인정 대상이 아니에요.": "Upload your previous school's transcript once and it's used for all your transfer requests. Courses graded below C (C- or lower) aren't eligible.",
  "다룸": "Covered",
  "다른 기관에 이미 있는 이메일": "email already exists at another institution",
  "다른 이름으로 저장 → CSV UTF-8": "Save As → CSV UTF-8",
@@ -818,7 +817,6 @@
  "성적 기준 미달": "Grade below minimum",
  "성적 기준 미달로 배정 해제": "Assignment released (grade below minimum)",
  "성적 기준 미달로 심사 대상에서 빠져 요청 #{id}의 과목 배정이 해제됐어요.": "A course in request #{id} was released from your queue: its grade is below the minimum for transfer credit.",
- "성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.": "The grade is below C (C- or lower), so this course isn't eligible. It's excluded without faculty review and isn't counted in expected credits.",
  "성적표": "Transcript",
  "성적표 과목": "Transcript course",
  "성적표 과목 목록을 정리하고 있어요. 끝나면 이 요청에 자동으로 들어와요.": "We're preparing your transcript's course list. It will be added to this request automatically.",
@@ -1714,5 +1712,7 @@
  "사람 눈에 보이지 않게 숨긴 글자(투명·흰 글씨·아주 작은 글씨)가 있어 분석에서 제외했어요.": "The document had text hidden from human readers (transparent, white, or tiny text), so it was left out of the analysis.",
  "입력 양식(폼) PDF나 실행 코드(JavaScript)·첨부 파일이 들어 있는 PDF는 받지 않아요. 내용이 그대로 보이는 일반 PDF로 다시 저장해서 올려 주세요 (인쇄 → PDF로 저장).": "Fillable form PDFs and PDFs containing executable code (JavaScript) or attached files aren't accepted. Save it again as a regular PDF that shows the content as is, then upload it (Print → Save as PDF).",
  "지금은 파일 안전 검사를 할 수 없어 받지 못했어요. 잠시 뒤 다시 올려 주세요.": "The file safety check isn't available right now, so the file wasn't accepted. Please try again shortly.",
- "파일에서 악성코드가 발견돼 받지 않았어요. 원본 파일을 백신으로 검사한 뒤 깨끗한 파일을 올려 주세요.": "Malware was found in the file, so it wasn't accepted. Scan the original with antivirus software and upload a clean file."
+ "파일에서 악성코드가 발견돼 받지 않았어요. 원본 파일을 백신으로 검사한 뒤 깨끗한 파일을 올려 주세요.": "Malware was found in the file, so it wasn't accepted. Scan the original with antivirus software and upload a clean file.",
+ "성적이 학칙의 인정 최저 성적에 못 미쳐 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.": "The grade is below the minimum grade in the academic policy, so this course isn't eligible. It's excluded without faculty review and isn't counted in the estimated credits.",
+ "다니던 대학의 성적표를 한 번 올리면 모든 편입 요청에 함께 쓰여요. 성적이 학칙의 인정 최저 성적에 못 미치는 과목은 인정 대상이 아니에요.": "Upload your previous school's transcript once and it's used for every transfer request. Courses with grades below the minimum grade in the academic policy aren't eligible."
 }
