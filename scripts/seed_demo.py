@@ -148,6 +148,8 @@ def seed(session: Session) -> None:
         (PolicyRuleType.TRANSFER_CAP, {"credits": 60}),
         (PolicyRuleType.DEGREE_CREDITS, {"credits": 120}),
         (PolicyRuleType.SEMESTER_LOAD, {"credits": 15}),
+        (PolicyRuleType.APPEAL_WINDOW, {"days": 30}),
+        (PolicyRuleType.APPEAL_REVIEW, {"days": 14}),
     ):
         session.add(
             PolicyRule(

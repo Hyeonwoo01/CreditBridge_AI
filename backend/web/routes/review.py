@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
+from backend.db.base import utcnow
 from backend.db.session import get_db
 from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError
@@ -219,7 +220,8 @@ def evidence_status(
 
 @router.get("/appeals")
 def appeals(request: Request, user: User = Evaluator, session: Session = Depends(get_db)) -> Response:
-    return render(request, "review/appeals.html", user=user, rows=appeal_service.rows(session, user))
+    rows = appeal_service.rows(session, user)
+    return render(request, "review/appeals.html", user=user, rows=rows, now=utcnow())
 
 
 @router.post("/appeals/{appeal_id}")

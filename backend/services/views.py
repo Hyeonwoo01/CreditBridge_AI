@@ -117,6 +117,7 @@ class EvaluationView:
     feedback: dict[int, str] = field(default_factory=dict)
     case_state: str = ""  # 상태 머신의 지금 상태 (case_state.CaseState)
     case_token: str = ""  # 화면을 열 때의 상태 토큰. 저장 폼에 실어 동시 수정을 막는다
+    appeal_deadline: appeal_service.Deadline | None = None  # 이의 신청 기한 (학칙 정책, 판정이 있을 때만)
 
     def span_id(self, side: str, evidence: EvidenceView, course_code: str, concept: str) -> int | None:
         return self.span_ids.get((side, evidence.char_start, evidence.char_end, f"{course_code}|{concept}"[:255]))
@@ -132,7 +133,10 @@ class EvaluationView:
         if self.decision is None:
             return None
         return appeal_service.block_reason(
-            self.decision, self.appeals, closed=self.request.status == RequestStatus.CLOSED
+            self.decision,
+            self.appeals,
+            closed=self.request.status == RequestStatus.CLOSED,
+            limit=self.appeal_deadline,
         )
 
     @property
@@ -229,6 +233,8 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.credit = decision_service.credit_conversion(session, evaluation)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
     view.case_state = case_state.state_of(session, evaluation)
+    if decision is not None:
+        view.appeal_deadline = appeal_service.deadline(session, request, decision)
     view.case_token = case_state.token(session, evaluation)
     view.grade_failed = syllabus.id in policy_service.grade_failed_syllabus_ids(session, [syllabus.id])
     # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)

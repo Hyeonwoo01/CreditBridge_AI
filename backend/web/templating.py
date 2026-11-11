@@ -147,6 +147,8 @@ def policy_value(params: Mapping[str, Any]) -> str:
     if "min_grade" in params:
         text = gettext("{grade} 이상", grade=params["min_grade"])
         return text + (gettext(" (P/PASS/S 인정)") if params.get("accept_pass") else "")
+    if "days" in params:
+        return gettext("{n}일", n=params["days"])
     return gettext("{n}학점", n=params.get("credits", "–"))
 
 

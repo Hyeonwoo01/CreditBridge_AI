@@ -1,7 +1,7 @@
 """기한 알림: 매일 한 번(Celery beat, Settings.reminder_hour_utc) 처리 기한이 지났거나 다가온 일을 담당자에게 알린다.
 
 - 교수: 판정 기한(배정 + review_sla_days)이 지났거나 하루 남은 심사
-- 심사관: 판정 기한이 지난 심사, 교수 배정 없이 오래 기다린 과목, 처리 기한이 다가온 삭제 요청
+- 심사관: 판정 기한이 지난 심사, 교수 배정 없이 오래 기다린 과목, 처리 기한이 다가온 삭제 요청·이의 신청
 - 기관 관리자: 승인 기한이 다가온 삭제 요청
 - 학생: 며칠째 답하지 않은 보완 자료 요청
 
@@ -17,7 +17,8 @@ from backend.config import Settings, get_settings
 from backend.db.base import utcnow
 from backend.i18n import N_
 from backend.models import Institution, PrivacyRequest, Syllabus, User
-from backend.models.enums import PrivacyStatus, Role
+from backend.models.enums import AppealStatus, PrivacyStatus, Role
+from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
@@ -40,6 +41,7 @@ class Plan:
     privacy_review: list[PrivacyRequest] = field(default_factory=list)  # 심사관 처리 대기, 기한 임박·초과
     privacy_approve: list[PrivacyRequest] = field(default_factory=list)  # 관리자 승인 대기, 기한 임박·초과
     materials: dict[int, list[Syllabus]] = field(default_factory=dict)  # 학생 id → 답하지 않은 과목
+    appeals_due: int = 0  # 처리 기한(학칙 정책)이 하루 안에 오거나 지난 접수 이의 신청
 
     @property
     def overdue_total(self) -> int:
@@ -54,6 +56,7 @@ class Plan:
         return (
             not (self.overdue or self.due_soon or self.unassigned or self.privacy_review or self.privacy_approve)
             and not self.materials
+            and not self.appeals_due
         )
 
 
@@ -82,6 +85,9 @@ def plan(session: Session, institution_id: int, now: datetime | None = None, set
             out.privacy_review.append(privacy)
         elif privacy.status == PrivacyStatus.REVIEWED:
             out.privacy_approve.append(privacy)
+    for appeal, _, _, _ in appeal_repo.of_institution(session, institution_id, exclude_closed=True):
+        if appeal.status == AppealStatus.SUBMITTED and appeal.due_at and appeal.due_at <= now + timedelta(days=1):
+            out.appeals_due += 1
     before = now - timedelta(days=settings.reminder_material_days)
     for _, syllabus in material_repo.open_before(session, institution_id, before):
         if syllabus.owner_id is not None:
@@ -124,6 +130,8 @@ def send_for_institution(session: Session, institution: Institution, now: dateti
         staff_parts.append(N_("교수 배정을 기다리는 과목 {n}개").format(n=p.unassigned))
     if p.privacy_review:
         staff_parts.append(N_("처리 기한이 다가온 삭제 요청 {n}건").format(n=len(p.privacy_review)))
+    if p.appeals_due:
+        staff_parts.append(N_("처리 기한이 다가오거나 지난 이의 신청 {n}건").format(n=p.appeals_due))
     if staff_parts:
         message = N_("기한 알림: {items}").format(items=" · ".join(staff_parts))
         for evaluator in notifications.staff(session, institution.id, Role.EVALUATOR):

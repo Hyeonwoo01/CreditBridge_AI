@@ -859,5 +859,15 @@ ALTER TABLE decisions ADD COLUMN course_snapshot JSONB;
 
 UPDATE alembic_version SET version_num='0013' WHERE alembic_version.version_num = '0012';
 
+-- Running upgrade 0013 -> 0014
+
+ALTER TABLE appeals ADD COLUMN due_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE policy_rules DROP CONSTRAINT ck_policy_rules_rule_type_valid;
+
+ALTER TABLE policy_rules ADD CONSTRAINT ck_policy_rules_rule_type_valid CHECK (rule_type IN ('min_grade', 'transfer_cap', 'degree_credits', 'semester_load', 'appeal_window', 'appeal_review'));
+
+UPDATE alembic_version SET version_num='0014' WHERE alembic_version.version_num = '0013';
+
 COMMIT;
 

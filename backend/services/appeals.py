@@ -4,6 +4,7 @@
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -15,7 +16,7 @@ from backend.errors import CreditBridgeError, DuplicateRowError, NotFoundError, 
 from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import Appeal, AppealFile, Assignment, CourseEvaluation, Decision, Syllabus, TransferRequest, User
-from backend.models.enums import AppealStatus, Recommendation, RequestStatus, Role
+from backend.models.enums import AppealStatus, PolicyRuleType, Recommendation, RequestStatus, Role
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
@@ -25,6 +26,7 @@ from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.security.permissions import can_view_evaluation
 from backend.services import audit, case_state, notifications
+from backend.services import policy as policy_service
 from backend.services import student as student_service
 from backend.services.student import UploadedFile
 
@@ -37,9 +39,48 @@ DIRECT_NOT_APPEALABLE = N_("직접 인정된 과목은 이의 신청을 받지 �
 ALREADY_APPEALED = N_("이의 신청은 과목당 한 번이라, 이미 처리된 이 과목은 다시 신청할 수 없어요.")
 REQUEST_CLOSED = N_("문서가 삭제돼 종료된 요청의 과목은 이의 신청할 수 없어요.")
 VISIT_OFFICE = N_("판정에 대해 더 자세히 알고 싶다면 학과 사무실을 직접 찾아 문의해 주세요.")
+DEADLINE_PASSED = N_("이의 신청 기간이 지났어요.")
+DEADLINE_CONFLICT = N_("이의 신청 기간을 정한 학칙이 서로 달라 지금은 신청을 받을 수 없어요. 학사처에 문의해 주세요.")
 
 
-def block_reason(decision: Decision, appeals: list[Appeal], closed: bool = False) -> str | None:
+@dataclass(frozen=True)
+class Deadline:
+    """판정에 이의 신청할 수 있는 마지막 시각 (리뷰 v3 P1-5). 학칙 정책이 없으면 기한 없음, 충돌이면 받지 않음."""
+
+    until: datetime | None
+    conflict: bool = False
+
+    def passed(self, now: datetime | None = None) -> bool:
+        return self.until is not None and (now or utcnow()) > self.until
+
+
+def deadline(session: Session, request: TransferRequest, decision: Decision) -> Deadline:
+    student = user_repo.get_by_id(session, request.student_id)
+    if student is None:
+        return Deadline(None)
+    rule = policy_service.for_student(session, student, request.target_institution_id).get(PolicyRuleType.APPEAL_WINDOW)
+    if rule.status == policy_service.CONFLICT:
+        return Deadline(None, conflict=True)
+    days = rule.days
+    return Deadline(decision.decided_at + timedelta(days=days) if days else None)
+
+
+def review_due(session: Session, request: TransferRequest, filed_at: datetime) -> datetime | None:
+    """학사처 처리 기한: 접수 + 학칙 정책 appeal_review 일 수. 정책이 없거나 충돌이면 없음."""
+    student = user_repo.get_by_id(session, request.student_id)
+    if student is None:
+        return None
+    days = (
+        policy_service.for_student(session, student, request.target_institution_id)
+        .get(PolicyRuleType.APPEAL_REVIEW)
+        .days
+    )
+    return filed_at + timedelta(days=days) if days else None
+
+
+def block_reason(
+    decision: Decision, appeals: list[Appeal], closed: bool = False, limit: Deadline | None = None
+) -> str | None:
     """이의 신청을 받지 않는 이유 (N_ 원문). 받을 수 있으면 None.
     문서 삭제로 종료된 요청은 받지 않고, 직접 인정은 더 나은 결과가 없고,
     기각·재판정으로 끝난 이의 신청이 있으면 다시 받지 않는다."""
@@ -49,6 +90,10 @@ def block_reason(decision: Decision, appeals: list[Appeal], closed: bool = False
         return DIRECT_NOT_APPEALABLE
     if any(a.status in (AppealStatus.DISMISSED, AppealStatus.REDECIDED) for a in appeals):
         return ALREADY_APPEALED
+    if limit is not None and limit.conflict:
+        return DEADLINE_CONFLICT
+    if limit is not None and limit.passed():
+        return DEADLINE_PASSED
     return None
 
 
@@ -93,7 +138,9 @@ def file_appeal(
     previous = appeal_repo.for_evaluation(session, evaluation.id)
     if any(a.status in OPEN for a in previous):
         raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요."))
-    blocked = block_reason(decision, previous, closed=request.status == RequestStatus.CLOSED)
+    blocked = block_reason(
+        decision, previous, closed=request.status == RequestStatus.CLOSED, limit=deadline(session, request, decision)
+    )
     if blocked:
         raise CreditBridgeError(f"{tr(blocked)} {tr(VISIT_OFFICE)}")
     reason = reason.strip()
@@ -114,7 +161,13 @@ def file_appeal(
     try:
         appeal = appeal_repo.add(
             session,
-            Appeal(course_evaluation_id=evaluation.id, decision_id=decision.id, student_id=student.id, reason=reason),
+            Appeal(
+                course_evaluation_id=evaluation.id,
+                decision_id=decision.id,
+                student_id=student.id,
+                reason=reason,
+                due_at=review_due(session, request, utcnow()),
+            ),
         )
     except DuplicateRowError:
         raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요.")) from None
@@ -334,6 +387,7 @@ class Appealable:
     syllabus: Syllabus
     request: TransferRequest
     decision: Decision
+    until: datetime | None = None  # 이의 신청 기한 (학칙 정책이 없으면 없음)
 
 
 def appealable(session: Session, student: User) -> list[Appealable]:
@@ -346,11 +400,15 @@ def appealable(session: Session, student: User) -> list[Appealable]:
                 continue
             if row.appeal is not None and row.appeal.status in OPEN:
                 continue
+            limit = deadline(session, request, row.decision)
             if block_reason(
-                row.decision, [row.appeal] if row.appeal else [], closed=request.status == RequestStatus.CLOSED
+                row.decision,
+                [row.appeal] if row.appeal else [],
+                closed=request.status == RequestStatus.CLOSED,
+                limit=limit,
             ):
                 continue
-            out.append(Appealable(row.evaluation, row.syllabus, request, row.decision))
+            out.append(Appealable(row.evaluation, row.syllabus, request, row.decision, limit.until))
     return out
 
 

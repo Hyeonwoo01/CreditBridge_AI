@@ -488,7 +488,7 @@ erDiagram
 
 **syllabi 증거 상태 (0012)** — `source_kind` VARCHAR(30)(student_uploaded·registrar_issued·instructor_confirmed·official_portal·public_web·institution_reference·other), `authenticity` VARCHAR(20)(unverified·verified·partially_verified·suspicious·rejected), `applicability` VARCHAR(10)(applicable·mismatch·unknown — `academic_term`과 성적표 수강 학기 비교), `academic_term`, `verification_method`, `verification_note`(학생 비공개), `verified_by` FK→users, `verified_at`. 파일 해시가 같아도 진위·출처는 옮기지 않는다. 의심·채택 안 함이면 판정 보류(자동 불인정 아님).
 
-**policy_rules** — `institution_id` FK(IX), `rule_type` VARCHAR(30)(min_grade·transfer_cap·degree_credits·semester_load, CHECK), `department_id` FK→departments null(모든 학과), `admission_year` INT null(1990~2100, 모든 입학연도), `parameters` JSONB({min_grade, accept_pass} 또는 {credits}), `effective_from` DATE, `effective_to` DATE null, `status` VARCHAR(10)(draft·approved·retired, IX), `source` TEXT(근거 학칙), `created_by`·`approved_by` FK→users null, `approved_at`, `created_at`. 승인된 규칙 중 학생 범위에 맞고 가장 구체적인 것(학과·입학연도를 정한 수)을 쓰고, 같은 구체성에서 값이 다르면 충돌, 없으면 미정(기본값 없음). 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만든다. 0011이 대상 대학마다 이전 설정(C 이상·P/PASS/S, 상한·졸업 학점, 학기당 15)을 대학 전체 승인 규칙으로 옮겼다. `institutions.max_transfer_credits`·`degree_credits`는 더 쓰지 않는다(기록용).
+**policy_rules** — `institution_id` FK(IX), `rule_type` VARCHAR(30)(min_grade·transfer_cap·degree_credits·semester_load·appeal_window·appeal_review, CHECK — 뒤의 둘은 0014), `department_id` FK→departments null(모든 학과), `admission_year` INT null(1990~2100, 모든 입학연도), `parameters` JSONB({min_grade, accept_pass}, {credits}, 이의 신청 기간·처리 기한은 {days}), `effective_from` DATE, `effective_to` DATE null, `status` VARCHAR(10)(draft·approved·retired, IX), `source` TEXT(근거 학칙), `created_by`·`approved_by` FK→users null, `approved_at`, `created_at`. 승인된 규칙 중 학생 범위에 맞고 가장 구체적인 것(학과·입학연도를 정한 수)을 쓰고, 같은 구체성에서 값이 다르면 충돌, 없으면 미정(기본값 없음). 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만든다. 0011이 대상 대학마다 이전 설정(C 이상·P/PASS/S, 상한·졸업 학점, 학기당 15)을 대학 전체 승인 규칙으로 옮겼다. `institutions.max_transfer_credits`·`degree_credits`는 더 쓰지 않는다(기록용).
 
 **credit_allocations** — `student_id` FK→users(IX), `decision_id` FK→decisions(IX), `syllabus_id` FK→syllabi(IX, 출신 과목), `target_course_id` FK→courses null(선택 학점이면 없음), `credits` DECIMAL(5,2)(>0, 대상 대학 단위), `credit_unit`, `status` VARCHAR(12)(active·superseded, IX), `superseded_by_decision_id` FK→decisions null, `created_at`. 판정이 출신 과목마다 한 줄씩 남기고 여러 과목을 합쳐 인정(N:1)하면 과목별 남은 학점에 비례해 나눈다. 학생의 확정 인정 학점은 active 줄의 합계다. 재판정하면 지우지 않고 superseded로 바꾼다. 같은 출신 과목(같은 출신 대학·과목 코드) active 합계는 환산 학점을 넘지 않고, 같은 학생의 같은 대상 과목은 다른 판정에서 다시 인정하지 않는다 — 판정 서비스가 검사(N:1은 한 판정의 여러 줄이 같은 대상을 가리켜 DB 유니크로 표현하지 않음). 0010이 0009 뒤 인정 학점이 있는 판정을 옮겼다.
 
@@ -508,6 +508,7 @@ erDiagram
 | reason | TEXT | NN | 사유 20~3000자 |
 | status | VARCHAR(20) | NN, IX | submitted · accepted · dismissed · redecided |
 | handled_by · handled_at · handler_note | BIGINT FK · TIMESTAMP · TEXT | null·null·NN | 처리한 심사관·시각·메모 (기각 시 필수) |
+| due_at | TIMESTAMP | null | 학사처 처리 기한: 접수 + 학칙 정책 `appeal_review` 일 수 (Alembic 0014, 리뷰 v3 P1-5). 정책이 없으면 비움. 하루 안에 오거나 지나면 심사관 기한 알림 |
 | (부분 유니크 인덱스) | `uq_appeals_open_evaluation` | UQ | `course_evaluation_id` `WHERE status IN ('submitted', 'accepted')` — 심사 건당 처리 중 이의 신청 하나 |
 
 **appeal_files** — `appeal_id` FK(IX), `file_key` VARCHAR(255) null, `original_filename` VARCHAR(255), `content_type` VARCHAR(100), `size` INT.

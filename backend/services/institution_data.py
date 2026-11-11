@@ -784,7 +784,10 @@ POLICY_RANGES = {
     PolicyRuleType.TRANSFER_CAP: (1, 300),
     PolicyRuleType.DEGREE_CREDITS: (1, 400),
     PolicyRuleType.SEMESTER_LOAD: (1, 40),
+    PolicyRuleType.APPEAL_WINDOW: (1, 365),
+    PolicyRuleType.APPEAL_REVIEW: (1, 180),
 }
+DAY_RULES = {PolicyRuleType.APPEAL_WINDOW, PolicyRuleType.APPEAL_REVIEW}  # 값이 학점이 아니라 일 수
 
 
 @dataclass(frozen=True)
@@ -826,8 +829,10 @@ def add_policy_rule(
     else:
         low, high = POLICY_RANGES[PolicyRuleType(rule_type)]
         if not (value.isdigit() and low <= int(value) <= high):
+            if rule_type in DAY_RULES:
+                raise CreditBridgeError(tr("일 수는 {low}~{high} 사이 숫자로 적어 주세요.", low=low, high=high))
             raise CreditBridgeError(tr("학점은 {low}~{high} 사이 숫자로 적어 주세요.", low=low, high=high))
-        params = {"credits": int(value)}
+        params = {"days" if rule_type in DAY_RULES else "credits": int(value)}
     dept = None
     if department.strip():
         dept = catalog_repo.department_by_name(session, institution_id, department.strip())

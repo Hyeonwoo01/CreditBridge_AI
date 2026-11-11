@@ -30,3 +30,5 @@ class Appeal(IdMixin, CreatedAtMixin, Base):
     handled_by: Mapped[int | None] = mapped_column(IdType, ForeignKey("users.id"))
     handler_note: Mapped[str] = mapped_column(Text, default="")
     handled_at: Mapped[datetime | None] = mapped_column(default=None)
+    # 학사처 처리 기한 (접수 + 학칙 정책 appeal_review 일 수, 0014부터). 정책이 없으면 비움
+    due_at: Mapped[datetime | None] = mapped_column(default=None)

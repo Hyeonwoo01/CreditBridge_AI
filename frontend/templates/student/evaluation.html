@@ -25,6 +25,7 @@
   <div class="grid gap-1">
     <span class="font-semibold">{{ _("판정 결과에 이의가 있나요?") }}</span>
     <span class="text-sm text-muted">{{ _("사유와 근거 자료를 내면 학사처가 검토하고, 받아들이면 학과 교수가 다시 판정해요.") }}</span>
+    {% if v.appeal_deadline and v.appeal_deadline.until %}<span class="text-sm font-semibold" data-appeal-deadline>{{ _("이의 신청 기한: {date}까지", date=time(v.appeal_deadline.until, "date")) }}</span>{% endif %}
   </div>
   <a href="/student/evaluations/{{ v.evaluation.id }}/appeal" class="btn-secondary">{{ _("이의 신청 작성") }}</a>
 </section>

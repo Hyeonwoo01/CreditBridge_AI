@@ -98,6 +98,8 @@ class PolicyRuleType(StrEnum):
     TRANSFER_CAP = "transfer_cap"  # {"credits": 60}
     DEGREE_CREDITS = "degree_credits"  # {"credits": 120}
     SEMESTER_LOAD = "semester_load"  # {"credits": 15} 학기당 이수 학점 (남은 학기 계산)
+    APPEAL_WINDOW = "appeal_window"  # {"days": 30} 판정 뒤 이의 신청을 받는 기간 (리뷰 v3 P1-5)
+    APPEAL_REVIEW = "appeal_review"  # {"days": 14} 이의 신청 접수 뒤 학사처 처리 기한
 
 
 class PolicyStatus(StrEnum):

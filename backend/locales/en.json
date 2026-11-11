@@ -1639,7 +1639,6 @@
  "정책 초안 추가": "Add a policy draft",
  "종류": "Type",
  "값": "Value",
- "(최저 성적은 C처럼, 나머지는 학점 수)": "(a grade like C for the minimum grade, otherwise credits)",
  "학과 (비우면 모든 학과)": "Department (empty = all)",
  "입학연도 (비우면 모든 입학연도)": "Admission year (empty = all)",
  "P/PASS/S 성적 인정 (최저 성적 정책만)": "Accept P/PASS/S grades (minimum grade policy only)",
@@ -1714,5 +1713,16 @@
  "지금은 파일 안전 검사를 할 수 없어 받지 못했어요. 잠시 뒤 다시 올려 주세요.": "The file safety check isn't available right now, so the file wasn't accepted. Please try again shortly.",
  "파일에서 악성코드가 발견돼 받지 않았어요. 원본 파일을 백신으로 검사한 뒤 깨끗한 파일을 올려 주세요.": "Malware was found in the file, so it wasn't accepted. Scan the original with antivirus software and upload a clean file.",
  "성적이 학칙의 인정 최저 성적에 못 미쳐 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.": "The grade is below the minimum grade in the academic policy, so this course isn't eligible. It's excluded without faculty review and isn't counted in the estimated credits.",
- "다니던 대학의 성적표를 한 번 올리면 모든 편입 요청에 함께 쓰여요. 성적이 학칙의 인정 최저 성적에 못 미치는 과목은 인정 대상이 아니에요.": "Upload your previous school's transcript once and it's used for every transfer request. Courses with grades below the minimum grade in the academic policy aren't eligible."
+ "다니던 대학의 성적표를 한 번 올리면 모든 편입 요청에 함께 쓰여요. 성적이 학칙의 인정 최저 성적에 못 미치는 과목은 인정 대상이 아니에요.": "Upload your previous school's transcript once and it's used for every transfer request. Courses with grades below the minimum grade in the academic policy aren't eligible.",
+ "이의 신청 기간이 지났어요.": "The appeal period has passed.",
+ "이의 신청 기간을 정한 학칙이 서로 달라 지금은 신청을 받을 수 없어요. 학사처에 문의해 주세요.": "The academic policies that set the appeal period conflict, so appeals can't be accepted right now. Please contact the registrar.",
+ "일 수는 {low}~{high} 사이 숫자로 적어 주세요.": "Enter a number of days between {low} and {high}.",
+ "이의 신청 기간": "Appeal period",
+ "이의 신청 처리 기한": "Appeal review deadline",
+ "처리 기한이 다가오거나 지난 이의 신청 {n}건": "{n} appeals near or past their review deadline",
+ "{n}일": "{n} days",
+ "(최저 성적은 C처럼, 이의 신청 기간·처리 기한은 일 수, 나머지는 학점 수)": "(minimum grade like C, appeal period and review deadline in days, others in credits)",
+ "처리 기한 {date}": "Review by {date}",
+ "처리 기한 지남 ({date})": "Review overdue ({date})",
+ "이의 신청 기한: {date}까지": "Appeal by {date}"
 }

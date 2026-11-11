@@ -66,8 +66,8 @@
   {% if reminders.empty %}
   <p class="text-sm text-muted">{{ _("오늘은 기한 알림을 받을 일이 없어요.") }}</p>
   {% else %}
-  <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-    {% for label, value, who in [(_('판정 기한 지난 심사'), reminders.overdue_total, _('담당 교수·심사관')), (_('내일 판정 기한'), reminders.due_soon.values() | sum, _('담당 교수')), (_('교수 배정 대기'), reminders.unassigned, _('심사관')), (_('삭제 요청 기한 임박'), reminders.privacy_review | length + reminders.privacy_approve | length, _('심사관·관리자')), (_('보완 자료 미제출'), reminders.materials_total, _('학생'))] %}
+  <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {% for label, value, who in [(_('판정 기한 지난 심사'), reminders.overdue_total, _('담당 교수·심사관')), (_('내일 판정 기한'), reminders.due_soon.values() | sum, _('담당 교수')), (_('교수 배정 대기'), reminders.unassigned, _('심사관')), (_('삭제 요청 기한 임박'), reminders.privacy_review | length + reminders.privacy_approve | length, _('심사관·관리자')), (_('보완 자료 미제출'), reminders.materials_total, _('학생')), (_('이의 신청 처리 기한'), reminders.appeals_due, _('심사관'))] %}
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3">
       <dt class="text-xs text-muted">{{ label }}</dt>
       <dd class="text-[22px] leading-tight font-semibold tabular-nums {{ 'text-elective' if value else '' }}">{{ value }}</dd>

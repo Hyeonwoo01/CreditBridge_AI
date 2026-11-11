@@ -30,7 +30,7 @@
     <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
       <div class="grid min-w-0 gap-0.5">
         <a href="/student/evaluations/{{ c.evaluation.id }}" class="font-semibold hover:text-primary">{{ c.syllabus.course_code }} {{ c.syllabus.course_title }}</a>
-        <span class="text-sm text-muted">{{ _("판정") }} <strong class="font-semibold {{ 'text-approve' if c.decision.result in ('direct', 'elective') else 'text-reject' }}">{{ c.decision.result | rec }}</strong> · {{ time(c.decision.decided_at, "date") }}{% if c.decision.appeal_id %} {{ _("· 이의 신청 재판정") }}{% endif %}</span>
+        <span class="text-sm text-muted">{{ _("판정") }} <strong class="font-semibold {{ 'text-approve' if c.decision.result in ('direct', 'elective') else 'text-reject' }}">{{ c.decision.result | rec }}</strong> · {{ time(c.decision.decided_at, "date") }}{% if c.decision.appeal_id %} {{ _("· 이의 신청 재판정") }}{% endif %}{% if c.until %} · <strong class="font-semibold">{{ _("이의 신청 기한: {date}까지", date=time(c.until, "date")) }}</strong>{% endif %}</span>
       </div>
       <a href="/student/evaluations/{{ c.evaluation.id }}/appeal" class="btn-secondary btn-sm">{{ _("이의 신청 작성") }}</a>
     </li>

@@ -32,6 +32,8 @@ TYPE_LABELS = {
     PolicyRuleType.TRANSFER_CAP: N_("편입 학점 상한"),
     PolicyRuleType.DEGREE_CREDITS: N_("졸업 학점"),
     PolicyRuleType.SEMESTER_LOAD: N_("학기당 이수 학점"),
+    PolicyRuleType.APPEAL_WINDOW: N_("이의 신청 기간"),
+    PolicyRuleType.APPEAL_REVIEW: N_("이의 신청 처리 기한"),
 }
 
 # 성적 단계 (높을수록 좋음). 표에 없는 성적(W·I·NP 등)은 통과로 보지 않는다
@@ -68,6 +70,11 @@ class Resolution:
     @property
     def credits(self) -> int | None:
         value = self.params.get("credits")
+        return int(value) if self.status == RESOLVED and isinstance(value, int | float) else None
+
+    @property
+    def days(self) -> int | None:
+        value = self.params.get("days")
         return int(value) if self.status == RESOLVED and isinstance(value, int | float) else None
 
 

@@ -201,7 +201,7 @@
 <section id="policies" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="policy-title">
   <h2 id="policy-title" class="section-title">{{ _("학칙 정책") }}</h2>
   <p class="text-sm text-muted">{{ _("인정 최저 성적·편입 학점 상한·졸업 학점·학기당 이수 학점을 학칙대로 정해요. 초안을 만든 뒤 승인해야 적용되고, 학과·입학연도를 정한 규칙이 대학 전체 규칙보다 우선해요. 맞는 규칙이 없으면 기본값 없이 '미정'으로 두고 그 값은 계산하지 않아요. 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만들어요(지난 판정에 남은 정책 기록은 그대로).") }}</p>
-  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
     {% for t, res in policies.current.items() %}
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ t | policy_type }} {{ _("(대학 전체)") }}</dt>
       <dd class="font-semibold">{% if res.status == 'resolved' %}{{ res.params | policy_value }}{% elif res.status == 'conflict' %}<span class="text-reject">{{ _("충돌") }}</span>{% else %}<span class="text-elective">{{ _("미정") }}</span>{% endif %}</dd></div>
@@ -224,7 +224,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <p class="text-sm font-semibold md:col-span-2">{{ _("정책 초안 추가") }}</p>
     <label class="field"><span>{{ _("종류") }}</span><select name="rule_type" class="input h-11">{% for t in policies.current %}<option value="{{ t }}">{{ t | policy_type }}</option>{% endfor %}</select></label>
-    <label class="field"><span>{{ _("값") }} <span class="text-muted">{{ _("(최저 성적은 C처럼, 나머지는 학점 수)") }}</span></span><input class="input h-11" name="value" required maxlength="5" placeholder="C / 60"></label>
+    <label class="field"><span>{{ _("값") }} <span class="text-muted">{{ _("(최저 성적은 C처럼, 이의 신청 기간·처리 기한은 일 수, 나머지는 학점 수)") }}</span></span><input class="input h-11" name="value" required maxlength="5" placeholder="C / 60"></label>
     <label class="field"><span>{{ _("학과 (비우면 모든 학과)") }}</span><select name="department" class="input h-11"><option value="">{{ _("모든 학과") }}</option>{% for name in policies.departments.values() %}<option value="{{ name }}">{{ name }}</option>{% endfor %}</select></label>
     <label class="field"><span>{{ _("입학연도 (비우면 모든 입학연도)") }}</span><input class="input h-11" type="number" name="admission_year" min="1990" max="2100"></label>
     <label class="field"><span>{{ _("시작일") }}</span><input class="input h-11" type="date" name="effective_from" value="{{ today.isoformat() }}"></label>
