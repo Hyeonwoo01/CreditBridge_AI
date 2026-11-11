@@ -5,6 +5,7 @@
 | URL | `GET /review?tab=all\|high\|low\|insufficient\|conflict&department=&sort=submitted\|coverage\|department&q=&page=`, 배정 `POST /review/assign`, 내보내기 `GET /review/export.csv` |
 | 역할 | 심사관 (소속 기관 건만) |
 | 템플릿 | `review/queue.html` (보조 바 위치 "학사처 심사 워크스페이스 · 심사 대기열") |
+| 화면 테스트 | `test_queue_tabs_and_department_assignment`, `test_queue_search_and_conflict_filter` |
 | 최대 폭 | 확장형 `max-w-[1440px]` (10열 표) |
 | 기능 | FR-17 신뢰도별 큐, FR-18 학과 교수 자동 배정(일괄), FR-11 일관성 경보 미리 보기, FR-24 SIS CSV 내보내기 |
 
@@ -88,3 +89,15 @@
 
 - "전주 대비" 증감 — 비교 기준 데이터가 없어 넣지 않았다.
 - TES 연동 버튼 — 연동 대상이 없어 넣지 않았다.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 검색 · 탭 5개 · 학과 칩 · 정렬 · 페이지 | R1 (`q`·`tab`·`department`·`sort`·`page`) |
+| 행 선택 → 담당 교수 일괄 배정 · 선택 항목 교수 일괄 배정 | R2 `POST /review/assign` |
+| SIS CSV 내보내기 | R3 |
+| 원문 대조 확인 → · 충돌 내역 확인 · 보완 요청 발송 · 과거 판례 N건 보기 | R4 (각각 `#history`·`#materials` 위치) |
+| 이 페이지 전체 선택 | 화면 안 |

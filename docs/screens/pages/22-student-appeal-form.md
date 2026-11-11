@@ -5,6 +5,7 @@
 | URL | `GET /student/evaluations/{id}/appeal`, 제출 `POST /student/evaluations/{id}/appeal` (multipart: `reason`, `files` 최대 3개, `csrf_token`) |
 | 역할 | 학생 (본인 과목만, 다른 학생·역할은 403) |
 | 템플릿 | `student/appeal_form.html` (상단 메뉴는 "이의 신청" 선택 상태) |
+| 화면 테스트 | `test_appeal_form_with_evidence_files` |
 | 최대 폭 | 기본 `max-w-[1280px]` |
 | 진입 | P04 "이의 신청 작성", P21 "이의 신청할 수 있는 과목"의 [이의 신청 작성] |
 | 기능 | FR-23 원 판정을 보면서 이의 사유와 근거 자료 제출 |
@@ -65,3 +66,12 @@ MATH 101 Calculus I · Hankuk University → Midwest State University
 - 내려받기 `GET /appeal-files/{id}`: 학생 본인, 소속 기관 심사관, 담당 학과 교수만. `Content-Disposition: attachment`, `Cache-Control: no-store`.
 - 심사관 P07, 교수 P12·학생 P04의 이의 신청 경과, 학생 P21에 파일 링크로 보인다.
 - 개인정보 삭제 요청이 승인되면 원본을 지우고 파일 이름만 "(삭제됨)"으로 남는다.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 이의 신청 제출 | S13 |
+| 과목 결과 · 이의 신청 목록 · 분석 결과와 근거 · 판정 근거 리포트 · 처리 상황 보기 · 취소 | S10 · S14 · S10 · C1 · S14 · S10 |

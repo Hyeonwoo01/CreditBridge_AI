@@ -5,6 +5,7 @@
 | URL | `GET /admin/sis`, 발급·폐기 `POST /admin/sis` (`action=issue|revoke`) |
 | 역할 | 대상 대학의 기관 관리자 (심사관은 403) |
 | 템플릿 | `admin/sis.html` |
+| 화면 테스트 | `test_sis_api_requires_admin_issued_token`, `test_audit_log_filters_by_action_target_and_date` |
 | 기능 | FR-24 확정 판정 내보내기용 토큰 관리 (API: `GET /api/v1/sis/decisions`, 버전 없는 옛 경로 `/api/sis/decisions`는 폐기 예정으로 같은 응답 + `Deprecation` 헤더) |
 
 ## 위치
@@ -43,3 +44,12 @@
 | --- | --- |
 | 폐기 | 플래시 "연동 토큰을 폐기했어요." |
 | 토큰 없거나 틀림 | API 401 "유효한 연동 토큰이 필요해요." |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 토큰 발급 · 토큰 다시 발급 (확인창) | M12 `action=issue` |
+| 토큰 폐기 | M12 `action=revoke` |

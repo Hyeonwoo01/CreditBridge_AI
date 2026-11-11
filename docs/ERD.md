@@ -342,6 +342,7 @@ erDiagram
 | department_id | BIGINT | FK→departments, IX, null | 교수의 학과 (과목과 같은 학과 행이어야 자동 배정, FR-18). 심사관은 선택, 관리자는 비움. 학생은 편입 전공(관리자가 정함, 편입 요청의 `major`로 복사) |
 | source_institution_id | BIGINT | FK→institutions, null | 학생의 출신(전적) 대학. 관리자가 계정 CSV·계정 수정에서 정하고 학생은 바꾸지 않는다. 교직원은 비움 (Alembic 0003, 기존 학생은 최근 요청 값으로 채움) |
 | delegate_user_id | BIGINT | FK→users, null | 부재 시 대리 심사자 (FR-19) |
+| admission_year | INT | null | 학생의 입학연도. 학칙 정책을 입학연도별로 고를 때 쓴다. 비우면 모든 입학연도 규칙만 맞음 (관리자가 계정 수정에서 정함, Alembic 0011) |
 | away_until | DATE | null | 부재 종료일 (FR-19) |
 | must_change_password | BOOLEAN | NN | 임시 비밀번호 → 첫 로그인 때 변경 |
 | failed_logins | INT | NN | 연속 로그인 실패 수 (5회 1분 잠금, 10회 초기화) |

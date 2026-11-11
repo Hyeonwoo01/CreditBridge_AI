@@ -5,6 +5,7 @@
 | URL | `GET /admin/audit?action=&target_type=&target_id=&since=&until=&page=` |
 | 역할 | 기관 관리자 |
 | 템플릿 | `admin/audit.html` |
+| 화면 테스트 | `test_sis_api_requires_admin_issued_token`, `test_audit_log_filters_by_action_target_and_date` |
 | 기능 | FR-10 추가 전용 감사 기록 조회. 소속 기관 사용자가 남긴 기록만(다른 대학 기록은 보이지 않음), 행위·대상·기간 필터, 50건씩 페이지 |
 
 ## 위치
@@ -42,3 +43,11 @@
 - 행위자(`actor_id`)가 같은 기관 사용자인 기록만 보여 준다(`audit_repo.search`). 관리자 콘솔(P10) 최근 감사 로그도 같은 범위에서 로그인 기록을 빼고 보여 준다.
 - 대상별 조회는 `audit_logs(target_type, target_id)` 복합 인덱스를 쓴다(Alembic 0009).
 - 화면의 시각은 브라우저 시간대로 보이고, 날짜 필터는 UTC 날짜 기준이다(라벨에 표시).
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 찾기 (행위·대상 종류·대상 번호·기간) · 초기화 · 대상 링크(그 대상만) · 이전·다음 페이지 | M13 (조건을 쿼리로) |

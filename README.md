@@ -64,7 +64,7 @@ AI에게 판정을 맡기면 빠르지만, AI는 강의계획서에 없는 내�
 
 역할별 화면과 메뉴는 아래 [주요 화면](#주요-화면), 화면별 세부는 [화면 명세서](docs/screens/README.md)에 있습니다.
 
-기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황·화면별 기능](docs/traceability.md) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·화면 버튼 대응) · [ERD](docs/ERD.md)(엔티티·속성·관계) · [미결 사항](docs/open-issues.md)(확정 안 된 규칙·지금 어려운 일) · [실행·배포 자세히](docs/setup.md) · [운영 가이드](docs/operations.md)
+기준 문서: [개발 규칙](CLAUDE.md) · [기획 통합본](docs/spec.md)(페르소나·테스트 명세·기술스택·기능 명세) · [화면 디자인](docs/DESIGN.md) · [화면 명세서](docs/screens/README.md)(화면별 URL·배치·상태) · [구현 현황](docs/traceability.md)(요구사항 → 코드 → 테스트) · [개인정보 처리](docs/privacy.md) · [API 명세](docs/API_Spec.md)(엔드포인트·JSON API) · [ERD](docs/ERD.md)(엔티티·속성·관계) · [미결 사항](docs/open-issues.md)(확정 안 된 규칙·지금 어려운 일) · [실행·배포 자세히](docs/setup.md) · [운영 가이드](docs/operations.md)
 
 ## AI가 판정을 추천하는 방식
 
@@ -175,7 +175,7 @@ uv run pytest tests/unit tests/integration   # 통합 테스트는 PostgreSQL �
 uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 AI API(설정한 Claude 또는 GPT) 호출, 비용 발생
 ```
 
-같은 검사를 푸시·PR마다 [GitHub Actions](.github/workflows/ci.yml)가 PostgreSQL 17 서비스 컨테이너로 다시 돌립니다(번역 점검 `scripts.i18n_check` 포함).
+같은 검사를 푸시·PR마다 [GitHub Actions](.github/workflows/ci.yml)가 PostgreSQL 17 서비스 컨테이너로 다시 돌립니다(번역 점검 `scripts.i18n_check`, 문서 점검 `scripts.docs_check` 포함 — 엔드포인트·테이블 칸·화면 버튼 표가 문서에 빠짐없는지).
 
 테스트에서는 AI·S3를 대역(`tests/fakes.py`)으로 바꿉니다. 대역 AI는 일부러 원문에 없는 구절을 섞어 내보내고, 테스트는 그 구절이 저장되지 않는지 확인합니다.
 
@@ -208,7 +208,7 @@ frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (PostgreSQL 17, 기준점 0001에 이전 MariaDB 마이그레이션을 합침)
 db/              init.sql(스키마, alembic --sql로 생성) · data.sql(데모 초기 데이터, pg_dump로 생성) — scripts/export_db_sql.sh로 다시 만듦
-scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · docs_check(API 명세·ERD·화면 명세 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
 tests/           unit · integration(PostgreSQL) · eval(골든셋) · fixtures/(학점 계산·문서 추출 회귀 기대값, 인젝션 공격 문구 모음)
 ```
 

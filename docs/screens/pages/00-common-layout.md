@@ -4,6 +4,7 @@
 | --- | --- |
 | 적용 | 로그인 후 모든 화면 (`base.html`) |
 | 템플릿 | `frontend/templates/base.html`, `partials/macros.html`(nav_link), `*/_nav.html` |
+| 화면 테스트 | `test_queue_search_and_conflict_filter`(집계 칩, 학생에게 숨김), `test_dashboard_lists_todos_and_readiness`(숫자만 표시), `test_nav_badges_for_new_results_clear_when_viewed`, `test_staff_nav_badges_count_their_own_work` |
 | 최대 폭 | 기본 `max-w-[1280px]`(본문 1200px). 심사 큐(P05)·원문 대조 화면(P06·P12)만 `max-w-[1440px]`(본문 1360px). 상단 바·보조 바·본문·푸터가 같은 폭을 공유해 좌우 끝선이 맞음 |
 
 ## 위치 (위 → 아래)
@@ -85,3 +86,16 @@
 | 번역 위치 | `backend/locales/en.json`(한국어 원문이 열쇠). 빠진 번역은 `uv run python -m scripts.i18n_check`와 `tests/unit/test_i18n.py`가 잡음 |
 | 문구 길이 | 영어가 길어져도 줄바꿈으로 받도록 버튼·칩은 `flex-wrap`, 표 머리는 두 줄까지 허용 (심사 큐 머리 "AI recommendation / confidence" 등) |
 
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 로고 | A1 `GET /` |
+| 역할별 메뉴 (학생 3·심사관 6·교수 1·관리자 7) | 각 화면 조회 API (S1·S14·S15 / R1·R6·R8·R10·R12·R3 / F1 / M1·M2·M14·M17·M9·M11·M13) |
+| 알림 벨 | A12 `GET /notifications` (배지 숫자는 A13, 60초마다) |
+| 이름·역할 (비밀번호 변경) | A6 `GET /account/password` |
+| English / 한국어 | A5 `POST /lang` |
+| 로그아웃 | A4 `POST /logout` |
+| 보조 바 집계 칩 | A14 `GET /notifications/workspace` (자동) |

@@ -5,6 +5,7 @@
 | URL | `GET /admin/assignments?show=unassigned\|all`, 자동 배정 `POST /admin/assignments/auto`, 지정 배정 `POST /admin/assignments/{evaluation_id}` |
 | 역할 | 기관 관리자 (다른 역할은 403) |
 | 템플릿 | `admin/assignments.html` (관리자 메뉴 "교수 배정", 숫자 배지 = 교수 배정이 필요한 과목 수) |
+| 화면 테스트 | `test_admin_assigns_and_reassigns_without_seeing_ai_results` |
 | 최대 폭 | 기본 `max-w-[1280px]` |
 | 기능 | 권한 매트릭스 "교수 배정·재배정 — 관리자 가능": 판정 전 심사 건의 담당 교수를 학과 규칙으로 자동 배정하거나 교수를 지정해 배정·바꾸기 |
 
@@ -48,3 +49,13 @@
 - 관리자는 AI 분석 결과를 보지 않는다(권한 매트릭스 "AI 분석 결과 조회 — 관리자는 통계만"). 그래서 추천 등급·신뢰도·커버리지·후보 과목명은 표에 없고, 배정 기준인 학과만 보여 준다.
 - 배정을 바꾸면 이전 배정 행은 `is_active=false`로 남고 새 행이 생긴다(이력 보존, 심사 건당 활성 배정 하나는 DB 유니크로도 막는다). 관리자가 바꾼 배정은 부재 대리가 아니므로 `reassigned_from`을 비우고, 이전 교수는 감사 로그 `assignment.create`의 `previous`에 남긴다.
 - 심사관도 같은 서비스(`review.assign_to`)를 쓸 수 있다. 화면은 심사 큐(P05)의 일괄 배정을 그대로 쓴다.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 미배정 · 전체 (보기 칩) | M17 `show` |
+| 고른 건 학과 교수에게 자동 배정 | M18 |
+| 배정 · 바꾸기 (행마다) | M19 |

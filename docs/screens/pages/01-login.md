@@ -5,6 +5,7 @@
 | URL | `GET /login`, `POST /login`, 언어 전환 `POST /lang` |
 | 역할 | 비로그인 (로그인 상태로 `/`에 오면 역할 홈으로 이동) |
 | 템플릿 | `login.html` |
+| 화면 테스트 | `test_five_failures_lock_login_for_a_minute`, `test_lockout_without_mail_sends_user_to_admin` |
 | 기능 | 인증 후 역할별 홈: 학생 `/student`, 심사관 `/review`, 교수 `/professor`, 관리자 `/admin/stats`. 임시 비밀번호 계정은 비밀번호 변경(P19)으로 |
 
 ## 위치
@@ -56,3 +57,12 @@
 | 임시 비밀번호로 로그인 | `/account/password`(P19)로 이동 |
 | 비밀번호 재설정 직후 | 플래시 "비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요." |
 | 다른 곳에서 비밀번호가 바뀐 세션 | 다음 요청 때 이 화면으로 돌아옴 |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 로그인 | A3 `POST /login` |
+| 비밀번호를 잊으셨나요? | A8 `GET /account/forgot` |

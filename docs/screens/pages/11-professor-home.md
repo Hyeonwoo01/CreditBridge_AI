@@ -5,6 +5,7 @@
 | URL | `GET /professor`, 부재 설정 `POST /professor/away` |
 | 역할 | 학과 교수 |
 | 템플릿 | `professor/index.html` |
+| 화면 테스트 | `test_away_professor_is_replaced_by_delegate`, `test_recent_decisions_on_professor_home` |
 | 기능 | 배정 목록(판정 전 + 이의 신청 재판정), 최근 판정한 심사(판정을 마친 건 다시 열기), FR-19 부재 기간·대리 심사자 |
 
 ## 위치
@@ -48,3 +49,12 @@
 | 판정한 심사 없음 | 파치먼트 "아직 판정한 심사가 없어요." |
 | 부재 저장 | 플래시 "진행 중인 N건을 대리 심사자에게 넘겼어요" + 대리 심사자·심사관 알림 |
 | 복귀 | 플래시 "복귀로 표시했어요." |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 심사 건 행 · 최근 판정한 심사 행 | F3 |
+| 부재 설정 [저장] | F2 |

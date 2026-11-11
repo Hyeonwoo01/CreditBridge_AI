@@ -5,6 +5,7 @@
 | URL | 목록 `GET /admin/accounts?q=&role=&status=active\|attention\|inactive\|all&page=`, 수정 `GET /admin/accounts/{id}`, 저장 `POST /admin/accounts/{id}` |
 | 역할 | 기관 관리자 (다른 역할은 403, 다른 기관 계정은 404) |
 | 템플릿 | `admin/accounts.html`, `admin/account_edit.html` (관리자 메뉴 "계정 목록") |
+| 화면 테스트 | `test_account_list_filters_and_hides_student_names`, `test_admin_edits_professor_department_and_delegate`, `test_student_account_page_hides_name_and_returns_after_deactivation` |
 | 최대 폭 | 기본 `max-w-[1280px]` |
 | 기능 | 권한 매트릭스 "사용자·학과·대리자 설정": 계정 찾기, 교직원 이름·교수/심사관 학과·교수 대리 심사자 수정, 학생 출신 대학·편입 전공 수정, 비밀번호 초기화·비활성화 바로 하기. 메뉴 "계정 목록" 숫자 배지 = 확인이 필요한 계정 수(로그인 실패로 비밀번호가 초기화된 계정 + 출신 대학·편입 전공이 빈 학생) |
 
@@ -80,3 +81,16 @@ dkim@msu.example
 ## 입학연도 (2026-11-11)
 
 학생 계정 수정의 "편입 정보"에 **입학연도**(네 자리, 비우면 모름)를 더했다. 입학연도별 학칙 정책(P18 학칙 정책)에 쓴다.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| (목록) 찾기 (이메일·역할) · 상태 칩 (활성·비활성·전체) · 이전·다음 페이지 | M14 |
+| (목록) 수정 | M15 |
+| (수정) ‹ 계정 목록 | M14 |
+| (수정) 저장 | M16 |
+| (수정) 설정 링크 메일 보내기 / 임시 비밀번호 발급 (확인창) | M6 (결과는 P18) |
+| (수정) 비활성화 (확인창) · 다시 활성화 | M7 + `next` (처리 뒤 이 화면으로) |

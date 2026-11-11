@@ -5,6 +5,7 @@
 | URL | 심사관 `GET /review/privacy`, `POST /review/privacy/{id}` / 관리자 `GET /admin/privacy`, `POST /admin/privacy/{id}` |
 | 역할 | 심사관(처리), 기관 관리자(승인 = 즉시 삭제) |
 | 템플릿 | `privacy.html` (역할별로 제목·버튼만 다름) |
+| 화면 테스트 | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_form_with_evidence_files`, `test_privacy_request_review_and_admin_approval`, `test_equivalency_import_shows_in_history_without_blocking` |
 | 기능 | FR-13 삭제 요청 흐름, 처리 기한 관리 |
 
 ## 위치
@@ -44,3 +45,12 @@
 
 - 판정 기록과 감사 로그는 학사 기록이라 남는다(설명 문구에 명시).
 - 운영 시 확인창이 필요하면 페이지 안 확인 단계로 구현한다(브라우저 `confirm()`은 일부 환경에서 막힘).
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 처리 완료 (심사관) | R9 |
+| 승인·삭제 (관리자, 확인창) | M10 |

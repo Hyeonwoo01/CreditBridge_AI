@@ -5,6 +5,7 @@
 | URL | `GET /evaluations/{id}/report`, PDF `GET /evaluations/{id}/report.pdf` |
 | 역할 | 볼 권한이 있는 학생(본인)·심사관(소속 기관)·교수(배정·판정). 관리자는 403 |
 | 템플릿 | `report.html` |
+| 화면 테스트 | `test_consistency_alert_for_conflicting_past_decision`, `test_student_sees_own_appeals_and_report_links_back`, `test_report_pdf_download` |
 | 기능 | FR-10 판정 이력, FR-23 감사용 근거 리포트, PDF 내려받기, FR-25 근거 구절의 원본 쪽 |
 
 ## 위치 (위 → 아래, 한 열 문서)
@@ -42,3 +43,13 @@ AI 추천: 등급·커버리지·신뢰도·후보·모델
 - PDF는 같은 내용을 A4 문서로 만든다(`report_pdf.html` → PyMuPDF, 서버에 저장하지 않음). 머리에 로고·"TRANSFER CREDIT EVALUATION REPORT"·"판정 근거 리포트", 심사 건 번호·분석·내려받은 시각(UTC). 개념별 근거는 표(개념·커버리지·판단) 아래 인용 줄. 모든 쪽 바닥에 "CreditBridge AI 판정 근거 리포트 #id · AI는 추천만 하고 최종 판정은 학과 교수가 합니다."와 "쪽 / 전체". 파일 이름 `creditbridge-report-{과목코드}-{id}.pdf`, `Cache-Control: no-store`.
 - 글꼴은 PyMuPDF 내장 CJK 글꼴 하나(한글·영문 같은 글꼴), 쓴 글자만 넣어 보통 100KB 안팎.
 - 내부 메모(P06·P12)는 화면 리포트와 PDF 어디에도 넣지 않는다.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| PDF 내려받기 | C2 |
+| 인쇄 | 화면 안 (브라우저 인쇄) |
+| ← 돌아가기 | S10 · R4 · F3 (역할별) |

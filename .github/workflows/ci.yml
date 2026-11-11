@@ -45,5 +45,7 @@ jobs:
         run: uv run mypy backend
       - name: Translations
         run: uv run python -m scripts.i18n_check
+      - name: Docs check (endpoints, ERD columns, screen button tables)
+        run: uv run python -m scripts.docs_check
       - name: Tests (unit + integration)
         run: uv run pytest tests/unit tests/integration -q

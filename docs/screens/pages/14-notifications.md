@@ -5,6 +5,7 @@
 | URL | `GET /notifications?page=` (50건씩 최신순, 열면 모두 읽음 처리), 배지 `GET /notifications/count` (HTMX 조각), 웹 푸시 `POST /notifications/push/subscribe`·`/unsubscribe` (JSON + `X-CSRF-Token`), 서비스 워커 `GET /sw.js` |
 | 역할 | 로그인한 모든 사용자 |
 | 템플릿 | `notifications.html` |
+| 화면 테스트 | `test_notifications_for_assignment_and_delegation` |
 | 기능 | FR-19·20 화면 알림 (SMTP 설정 시 같은 내용 메일, VAPID 키 설정 시 구독한 기기에 웹 푸시) |
 
 ## 위치
@@ -60,3 +61,13 @@
 | 상태 | 표시 |
 | --- | --- |
 | 없음 | 파치먼트 "새 알림이 없어요." |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 푸시 알림 받기 · 이 기기에서 끄기 (VAPID 키가 있을 때) | A15 · A16 (서비스 워커 A17을 먼저 등록) |
+| 이전·다음 페이지 | A12 `page` |
+| (알림 행의 링크는 해당 화면 조회 API · 오류 화면 "처음으로"는 A1) | – |

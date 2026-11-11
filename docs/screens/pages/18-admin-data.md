@@ -5,6 +5,7 @@
 | URL | `GET /admin/data`, 과목 CSV `POST /admin/data/courses`, 계정 CSV `POST /admin/data/accounts`, 기준 강의계획서 `POST /admin/data/courses/{id}/reference`·빼기 `POST /admin/data/courses/{id}/reference/remove`, 출신 대학 `POST /admin/data/institutions`·지우기 `POST /admin/data/institutions/{id}/delete`, 비밀번호 초기화 `POST /admin/data/password-reset`, 계정 비활성화 `POST /admin/data/accounts/active` (`email`, `action=deactivate|reactivate`) |
 | 역할 | 기관 관리자 (심사관·교수·학생은 403) |
 | 템플릿 | `admin/data.html` (보조 바 위치 "관리자 콘솔 · 계정·과목") |
+| 화면 테스트 | `test_institution_data.py` 전체 |
 | 최대 폭 | 기본 `max-w-[1280px]` |
 | 기능 | 실제 운영 준비: 과목·계정 CSV 가져오기, 과목별 기준 강의계획서, 출신 대학 등록, 임시 비밀번호 재발급, 졸업·퇴직 계정 비활성화 (기능 명세 밖) |
 
@@ -100,3 +101,22 @@ Midwest State University 계정·과목 관리
 | 비활성화 성공 | 플래시 "{이메일} 계정을 비활성화했어요. 로그인이 막히고 다른 기기의 로그인도 끊겼어요." + (교수) "진행 중인 심사 N건을 같은 학과 다른 교수에게 넘겼어요." / "심사 N건은 넘길 교수가 없어 심사관이 다시 배정해야 해요." 넘겨받은 교수에게 알림 → `#account-active` |
 | 다시 활성화 성공 | 플래시 "{이메일} 계정을 다시 활성화했어요. 이전 비밀번호로 로그인할 수 있어요." (넘긴 심사는 돌아오지 않음) |
 | 비활성화 거절 | 빨강 플래시 "우리 기관에 그 이메일의 계정이 없어요." / "본인 계정은 비활성화할 수 없어요." / "이미 비활성화된 계정이에요." / "이미 활성 상태인 계정이에요." |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 과목 가져오기 | M3 |
+| 기준 강의계획서 올리기·바꾸기 | M4 |
+| 기준 강의계획서 빼기 (확인창) | M20 |
+| 계정 가져오기 | M5 |
+| 설정 링크 메일 보내기 / 임시 비밀번호 발급 (확인창) | M6 |
+| 비활성화 (확인창) · 다시 활성화 | M7 `action=deactivate` · `action=reactivate` |
+| 학칙 정책 초안 추가 · 승인 · 끝내기(확인창) | M22 · M26 |
+| 학점 단위 저장 · 환산 규칙 추가 · 끝내기(확인창) | M23 · M24 · M25 |
+| 출신 대학 추가 | M8 |
+| 출신 대학 지우기 (확인창, 쓰지 않는 대학만) | M21 |
+| 이메일을 모르면 계정 목록에서 찾기 | M14 |
+| 단계 바로가기 4개 · 예시 파일 받기 · 임시 비밀번호 CSV 받기 | 화면 안 (같은 화면 위치) · 정적 파일 · 화면 안 (data URI) |

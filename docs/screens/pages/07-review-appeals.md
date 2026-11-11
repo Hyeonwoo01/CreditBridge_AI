@@ -5,6 +5,7 @@
 | URL | `GET /review/appeals`, 처리 `POST /review/appeals/{id}` (`action=accept|dismiss`) |
 | 역할 | 심사관 |
 | 템플릿 | `review/appeals.html` |
+| 화면 테스트 | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_form_with_evidence_files`, `test_privacy_request_review_and_admin_approval`, `test_equivalency_import_shows_in_history_without_blocking` |
 | 기능 | FR-23 이의 신청 접수·처리 |
 
 ## 위치
@@ -45,3 +46,12 @@
 | 기각 메모 비움 | 빨강 플래시 "기각할 때는 학생에게 전할 사유를 적어 주세요." |
 | 원 판정 교수를 골라 보냄 | 빨강 플래시 "재판정할 학과 교수를 선택해 주세요." |
 | 다른 심사관이 먼저 처리 | 심사 건 행을 잠근 뒤 다시 읽어 빨강 플래시 "이미 처리한 이의 신청이에요." |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 받아들이고 재판정 배정 · 기각 | R7 (`action=accept` · `action=dismiss`) |
+| 심사 건 · 판정 근거 리포트 · 근거 자료 | R4 · C1 · C5 |

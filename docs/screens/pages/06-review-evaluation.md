@@ -5,6 +5,7 @@
 | URL | `GET /review/evaluations/{id}`, 담당 교수 배정 `POST /review/evaluations/{id}/assign`, 보완 요청 `POST /review/evaluations/{id}/materials`, 학생 대신 보완 자료 `POST /review/evaluations/{id}/supplement` |
 | 역할 | 심사관 (소속 기관, 제출된 요청만) |
 | 템플릿 | `review/evaluation.html` + 공용 `partials/evaluation.html`, `partials/history.html`, `partials/material_request_form.html`, `partials/staff_supplement_form.html` |
+| 화면 테스트 | `test_evaluator_can_request_materials_but_not_after_decision`, `test_internal_notes_for_staff_only` |
 | 최대 폭 | 확장형 `max-w-[1440px]` (좌우 원문 대조 칸을 넓게) |
 | 기능 | 근거 확인(P04와 같은 분석 결과, FR-25 원본 PDF 쪽 링크, 다시 분석했으면 이전 분석과 비교), FR-11 과거 판정 이력, 심사 건 내부 메모, FR-22 보완 자료 요청, 학생 대신 보완 자료 올리기(권한 매트릭스 "문서 업로드 — 심사관 소속 기관 전체"), 처리 기록 |
 
@@ -57,3 +58,16 @@
 ## 증거 상태 (2026-11-11, 리뷰 v3 P0-5)
 
 내부 메모 아래 카드 `#evidence-status`: 출처(학생 제출·학사처 발급·담당 교원 확인·공식 포털 확인·공개 웹·기타), 진위(미확인·확인됨·일부 확인·검토 중·채택 안 함), 강의계획서 학기(예: 2024-1)와 성적표 수강 학기, 확인 방법(확인됨·일부 확인이면 필수), 메모(검토 중·채택 안 함이면 필수, 학생 비공개), [증거 상태 저장]. 적용 학기(일치·다름·모름)는 자동 계산. 분석 결과 머리에 출처·진위·적용 학기 배지와 "강의계획서 학기 · 수강 학기"(P04·P12도 같음), 검토 중·채택 안 함이면 판정 보류 안내, 다른 학기 자료면 확인 안내.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 증거 상태 저장 | R15 |
+| 담당 교수 배정 [배정 / 바꾸기] | R14 |
+| 학생에게 보완 자료 요청 [요청 보내기] | R5 |
+| 학생 대신 보완 자료 올리기 [올리고 다시 분석] (확인창) | R13 |
+| 메모 남기기 | C4 |
+| 원본 N쪽 ↗ · 근거 자료 · 판정 근거 리포트 · ← 심사 큐 | C3 · C5 · C1 · R1 |

@@ -5,6 +5,7 @@
 | URL | `GET /professor/evaluations/{id}`, 판정 `POST /professor/evaluations/{id}/decision`, 보완 요청 `POST /professor/evaluations/{id}/materials` |
 | 역할 | 학과 교수 (본인에게 배정된 건, 또는 본인이 판정한 건 열람) |
 | 템플릿 | `professor/evaluation.html` + `partials/evaluation.html`, `partials/history.html`, `partials/material_request_form.html` |
+| 화면 테스트 | `test_professor_decision_rules_and_portal`, `test_reason_dialog_reopens_on_validation_error`, `test_evidence_links_open_original_pdf_page` |
 | 최대 폭 | 확장형 `max-w-[1440px]` (좌우 원문 대조 칸을 넓게). 하단 판정 바도 같은 폭 |
 | 기능 | FR-09 최종 판정(선택형 사유), FR-11 일관성 경보, FR-20 모바일 승인, FR-22 보완 자료 요청, FR-23 재판정, FR-25 원본 PDF 쪽 열기, 심사 건 내부 메모 |
 
@@ -115,3 +116,18 @@
 
 - 모바일(834px 미만): 근거 쌍이 세로로 쌓이고, 하단 바는 항상 고정, 버튼은 작은 캡슐(높이 36px 이상).
 - 사유 창은 모바일에서도 같은 창을 화면 폭 - 32px로 띄우고, 사유 목록과 메모는 창 안에서 스크롤한다.
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 판정 칩(승인·수정·반려) · 등급·대상 과목 선택 | 화면 안 (F4 입력값) |
+| 판정 확정 · 하단 바 판정 확정 · 재판정 확정 | F4 |
+| 사유 선택 창 [사유 저장 및 판정 확정] | F4 (같은 폼) |
+| 사유 선택 창 [취소 / 판정 변경] · 닫기 · 과거 판정 이력 보기 | 화면 안 |
+| 보완 자료 요청 (하단 바) → [요청 보내기] | F5 |
+| 근거 구절 옆 [맞음] · [틀림] | F6 (HTMX, 버튼만 다시 그림) |
+| 메모 남기기 | C4 |
+| ← 배정된 심사 · 판정 근거 리포트 · 원본 N쪽 ↗ | F1 · C1 · C3 |

@@ -76,34 +76,9 @@
 | 출신 대학 등록 | ✅ | `institution_data.add_source_institution` | `test_source_institution_registration` |
 | CSV 공통 처리 | ✅ | `services/csv_import.py` (UTF-8·cp949, 5MB, 실제 줄 번호) — 동등 과목표 가져오기도 사용 | `unit/test_institution_data_units.py` |
 
-## 화면 ↔ 기능
+## 화면에 넣지 않은 것
 
-화면 디자인 기준은 [DESIGN.md](DESIGN.md) 1.1.0. 폭은 기본 1280px, 심사 큐·원문 대조 화면만 1440px(`frontend/templates/base.html` `{% block width %}`). 템플릿 열의 경로는 `frontend/templates/` 기준.
-
-| 화면 | URL | 템플릿 | 기능 | 화면 테스트 |
-| --- | --- | --- | --- | --- |
-| 로그인 | `/login` | `login.html` (실패 5번 1분 잠금·10번 초기화 안내) | FR-12, 운영 데이터 준비 | `test_five_failures_lock_login_for_a_minute`, `test_lockout_without_mail_sends_user_to_admin` |
-| 공통 레이아웃 | 모든 화면 | `base.html` (기관 보조 바·집계 칩, Human-in-the-Loop 푸터), 역할별 메뉴 `*/_nav.html`·`partials/macros.html::nav_link`. 역할별 메뉴 숫자 배지(`views.nav_badges`, `web/nav.py`가 그릴 때 한 번 계산, 숫자만·0이면 숨김). 학생 "내 편입 요청 · 성적표 · 이의 신청 · 인정 사례": 채워야 할 서류 수(앰버)·이의 신청할 수 있는 과목 수(중립)·새 결과 수(파랑). 심사관: 심사 큐에 교수 배정이 필요한 과목 수, 이의 신청에 처리할(접수됨) 건수, 삭제 요청에 처리할 건수. 교수: 배정된 심사에 판정할 건수(재판정 포함). 관리자: 계정·과목에 준비가 필요한 항목(기준 강의계획서 없는 과목 + 교수가 없는 학과), 삭제 승인에 승인할 건수. 교직원 배지는 모두 앰버(처리할 일)이고 기관 전체 집계는 보조 바 칩이 맡음. 함께 쓰는 화면(알림·판정 근거 리포트·비밀번호 변경)에도 같은 배지, 모바일은 햄버거 메뉴 안. 첫 로그인 비밀번호 강제 변경 중과 오류 화면에는 역할 메뉴·배지 없음 | FR-12, FR-17·18·19·20·21, FR-13·23 | `test_queue_search_and_conflict_filter`(집계 칩, 학생에게 숨김), `test_dashboard_lists_todos_and_readiness`(숫자만 표시), `test_nav_badges_for_new_results_clear_when_viewed`, `test_staff_nav_badges_count_their_own_work` |
-| 내 성적표 | `/student/transcript` | `student/transcript.html` | FR-02 처음 들어오면 먼저 올리는 계정 성적표(`student_transcripts`), 과목 줄을 뽑으면 성적 C 이상 과목마다 요청 자동 생성(`student.sync_course_requests`), 바꾸면 제출 전 요청에만 반영 | `test_account_transcript.py`, `test_course_requests.py` |
-| 학생 홈(대시보드) | `/student` | `student/index.html` | FR-15 성적표 과목 요청 목록(학생이 만들지 않음)·편입 학점 상한과 졸업 학점 과목 고르기(`student.cap_simulation`, `set_counted`)·전체 합계(요청을 합친 예상 인정 학점·판정 확정 수·남은 학기, 같은 과목은 한 번: `services/student.py::merged_rows`)·요청별 예상 인정 학점·판정 확정 수, FR-21 할 일·서류 준비율 | `test_request_needs_affiliated_student_and_valid_major`, `test_dashboard_lists_todos_and_readiness`, `test_total_merges_requests_and_counts_same_course_once` |
-| 선배 인정 사례(학생) | `/student/precedents` | `student/precedents.html` | FR-26 기관 동등 과목표 검색 | `test_precedents_show_only_institution_equivalency_table` |
-| 편입 학점 시뮬레이션 리포트 | `/student/requests/{id}` | `student/request.html`, `partials/course_list.html` | FR-01·02·15·21·22, FR-13 삭제 요청 | `test_request_page_shows_simulation_and_stage`, `test_student_report_filters_courses` |
-| 이의 신청(학생) | `/student/appeals` | `student/appeals.html` | FR-23 | `test_student_sees_own_appeals_and_report_links_back` |
-| 이의 신청 작성(학생) | `/student/evaluations/{id}/appeal` | `student/appeal_form.html` | FR-23 | `test_appeal_form_with_evidence_files` |
-| 과목 분석 결과(학생) | `/student/evaluations/{id}` | `student/evaluation.html`, `partials/evaluation.html` | FR-05~08·22·23·25 | `test_material_request_flow_keeps_assignment`, `test_evidence_links_jump_to_source_positions` |
-| 심사 큐 | `/review` | `review/queue.html` (메뉴 숫자: 교수 배정이 필요한 과목) | FR-11·17·18·24 | `test_queue_tabs_and_department_assignment`, `test_queue_search_and_conflict_filter` |
-| 심사 건 상세 | `/review/evaluations/{id}` | `review/evaluation.html`, `partials/history.html`(`#history`), `partials/notes.html`(`#notes` 내부 메모), `partials/material_request_form.html`(`#materials`) | FR-11·22·25 | `test_evaluator_can_request_materials_but_not_after_decision`, `test_internal_notes_for_staff_only` |
-| 이의 신청 처리(근거 자료 내려받기)·삭제 요청·동등 과목표 | `/review/appeals`, `/appeal-files/{id}`, `/review/privacy`, `/admin/privacy`, `/review/equivalencies` | `review/appeals.html`, `privacy.html`, `review/equivalencies.html` | FR-23·13·26 | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_form_with_evidence_files`, `test_privacy_request_review_and_admin_approval`, `test_equivalency_import_shows_in_history_without_blocking` |
-| 관리자 콘솔 · 운영 통계 | `/admin/stats`, `/review/stats` | `stats.html` | FR-27·10·13·24 | `test_stats_page_counts_decisions_and_disagreement`, `test_admin_console_shows_recent_audit_without_student_names` |
-| 교수 홈(배정된 심사) | `/professor` | `professor/index.html` (배정 목록·이의 신청 재판정·최근 판정한 심사·부재 설정, 메뉴 숫자: 판정할 건수) | FR-18·19·23 | `test_away_professor_is_replaced_by_delegate`, `test_recent_decisions_on_professor_home` |
-| 교수 판정 화면 | `/professor/evaluations/{id}`, `/evaluations/{id}/original/{side}` | `professor/evaluation.html` (사유 선택 창, 하단 판정 바, 근거 구절 "원본 N쪽" 링크, 내부 메모 `partials/notes.html`) | FR-09·11·20·22·23·25 | `test_professor_decision_rules_and_portal`, `test_reason_dialog_reopens_on_validation_error`, `test_evidence_links_open_original_pdf_page` |
-| 판정 근거 리포트 | `/evaluations/{id}/report`, `/evaluations/{id}/report.pdf` | `report.html` (역할별 메뉴·숫자 배지·돌아가기·PDF 내려받기·근거 구절 원본 쪽), `report_pdf.html`(PDF용) | FR-10·23·25 | `test_consistency_alert_for_conflicting_past_decision`, `test_student_sees_own_appeals_and_report_links_back`, `test_report_pdf_download` |
-| 알림 | `/notifications` | `notifications.html` (역할별 메뉴·숫자 배지, 열면 모두 읽음) | FR-19·20·22·23 | `test_notifications_for_assignment_and_delegation` |
-| 계정·과목 관리 | `/admin/data`, `/account/password`, `/account/forgot`, `/account/reset` | `admin/data.html`, `account/password.html`, `account/forgot.html`, `account/reset.html` (메뉴 숫자: 기준 강의계획서 없는 과목 + 교수가 없는 학과) — 비밀번호 변경 화면은 역할별 메뉴·숫자 배지가 있고 첫 로그인 강제 변경이면 숨김 | 운영 데이터 준비 | `test_institution_data.py` 전체 |
-| 계정 목록·계정 수정 | `/admin/accounts`, `/admin/accounts/{id}` | `admin/accounts.html`, `admin/account_edit.html` | FR-12·19 | `test_account_list_filters_and_hides_student_names`, `test_admin_edits_professor_department_and_delegate`, `test_student_account_page_hides_name_and_returns_after_deactivation` |
-| 교수 배정(관리자) | `/admin/assignments` | `admin/assignments.html` | FR-18·19 | `test_admin_assigns_and_reassigns_without_seeing_ai_results` |
-| 학사정보 연동·감사 로그 | `/admin/sis`, `/admin/audit` | `admin/sis.html`, `admin/audit.html` | FR-24·10 | `test_sis_api_requires_admin_issued_token`, `test_audit_log_filters_by_action_target_and_date` |
-| 오류 | 모든 화면 | `error.html` (400·403·404, 역할 메뉴·숫자 배지 없이 "이전 화면으로·처음으로" 링크) | FR-12 | `test_role_based_access` |
+화면 목록·URL·템플릿·화면 테스트는 [화면 명세서](screens/README.md)와 각 화면 페이지에 있다.
 
 화면 언어: 모든 화면은 한국어·영어 두 가지(상단 언어 버튼). 화면에 넣지 않은 것: 판정 확률(%), 실제 데이터가 없는 인증 배지·전주 대비 증감·해시 체인·상담 담당자 카드, 교수·관리자 화면의 학생 이름.
 

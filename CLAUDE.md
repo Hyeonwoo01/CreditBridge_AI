@@ -6,7 +6,7 @@ AI는 추천만 하고, 최종 판정은 반드시 사람(학과 교수)이 한�
 기준 문서: docs/spec.md(페르소나·테스트 명세·기술스택·기능 명세 통합본), docs/DESIGN.md(화면 디자인 시스템: 단일 Action Blue, 1px 헤어라인, 그림자 없음),
 docs/traceability.md(요구사항-코드-테스트 추적), docs/privacy.md(개인정보 처리),
 docs/screens/(화면 명세서: 화면별 URL·배치·컴포넌트·상태 문구),
-docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API), docs/ERD.md(데이터베이스 구조: 엔티티·속성·관계), docs/open-issues.md(확정 안 된 규칙·지금 어려운 일).
+docs/API_Spec.md(API 명세: 엔드포인트 목록·JSON API·화면별 조회 API, 화면 버튼 대응은 docs/screens/ 각 페이지), docs/ERD.md(데이터베이스 구조: 엔티티·속성·관계), docs/open-issues.md(확정 안 된 규칙·지금 어려운 일).
 
 ## 고정 스택 (이 목록 밖의 라이브러리를 추가하지 말 것)
 - Python 3.12 / uv (pip install 금지, uv add 사용)
@@ -59,5 +59,6 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
 - 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
 - 화면 문구를 추가·수정했다면 backend/locales/en.json에 영어를 넣고 uv run python -m scripts.i18n_check 통과 (테스트 tests/unit/test_i18n.py도 같은 검사)
+- 엔드포인트·테이블 칸·화면 버튼을 바꿨다면 docs/API_Spec.md 2절·docs/ERD.md·해당 화면 페이지의 "버튼 ↔ API"를 고치고 uv run python -m scripts.docs_check 통과 (테스트 tests/unit/test_docs_check.py도 같은 검사). 화면 목록·URL·템플릿·화면 테스트는 docs/screens/에만 적는다
 - 템플릿에 새 Tailwind 클래스를 썼다면 scripts/build_css.sh로 frontend/static/css/app.css를 다시 빌드
 - 새 의존성이 필요하면 추가하지 말고 먼저 사람에게 물어볼 것

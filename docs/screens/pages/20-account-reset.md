@@ -5,6 +5,7 @@
 | URL | `GET·POST /account/forgot`, `GET /account/reset?token=…`, `POST /account/reset` |
 | 역할 | 비로그인 (로그인 화면의 "비밀번호를 잊으셨나요?") |
 | 템플릿 | `account/forgot.html`, `account/reset.html` |
+| 화면 테스트 | `test_institution_data.py` 전체 |
 | 기능 | 메일 재설정·설정 링크(한 번만 사용, 30분 또는 72시간). 메일 발송이 설정되지 않았으면 기관 관리자에게 요청하도록 안내(관리자는 P18에서 재발급) |
 
 ## 위치
@@ -39,3 +40,13 @@
 | 흔적 | 토큰은 메일 작업 안에서 생성(DB·작업 큐·로그에 없음), 접근 로그는 쿼리 문자열 제거, 재설정 화면은 `Cache-Control: no-store`·`Referrer-Policy: no-referrer` |
 | 완료 | 로그인 화면으로 이동, 플래시 "비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요." 다른 기기의 로그인은 끊기고, 로그인 연속 실패 횟수·잠금도 풀림 |
 | 무효 링크 | `GET` 400 / 이미 쓴 토큰으로 `POST` 422 |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 재설정 링크 받기 | A9 `POST /account/forgot` |
+| 비밀번호 바꾸기 (메일 링크로 연 화면) | A11 `POST /account/reset` |
+| 재설정 링크 다시 받기 · 로그인으로 돌아가기 | A8 · A2 |

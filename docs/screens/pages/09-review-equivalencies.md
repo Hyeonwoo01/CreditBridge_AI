@@ -5,6 +5,7 @@
 | URL | `GET /review/equivalencies?q=&result=direct\|elective\|none&page=`, 가져오기 `POST /review/equivalencies` (multipart) |
 | 역할 | 심사관 |
 | 템플릿 | `review/equivalencies.html` |
+| 화면 테스트 | `test_appeal_accept_and_redecide_keeps_original_decision`, `test_appeal_form_with_evidence_files`, `test_privacy_request_review_and_admin_approval`, `test_equivalency_import_shows_in_history_without_blocking` |
 | 기능 | FR-26 엑셀(CSV) 판정 이력 일괄 가져오기, 가져온 이력 전체 검색 |
 
 ## 위치
@@ -64,3 +65,12 @@
 | 검색 결과 없음 | "조건에 맞는 이력이 없어요." (검색 조건이 없으면 "아직 가져온 이력이 없어요.") |
 | 행 오류 | HTTP 422 + 오류 목록, 아무것도 저장하지 않음 |
 | 파일 오류 | 빨강 플래시 (CSV 아님, 빈 파일, 5MB 초과, 필수 열 없음, 인코딩) |
+
+## 버튼 ↔ API
+
+엔드포인트 ID(A·S·R·F·C·M·J)는 [API 명세 2절](../../API_Spec.md#2-엔드포인트-목록). `화면 안` = 서버를 부르지 않는 버튼.
+
+| 버튼·링크 | API |
+| --- | --- |
+| 가져오기 (CSV) · 예시 파일 | R11 · 정적 파일 |
+| 찾기 · 판정 결과 칩 · 이전·다음 페이지 | R10 `q`·`result`·`page` |
