@@ -1,4 +1,4 @@
-{% from "partials/macros.html" import rec_badge, stage_bar, time %}
+{% from "partials/macros.html" import ai_rec_badge, rec_badge, stage_bar, time %}
 <div id="course-list" class="grid gap-3" {% if view.processing %}hx-get="/student/requests/{{ view.request.id }}?show={{ view.show }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
   {% for row in view.visible_rows %}
   {% set ev = row.evaluation %}
@@ -23,7 +23,7 @@
           {% elif row.group == 'supplement' %}
             <span class="badge-elective">{{ _("보완 필요") }}</span>
           {% elif ev %}
-            <span class="badge">{{ _('심사 중') if view.request.status != 'draft' else _('AI 추천') }}</span>{{ rec_badge(ev.recommendation) }}
+            <span class="badge">{{ _('심사 중') if view.request.status != 'draft' else _('AI 추천') }}</span>{{ ai_rec_badge(ev.recommendation) }}
           {% endif %}
         </div>
         <a href="/student/syllabi/{{ row.syllabus.id }}" class="truncate text-[19px] font-semibold hover:text-primary">{{ row.syllabus.course_code }} {{ row.syllabus.course_title }}</a>

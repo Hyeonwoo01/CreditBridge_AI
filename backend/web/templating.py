@@ -11,8 +11,8 @@ from markupsafe import Markup, escape
 from backend.config import get_settings
 from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
+from backend.services import ai_monitoring, review_frameworks
 from backend.services import jobs as job_service
-from backend.services import review_frameworks
 from backend.services.case_state import LABELS as CASE_STATE_LABELS
 from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
@@ -184,6 +184,7 @@ TEMPLATES.env.filters.update(
     authenticity=lambda v: _label(AUTHENTICITY_LABELS, v),
     case_state=lambda v: _label(CASE_STATE_LABELS, v),
     job_status=lambda v: _label(JOB_STATUS_LABELS, v),
+    ai_gate=lambda v: _label(ai_monitoring.GATE_LABELS, v),
     job_error=lambda v: _label(job_service.ERROR_LABELS, v),
     checklist_item=lambda item, framework: gettext(review_frameworks.label(framework, item)),
     applicability=lambda v: _label(APPLICABILITY_LABELS, v),
@@ -209,6 +210,7 @@ TEMPLATES.env.globals.update(
     current_locale=get_locale,
     locale_labels=LABELS,
     demo_mode=lambda: get_settings().demo_mode,  # 공개 데모 안내·데모 계정 버튼
+    ai_limited=lambda: get_settings().ai_limited,  # AI 추천 범위 제한 (리뷰 v3 P1-7)
 )
 
 

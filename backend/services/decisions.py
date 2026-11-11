@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
 from backend.errors import DecisionValidationError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
@@ -376,6 +377,8 @@ def decide(
         raise DecisionValidationError(tr("이의 신청 재판정은 원 판정 교수가 아닌 다른 교수가 해야 해요."))
     if action not in DecisionAction.__members__.values():
         raise DecisionValidationError(tr("승인·수정·반려 중 하나를 선택해 주세요."))
+    if action == DecisionAction.APPROVE and get_settings().ai_limited:
+        raise DecisionValidationError(tr("지금은 AI 추천 등급을 쓰지 않아요. '수정'에서 판정 결과를 직접 골라 주세요."))
     hold = evidence_service.hold_reason(syllabus_repo.get(session, evaluation.syllabus_id))
     if hold:  # 진위 검토 중·채택 안 한 자료는 자동 불인정이 아니라 판정 보류
         raise DecisionValidationError(tr(hold))

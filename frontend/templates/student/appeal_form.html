@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import rec_badge, time %}
+{% from "partials/macros.html" import ai_rec_badge, rec_badge, time %}
 {% block nav %}{% include "student/_nav.html" %}{% endblock %}
 {% block content %}
 {% set ev = v.evaluation %}
@@ -30,7 +30,7 @@
       <dd>{% for c in d.reason_codes %}{{ c | reason }}{% if not loop.last %}, {% endif %}{% endfor %}{% if d.reason_memo %} — {{ d.reason_memo }}{% endif %}</dd>
       {% endif %}
       <dt class="text-muted">{{ _("AI 추천") }}</dt>
-      <dd class="flex flex-wrap items-center gap-2">{{ rec_badge(ev.recommendation) }}{% if ev.coverage is not none and v.candidate %}<span class="text-muted">{{ _("{code} 커버리지 {coverage}", code=(v.candidate.code), coverage=(ev.coverage | pct)) }}</span>{% endif %}</dd>
+      <dd class="flex flex-wrap items-center gap-2">{{ ai_rec_badge(ev.recommendation) }}{% if ev.coverage is not none and v.candidate %}<span class="text-muted">{{ _("{code} 커버리지 {coverage}", code=(v.candidate.code), coverage=(ev.coverage | pct)) }}</span>{% endif %}</dd>
     </dl>
     {% set gaps = v.primary.concepts | selectattr("status", "in", ["not_taught", "unclear", "partial"]) | list if v.primary else [] %}
     {% if gaps %}

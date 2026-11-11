@@ -24,7 +24,7 @@
   {% if error and not reopen %}<p class="text-sm text-reject">{{ error }}</p>{% endif %}
   <fieldset class="flex flex-wrap gap-2">
     <legend class="sr-only">{{ _("판정") }}</legend>
-    {% for value, label in [('approve', _('AI 추천대로 승인')), ('modify', _('수정')), ('reject', _('반려(불인정)'))] %}
+    {% for value, label in ([] if ai_limited() else [('approve', _('AI 추천대로 승인'))]) + [('modify', _('수정')), ('reject', _('반려(불인정)'))] %}
     <label class="chip cursor-pointer"><input class="sr-only" type="radio" name="action" value="{{ value }}" required {% if f.get('action') == value or (not f and value == 'approve' and v.evaluation.recommendation != 'insufficient') %}checked{% endif %}>{{ label }}</label>
     {% endfor %}
   </fieldset>

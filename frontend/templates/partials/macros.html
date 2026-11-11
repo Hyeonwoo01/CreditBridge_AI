@@ -3,6 +3,11 @@
 <span class="{{ {'direct': 'badge-approve', 'elective': 'badge-elective', 'insufficient': 'badge-elective', 'none': 'badge-reject'}.get(rec, 'badge') }}">{{ rec | rec }}</span>
 {%- endmacro %}
 
+{# AI 추천 등급 배지. AI_RECOMMENDATION_MODE=evidence_only면 등급 대신 '등급 숨김' (리뷰 v3 P1-7). 판정 결과에는 rec_badge #}
+{% macro ai_rec_badge(rec) -%}
+{% if ai_limited() %}<span class="badge" data-ai-limited>{{ _("AI 등급 숨김") }}</span>{% else %}{{ rec_badge(rec) }}{% endif %}
+{%- endmacro %}
+
 {% macro conf_badge(conf) -%}
 <span class="{{ {'high': 'badge-approve', 'medium': 'badge-elective', 'low': 'badge-reject'}.get(conf, 'badge') }}">{{ _("신뢰도 {conf}", conf=(conf | conf)) }}</span>
 {%- endmacro %}

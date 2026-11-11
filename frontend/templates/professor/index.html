@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import rec_badge, time %}
+{% from "partials/macros.html" import ai_rec_badge, rec_badge, time %}
 {% block nav %}{% include "professor/_nav.html" %}{% endblock %}
 {% block content %}
 <header class="grid gap-2">
@@ -11,7 +11,7 @@
   <a href="/professor/evaluations/{{ it.evaluation.id }}" class="card grid gap-2 p-5 hover:border-primary/40">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <span class="font-semibold">{{ it.syllabus.course_code }} {{ it.syllabus.course_title }}</span>
-      <span class="flex items-center gap-2">{{ rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.coverage is not none and it.candidate and it.evaluation.recommendation != "insufficient" %}<strong class="tabular-nums" title="{{ _('개념 커버리지') }}">{{ it.evaluation.coverage | pct }}</strong>{% endif %}</span>
+      <span class="flex items-center gap-2">{{ ai_rec_badge(it.evaluation.recommendation) }}{% if it.evaluation.coverage is not none and it.candidate and it.evaluation.recommendation != "insufficient" %}<strong class="tabular-nums" title="{{ _('개념 커버리지') }}">{{ it.evaluation.coverage | pct }}</strong>{% endif %}</span>
     </div>
     {% if it.appeal %}<span class="w-fit badge text-reject">{{ _("이의 신청 재판정") }}</span>{% endif %}
     <span class="text-sm text-muted">{{ _("→ {candidate} · 배정 {time}", candidate=(it.candidate.code if it.candidate else _('후보 없음')), time=(time(it.assignment.assigned_at, "date"))) }}{% if it.delegated_from %} {{ _("· {name} 교수 부재로 대리 배정", name=(it.delegated_from.name)) }}{% endif %}</span>

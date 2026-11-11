@@ -1,4 +1,4 @@
-{% from "partials/macros.html" import rec_badge, conf_badge, time %}
+{% from "partials/macros.html" import ai_rec_badge, rec_badge, conf_badge, time %}
 {# 근거 구절 옆 원본 파일 링크 (FR-25): PDF는 그 쪽(#page=N), 이미지는 원본 이미지. 새 탭으로 연다 #}
 {# 담당 교수만: 근거 구절 옆 맞음·틀림 #}
 {% macro feedback(side, e, c, k) -%}
@@ -42,6 +42,7 @@
 {% else %}
 
 {# ---- 추천 요약 ---- #}
+{% if ai_limited() %}<p class="mt-6 rounded-md bg-parchment p-4 text-sm" role="status" data-ai-limited-note>{{ _("지금은 AI 추천 등급과 신뢰도를 보여 주지 않아요. 근거 구절과 커버리지만 참고하고, 결과는 학과 교수가 직접 정해요.") }}</p>{% endif %}
 <section class="card mt-6 grid gap-6 md:grid-cols-[auto_1fr] md:items-center md:gap-10">
   <div class="flex flex-col items-center gap-2 text-center">
     {% if ev.recommendation == 'insufficient' %}
@@ -50,14 +51,16 @@
     {% elif ev.coverage is not none and v.candidate %}
       <span class="rating">{{ ev.coverage | pct }}</span>
       <span class="text-sm text-muted">{{ _("{code} 개념 커버리지", code=(v.candidate.code)) }}</span>
+    {% elif ai_limited() %}
+      <span class="font-display text-[40px] leading-[1.1] font-semibold text-muted">–</span>
     {% else %}
       <span class="font-display text-[40px] leading-[1.1] font-semibold">{{ ev.recommendation | rec }}</span>
     {% endif %}
   </div>
   <div class="grid gap-3">
     <div class="flex flex-wrap items-center gap-2">
-      {{ rec_badge(ev.recommendation) }}
-      {{ conf_badge(ev.confidence) }}
+      {{ ai_rec_badge(ev.recommendation) }}
+      {% if not ai_limited() %}{{ conf_badge(ev.confidence) }}{% endif %}
       {% if ev.level_flag and ev.level_flag != 'same' %}<span class="badge-reject">{{ ev.level_flag | level }}</span>{% endif %}
     </div>
     {% if v.candidate %}

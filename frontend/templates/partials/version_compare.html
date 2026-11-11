@@ -1,4 +1,4 @@
-{% from "partials/macros.html" import rec_badge, time %}
+{% from "partials/macros.html" import ai_rec_badge, rec_badge, time %}
 {# 강의계획서 버전 비교: 보완 자료나 분석 기준이 바뀌어 다시 분석했을 때 바로 앞 분석과 달라진 점. cmp: versions.Comparison #}
 {% set cmp = v.comparison %}
 {% set trend_label = {'up': _('좋아짐'), 'down': _('낮아짐'), 'same': _('그대로'), 'new': _('새 개념'), 'gone': _('빠진 개념')} %}
@@ -13,7 +13,7 @@
     <dl class="grid gap-3 sm:grid-cols-3">
       <div class="grid gap-1 rounded-md bg-parchment px-4 py-3">
         <dt class="text-xs text-muted">{{ _("AI 추천") }}</dt>
-        <dd class="flex flex-wrap items-center gap-1.5 text-sm">{{ rec_badge(cmp.previous.recommendation) }}<span class="text-muted" aria-label="{{ _('에서') }}">→</span>{{ rec_badge(cmp.current.recommendation) }}</dd>
+        <dd class="flex flex-wrap items-center gap-1.5 text-sm">{{ ai_rec_badge(cmp.previous.recommendation) }}<span class="text-muted" aria-label="{{ _('에서') }}">→</span>{{ ai_rec_badge(cmp.current.recommendation) }}</dd>
         <dd class="text-xs {{ trend_class[cmp.trend('rec')] }}">{{ arrow[cmp.trend('rec')] }} {{ trend_label[cmp.trend('rec')] }}</dd>
       </div>
       <div class="grid gap-1 rounded-md bg-parchment px-4 py-3">

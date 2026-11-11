@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
 from backend.documents.text import page_at
 from backend.errors import NotFoundError, PermissionDeniedError
 from backend.i18n import gettext as tr
@@ -42,8 +43,8 @@ from backend.schemas.extraction import SyllabusExtraction
 from backend.schemas.results import CandidateResult, EvaluationResult, EvidenceView
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import accounts as account_service
+from backend.services import ai_monitoring, case_state, review_frameworks
 from backend.services import appeals as appeal_service
-from backend.services import case_state, review_frameworks
 from backend.services import credits as credit_service
 from backend.services import decisions as decision_service
 from backend.services import evidence_feedback as feedback_service
@@ -334,6 +335,7 @@ def request_view(
         degree_credits=degree or plan_degree,
         tuition_per_credit=tuition if tuition is not None else (target.tuition_per_credit or 1000),
         credits_per_semester=per_semester,
+        ai_estimates=not get_settings().ai_limited,
     )
     processing = any(
         r.syllabus.status in ("uploaded", "processing")
@@ -440,7 +442,13 @@ def student_home(session: Session, student: User) -> StudentHome:
         summaries.append(
             RequestSummary(
                 r,
-                student_service.simulate(rows, plan(inst.id)[0], inst.tuition_per_credit or 1000, plan(inst.id)[1]),
+                student_service.simulate(
+                    rows,
+                    plan(inst.id)[0],
+                    inst.tuition_per_credit or 1000,
+                    plan(inst.id)[1],
+                    ai_estimates=not get_settings().ai_limited,
+                ),
                 student_service.readiness(session, r),
                 len(rows),
                 sum(1 for row in rows if row.decision is not None),
@@ -463,7 +471,13 @@ def student_home(session: Session, student: User) -> StudentHome:
     merged = student_service.merged_rows(groups)
     if total_inst is not None and (merged or pending):
         degree_credits, per_semester, cap = plan(total_inst.id)
-        raw = student_service.simulate(merged, degree_credits, total_inst.tuition_per_credit or 1000, per_semester)
+        raw = student_service.simulate(
+            merged,
+            degree_credits,
+            total_inst.tuition_per_credit or 1000,
+            per_semester,
+            ai_estimates=not get_settings().ai_limited,
+        )
         choices = [
             sm
             for sm in summaries
@@ -615,6 +629,13 @@ def reminder_preview(session: Session, user: User) -> reminder_service.Plan:
     if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
         raise PermissionDeniedError(tr("심사관과 기관 관리자만 볼 수 있어요."))
     return reminder_service.plan(session, user.institution_id)
+
+
+def ai_quality(session: Session, user: User) -> list[ai_monitoring.VersionQuality]:
+    """관리자 콘솔 'AI 성능 모니터링' (리뷰 v3 P1-7): 프롬프트·모델 버전별 교수 판정 일치율·잘못된 강한 추천률."""
+    if user.role != Role.ADMIN or user.institution_id is None:
+        raise PermissionDeniedError(tr("기관 관리자만 볼 수 있어요."))
+    return ai_monitoring.quality(session, user.institution_id)
 
 
 def job_health(session: Session, user: User) -> job_service.Health:

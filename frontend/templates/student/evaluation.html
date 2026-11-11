@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import rec_badge, time %}
+{% from "partials/macros.html" import ai_rec_badge, rec_badge, time %}
 {% block nav %}{% include "student/_nav.html" %}{% endblock %}
 {% block content %}
 <p class="mb-4 text-sm text-muted"><a class="underline" href="/student/requests/{{ v.request.id }}">{{ _("← 과목 목록") }}</a></p>
@@ -35,7 +35,7 @@
 <section class="mt-10 grid gap-2">
   <h2 class="section-title">{{ _("이전 분석 기록") }}</h2>
   {% for p in v.previous %}
-  <a class="flex items-center justify-between rounded-sm bg-parchment px-4 py-3 text-sm" href="/student/evaluations/{{ p.id }}"><span>{{ time(p.created_at) }}</span><span class="flex items-center gap-2">{{ rec_badge(p.recommendation) }}{% if p.coverage is not none %}{{ _("커버리지 {coverage}", coverage=(p.coverage | pct)) }}{% endif %}</span></a>
+  <a class="flex items-center justify-between rounded-sm bg-parchment px-4 py-3 text-sm" href="/student/evaluations/{{ p.id }}"><span>{{ time(p.created_at) }}</span><span class="flex items-center gap-2">{{ ai_rec_badge(p.recommendation) }}{% if p.coverage is not none %}{{ _("커버리지 {coverage}", coverage=(p.coverage | pct)) }}{% endif %}</span></a>
   {% endfor %}
 </section>
 {% endif %}

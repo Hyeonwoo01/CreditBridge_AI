@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     celery_task_always_eager: bool = False
 
     max_upload_mb: int = 20
+    # AI 추천 범위 (리뷰 v3 P1-7): full이면 추천 등급·신뢰도를 보여 주고, evidence_only면 근거·커버리지만 보여 주며
+    # 학생 예상치에서 AI 추천 기반 추정을 빼고 교수의 'AI 추천대로 승인'을 막는다 (품질 기준 미달 때 쓰는 안전장치)
+    ai_recommendation_mode: str = "full"
+    # AI 출시 기준 (관리자 콘솔 'AI 성능 모니터링'): 표본이 이만큼 이상일 때 일치율 하한·잘못된 강한 추천률 상한
+    ai_gate_min_samples: int = 20
+    ai_gate_min_agreement: float = 0.70
+    ai_gate_max_strong_wrong: float = 0.15
     # 업로드 악성코드 검사 (ClamAV clamd, 리뷰 v3 P0-7). 비우면 검사하지 않는다 (개발·테스트).
     # 켜면 검사를 마친 파일만 저장한다. clamav_required=true면 검사 서버가 응답하지 않을 때 업로드를 받지 않는다
     clamav_host: str = ""
@@ -73,6 +80,10 @@ class Settings(BaseSettings):
     # 비밀번호 변경·초기화와 계정 비활성화를 막는다. 운영에서는 반드시 false
     demo_mode: bool = False
     demo_storage_dir: str = "/tmp/creditbridge-files"
+
+    @property
+    def ai_limited(self) -> bool:
+        return self.ai_recommendation_mode == "evidence_only"
 
     @property
     def is_production(self) -> bool:

@@ -674,7 +674,11 @@ def _semesters(degree_credits: int | None, gained: float, per_semester: int | No
 
 
 def simulate(
-    rows: list[CourseRow], degree_credits: int | None, tuition_per_credit: int, credits_per_semester: int | None
+    rows: list[CourseRow],
+    degree_credits: int | None,
+    tuition_per_credit: int,
+    credits_per_semester: int | None,
+    ai_estimates: bool = True,
 ) -> Simulation:
     """예상 인정 학점·남은 학기·미인정 학점의 추가 비용을 범위값으로 계산한다 (예상치).
 
@@ -704,6 +708,8 @@ def simulate(
         source = conv.value
         source_total += source
         if ev is None or ev.status != "done":
+            continue
+        if decision is None and not ai_estimates:  # AI 추천 범위 제한 중: 확정 전 과목은 추정하지 않는다 (P1-7)
             continue
         credit = min(source, row.candidate_credits) if row.candidate_credits else source
         if decision is not None:  # 0009 이전 판정: 인정 학점이 저장돼 있지 않아 같은 규칙으로 계산

@@ -19,8 +19,8 @@ from backend.models.enums import ConversionMethod, CreditSystem, Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import accounts as account_service
+from backend.services import ai_monitoring, institution_data, notifications, views
 from backend.services import auth as auth_service
-from backend.services import institution_data, notifications, views
 from backend.services import jobs as job_service
 from backend.services import privacy as privacy_service
 from backend.services import review as review_service
@@ -185,6 +185,7 @@ def update_account(
 @router.get("/stats")
 def stats(request: Request, user: User = Admin, session: Session = Depends(get_db)) -> Response:
     """운영 통계 (FR-27)."""
+    ai_versions = views.ai_quality(session, user)
     return render(
         request,
         "stats.html",
@@ -195,6 +196,10 @@ def stats(request: Request, user: User = Admin, session: Session = Depends(get_d
         reminders=views.reminder_preview(session, user),
         reminder_hour=get_settings().reminder_hour_utc,
         jobs=views.job_health(session, user),
+        ai_versions=ai_versions,
+        ai_failing=ai_monitoring.current_failing(ai_versions),
+        ai_mode_limited=get_settings().ai_limited,
+        gate=get_settings(),
     )
 
 
