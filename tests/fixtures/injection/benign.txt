@@ -1,0 +1,20 @@
+# 실제 강의계획서에 흔한 문장: 하나도 탐지되면 안 된다 (오탐 회귀)
+Week 4: Equivalence relations and equivalent fractions; classify equivalent sets.
+New rules for late submissions will be announced in class.
+Students must accept the academic integrity policy before the first exam.
+Lab reports are marked and returned within one week.
+Score of 90 or above earns an A; the instructor may approve make-up exams.
+Answer all questions; partial credit is awarded for correct reasoning.
+Transfer students should consult the registrar about prerequisites.
+Use the assistant professor's office hours for project questions.
+Return the signed lab safety form by Week 2.
+The course covers system design, system prompts in HCI, and user interfaces.
+Week 10: Recommender systems and collaborative filtering.
+100점 만점으로 평가하며 출석 10%, 과제 30%, 시험 60%를 반영한다.
+새 규칙에 따라 지각 3회는 결석 1회로 처리한다.
+본 과목은 공학인증 프로그램의 전공 필수 과목이다.
+이 강의는 선형대수학을 선수 과목으로 한다.
+수업 중 질문은 언제든지 환영합니다.
+과제는 기한 내에 제출하며 늦은 제출은 감점한다.
+기말 프로젝트는 팀별로 발표하고 동료 평가를 반영한다.
+시스템 프로그래밍 실습은 리눅스 환경에서 진행한다.

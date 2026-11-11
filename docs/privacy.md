@@ -6,7 +6,7 @@ CreditBridge AI가 학생 문서를 어떻게 저장·전송·삭제하는지 �
 
 | 데이터 | 저장 위치 | 비고 |
 | --- | --- | --- |
-| 원본 강의계획서·성적표·보완 자료·이의 신청 근거 자료 파일 | 객체 스토리지(S3 호환) | 운영은 `S3_SERVER_SIDE_ENCRYPTION=AES256` 또는 `aws:kms`로 저장 암호화. DB에는 파일 키만(`supplement_files`, `appeal_files`는 파일 키·원래 파일 이름·형식·크기) |
+| 원본 강의계획서·성적표·보완 자료·이의 신청 근거 자료 파일 | 객체 스토리지(S3 호환) | 운영은 `S3_SERVER_SIDE_ENCRYPTION=AES256` 또는 `aws:kms`로 저장 암호화. DB에는 파일 키만(`supplement_files`, `appeal_files`는 파일 키·원래 파일 이름·형식·크기). 새 파일 키는 대상 대학 범위 경로 `t{기관 id}/종류/…`(리뷰 v3 P0-7, 기관 단위 삭제·백업용 — 읽기 권한은 언제나 DB 소유 관계로 검사). PDF에 숨긴 글자(투명·흰 글씨·아주 작은 글씨)는 추출 텍스트에서 빼고 AI에도 보내지 않는다 |
 | 강의계획서 추출 텍스트·구조화 결과 | `syllabi.raw_text`, `syllabi.extracted_json`, `syllabi.page_offsets` | 강의 내용이며 학생 개인정보는 아님. `page_offsets`는 원본 PDF의 쪽별 글자 위치(숫자 목록)뿐 |
 | 심사 건 내부 메모 | `evaluation_notes` | 심사관·담당 교수가 쓴 메모(1000자). 학생 화면·판정 근거 리포트(화면·PDF)에는 나오지 않음. 메모 칸에 "이름·학번·성적은 적지 마세요"를 안내하고, 감사 로그(`note.create`)에는 메모 id만 남기고 내용은 넣지 않음 |
 | 성적표 과목·학점·성적 | `transcript_entries` | 이름·학번·생년월일은 저장하지 않고, 이름은 마스킹 값(`L** J****`)만 |

@@ -17,8 +17,8 @@ class FakeStorage:
         self.objects: dict[str, bytes] = {}
 
     @staticmethod
-    def new_key(kind: str, filename: str) -> str:
-        return f"{kind}/{uuid4()}/{filename}"
+    def new_key(kind: str, filename: str, tenant: int | None = None) -> str:
+        return f"{f't{tenant}/' if tenant else ''}{kind}/{uuid4()}/{filename}"
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         self.objects[key] = data

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 import pymupdf
 
-from backend.errors import UploadRejectedError
+from backend.errors import DocumentParseError, UploadRejectedError
 from backend.i18n import gettext as tr
 
 ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
@@ -19,6 +19,19 @@ MAX_PAGES = 60
 MAX_SCANNED_PAGES = 20
 MAX_PIXELS = 25_000_000
 RENDER_DPI = 150
+# 압축 폭탄·비정상 구조 방지: PDF 객체 수 상한, 뽑은 글자 수 상한 (60쪽 강의계획서는 보통 20만 자 이하)
+MAX_PDF_OBJECTS = 50_000
+MAX_TEXT_CHARS = 600_000
+# 실행 코드·첨부 파일·외부 실행 같은 위험 요소 (리뷰 v3 P0-7). 강의계획서에는 필요 없으므로 받지 않는다
+RISKY_PDF_KEYS = (b"/JavaScript", b"/JS", b"/Launch", b"/EmbeddedFile", b"/RichMedia", b"/XFA", b"/SubmitForm")
+SIGNATURES = {
+    ".pdf": (b"%PDF-",),
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+}
+# 숨은 글자: 이보다 작은 글씨(pt)는 사람이 읽을 수 없다
+MIN_VISIBLE_FONT = 2.0
 
 
 @dataclass
@@ -30,6 +43,8 @@ class ExtractedDocument:
     # 페이지별 텍스트 (스캔 페이지는 ""), scanned_index는 scanned_pages 각각의 페이지 번호(0부터)
     pages: list[str] = field(default_factory=list)
     scanned_index: list[int] = field(default_factory=list)
+    # 사람 눈에는 안 보이는 글자(투명·흰 바탕 위 흰 글씨·아주 작은 글씨). AI 입력에서 뺀다 (리뷰 v3 P0-7)
+    hidden: list[str] = field(default_factory=list)
 
 
 def join_pages(pages: list[str]) -> tuple[str, list[int]]:
@@ -73,6 +88,10 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
         raise UploadRejectedError(tr("빈 파일이에요. 내용이 있는 파일을 올려 주세요."))
     if len(data) > max_mb * 1024 * 1024:
         raise UploadRejectedError(tr("파일이 {mb}MB를 넘어요.", mb=max_mb))
+    if not _signature_ok(ext, data):  # 확장자·브라우저가 보낸 형식은 믿지 않고 파일 첫 바이트를 본다
+        raise UploadRejectedError(
+            tr("파일 내용이 확장자({ext})와 달라요. 원래 형식 그대로 저장한 파일을 올려 주세요.", ext=ext)
+        )
     if ext == ".pdf":
         try:
             doc = pymupdf.open(stream=data, filetype="pdf")
@@ -84,6 +103,21 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
             if doc.page_count > MAX_PAGES:
                 raise UploadRejectedError(
                     tr("PDF가 {pages}쪽을 넘어요. 필요한 쪽만 남겨 올려 주세요.", pages=MAX_PAGES)
+                )
+            if doc.is_repaired or doc.page_count == 0:
+                raise UploadRejectedError(
+                    tr("PDF 구조가 손상돼 일부만 읽을 수 있어요. 원래 프로그램에서 PDF로 다시 저장해 올려 주세요.")
+                )
+            if doc.xref_length() > MAX_PDF_OBJECTS:
+                raise UploadRejectedError(
+                    tr("PDF 구조가 지나치게 복잡해요. 인쇄 → PDF로 저장해 다시 만들어 올려 주세요.")
+                )
+            if risky_pdf_parts(doc):
+                raise UploadRejectedError(
+                    tr(
+                        "실행 코드(JavaScript)나 첨부 파일이 들어 있는 PDF는 받지 않아요. "
+                        "인쇄 → PDF로 저장해 다시 만들어 올려 주세요."
+                    )
                 )
     else:
         # 픽셀 수를 머리말에서 먼저 확인한다: 작은 파일이 거대한 이미지로 풀려 메모리를 다 쓰지 않게
@@ -97,6 +131,60 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
         except Exception as exc:
             raise UploadRejectedError(tr("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.")) from exc
     return ext
+
+
+def _signature_ok(ext: str, data: bytes) -> bool:
+    head = data[:1024] if ext == ".pdf" else data[:16]
+    # PDF는 머리말 앞에 쓰레기 바이트가 조금 있어도 표준상 허용된다 (첫 1024바이트 안)
+    return any((sig in head) if ext == ".pdf" else head.startswith(sig) for sig in SIGNATURES[ext])
+
+
+def risky_pdf_parts(doc: pymupdf.Document) -> list[str]:
+    """JavaScript·외부 실행·첨부 파일·멀티미디어·XFA 폼처럼 강의계획서에 필요 없는 위험 요소의 이름."""
+    found: set[str] = set()
+    if doc.embfile_count():
+        found.add("/EmbeddedFile")
+    for xref in range(1, doc.xref_length()):
+        try:
+            obj = doc.xref_object(xref, compressed=True).encode()
+        except Exception:  # 깨진 객체 하나는 건너뛴다 (손상 여부는 is_repaired로 따로 본다)
+            continue
+        for key in RISKY_PDF_KEYS:
+            # /JS는 /JSxxx 같은 다른 이름과 구분한다 (뒤에 이름 글자가 오지 않을 때만)
+            at = obj.find(key)
+            while at >= 0:
+                nxt = obj[at + len(key) : at + len(key) + 1]
+                if not nxt.isalnum():
+                    found.add(key.decode())
+                    break
+                at = obj.find(key, at + 1)
+    return sorted(found)
+
+
+def _hidden_spans(page: pymupdf.Page) -> list[str]:  # 원래 글 그대로 (본문에서 지울 때 씀)
+    """사람 눈에 안 보이는 글자: 투명(렌더링 모드 3·투명도 0), 아주 작은 글씨, 칠한 배경이 없는 곳의 흰 글씨."""
+    fills: list[pymupdf.Rect] | None = None
+    hidden = []
+    for block in page.get_text("dict")["blocks"]:
+        for line in block.get("lines", []):
+            for span in line["spans"]:
+                text = span["text"].strip()
+                if len(text) < 3:
+                    continue
+                invisible = span.get("alpha", 255) == 0 or span["size"] < MIN_VISIBLE_FONT
+                if not invisible and span["color"] == 0xFFFFFF:
+                    if fills is None:  # 흰 글씨는 색칠한 상자(제목 띠 등) 위면 보이는 글자다
+                        fills = [
+                            pymupdf.Rect(d["rect"])
+                            for d in page.get_drawings()
+                            if d.get("fill") and tuple(d["fill"])[:3] != (1.0, 1.0, 1.0)
+                        ]
+                    box = pymupdf.Rect(span["bbox"])
+                    center = (box.tl + box.br) / 2
+                    invisible = not any(center in r for r in fills)
+                if invisible:
+                    hidden.append(span["text"])
+    return hidden
 
 
 _JPEG_SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
@@ -147,9 +235,18 @@ def extract(data: bytes, filename: str) -> ExtractedDocument:
     pages: list[str] = []
     scanned: list[bytes] = []
     scanned_index: list[int] = []
+    hidden: list[str] = []
     with pymupdf.open(stream=data, filetype="pdf") as doc:
         for number, page in enumerate(doc):
-            text = page.get_text("text")
+            try:
+                text = page.get_text("text")
+                for span in _hidden_spans(page):  # 숨은 글자는 저장·AI 입력·근거에서 모두 뺀다
+                    text = text.replace(span, "", 1)
+                    hidden.append(span.strip()[:200])
+            except Exception as exc:  # 한 쪽이라도 못 읽으면 일부만 분석하지 않는다
+                raise DocumentParseError(f"page {number + 1} could not be read") from exc
+            if sum(map(len, pages)) + len(text) > MAX_TEXT_CHARS:
+                raise DocumentParseError("document text is too long")
             if len(text.strip()) >= MIN_PAGE_CHARS:
                 pages.append(text)
             elif len(scanned) < MAX_SCANNED_PAGES:
@@ -161,5 +258,10 @@ def extract(data: bytes, filename: str) -> ExtractedDocument:
         total = len(doc)
     quality = (total - len(scanned)) / total if total else 0.0
     return ExtractedDocument(
-        text="\n".join(pages), quality=quality, scanned_pages=scanned, pages=pages, scanned_index=scanned_index
+        text="\n".join(pages),
+        quality=quality,
+        scanned_pages=scanned,
+        pages=pages,
+        scanned_index=scanned_index,
+        hidden=hidden,
     )

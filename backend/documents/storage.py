@@ -25,9 +25,12 @@ class ObjectStorage:
         )
 
     @staticmethod
-    def new_key(kind: str, filename: str) -> str:
+    def new_key(kind: str, filename: str, tenant: int | None = None) -> str:
+        """tenant: 파일을 소유한 대상 대학 id. 경로 앞에 붙여 기관 단위 삭제·백업·접근 정책을 나눌 수 있게 한다
+        (리뷰 v3 P0-7 테넌트 격리). 읽기 권한은 언제나 DB의 소유 관계로 검사하고 경로를 믿지 않는다."""
         safe = re.sub(r"[^A-Za-z0-9._-]+", "_", filename)[-80:] or "file"
-        return f"{kind}/{uuid4()}/{safe}"
+        prefix = f"t{tenant}/" if tenant else ""
+        return f"{prefix}{kind}/{uuid4()}/{safe}"
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         extra: dict[str, str] = {"ContentType": content_type}

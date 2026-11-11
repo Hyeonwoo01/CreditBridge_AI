@@ -269,7 +269,7 @@ def test_privacy_request_review_and_admin_approval(
         files={"file": ("plan.pdf", demo_pdf("linear_algebra_detailed.txt"), "application/pdf")},
         data={"csrf_token": token},
     )
-    assert any(k.startswith("supplements/") for k in fake_storage.objects)
+    assert any("/supplements/" in k for k in fake_storage.objects)  # 대상 대학 범위 경로 t{id}/
 
     client.post(f"/student/requests/{rid}/delete-documents", data={"csrf_token": token})
     page = client.post(f"/student/requests/{rid}/delete-documents", data={"csrf_token": token}).text
@@ -583,7 +583,7 @@ def test_appeal_form_with_evidence_files(client: TestClient, seeded: Session, fa
     appeal = seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).one()
     files = seeded.scalars(select(AppealFile).where(AppealFile.appeal_id == appeal.id).order_by(AppealFile.id)).all()
     assert [f.original_filename for f in files] == ["강의노트.pdf", "시험지.png"]
-    assert all(f.file_key and f.file_key.startswith("appeals/") for f in files)
+    assert all(f.file_key and "/appeals/" in f.file_key for f in files)
     page = client.get("/student/appeals").text
     assert "이의 신청을 접수했어요" in page and "강의노트.pdf" in page
     assert "이미 처리 중인 이의 신청" in client.get(form).text  # 작성 화면 대신 안내

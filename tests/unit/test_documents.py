@@ -37,7 +37,9 @@ def test_image_upload_becomes_a_page_to_transcribe() -> None:
         ("a.exe", b"MZ", "지원하지 않는 형식"),
         ("syllabus.docx", b"PK\x03\x04 docx", "PDF로 저장해서"),
         ("syllabus.txt", b"Week 1: Limits", "지원하지 않는 형식"),
-        ("broken.png", b"not an image", "이미지를 열 수 없어요"),
+        ("broken.png", b"not an image", r"확장자\(\.png\)와 달라요"),  # 첫 바이트가 PNG가 아니다
+        ("broken.png", b"\x89PNG\r\n\x1a\n" + b"x" * 40, "이미지를 열 수 없어요"),  # 머리말만 PNG
+        ("scan.jpg", b"%PDF-1.7 not a jpeg", r"확장자\(\.jpg\)와 달라요"),
         ("a.pdf", b"   ", "빈 파일"),
         ("a.pdf", b"%PDF-broken", "PDF를 열 수 없어요"),
     ],

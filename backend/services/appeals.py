@@ -120,7 +120,7 @@ def file_appeal(
         raise CreditBridgeError(tr("이미 처리 중인 이의 신청이 있어요.")) from None
     for f, ext in checked:
         assert storage is not None
-        key = storage.new_key("appeals", f.filename)
+        key = storage.new_key("appeals", f.filename, student.institution_id)
         storage.put(key, f.data, doc_text.CONTENT_TYPES[ext])
         appeal_repo.add_file(
             session,

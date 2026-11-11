@@ -6,7 +6,7 @@ Celery 작업(backend/workers/tasks.py)이 호출한다. 웹 요청 안에서 �
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
 from sqlalchemy.orm import Session
@@ -68,6 +68,7 @@ class DocumentText:
     text: str
     quality: float  # 인식 품질 점수 0~1
     page_offsets: list[int]  # 원본 파일 페이지 위치표 (documents.text.join_pages)
+    hidden: list[str] = field(default_factory=list)  # 본문에서 뺀 숨은 글자 (documents.text.ExtractedDocument)
 
 
 def document_to_text(llm: LLMClient, data: bytes, filename: str) -> DocumentText:
@@ -75,7 +76,7 @@ def document_to_text(llm: LLMClient, data: bytes, filename: str) -> DocumentText
     doc = doc_text.extract(data, filename)
     if not doc.scanned_pages:
         text, offsets = doc_text.join_pages(doc.pages)
-        return DocumentText(text, doc.quality, offsets)
+        return DocumentText(text, doc.quality, offsets, doc.hidden)
     prompt = load_prompt("transcription").render()
     pages = list(doc.pages)
     legibility = []
@@ -86,7 +87,7 @@ def document_to_text(llm: LLMClient, data: bytes, filename: str) -> DocumentText
     scanned_share = len(doc.scanned_pages) / max(len(doc.scanned_pages) + (1 if doc.text.strip() else 0), 1)
     quality = doc.quality + scanned_share * (sum(legibility) / len(legibility))
     text, offsets = doc_text.join_pages(pages)
-    return DocumentText(text, round(min(quality, 1.0), 3), offsets)
+    return DocumentText(text, round(min(quality, 1.0), 3), offsets, doc.hidden)
 
 
 def backfill_page_offsets(session: Session, storage: ObjectStorage) -> tuple[int, int]:
@@ -152,17 +153,34 @@ def _reuse_extraction(session: Session, syllabus: Syllabus) -> bool:
     return True
 
 
+def injection_flags(text: str, hidden: list[str]) -> list[str]:
+    """의심 문구 줄과 본문에서 뺀 숨은 글자를 화면 표시용 문장으로 (DB에는 한국어로 저장, 화면에서 | t)."""
+    flags = [N_("{line}행: {text}").format(line=f.line_no, text=f.text) for f in injection.detect(text)]
+    return flags + [HIDDEN_FLAG.format(text=h) for h in hidden]
+
+
+# 흰 글씨·아주 작은 글씨·투명 글자처럼 사람 눈에 안 보이는 글자 (리뷰 v3 P0-7). 본문·AI 입력에서 뺐다는 표시
+HIDDEN_FLAG = N_("숨은 글자: {text}")
+
+
+def _hidden_of(flags: list[str] | None) -> list[str]:
+    prefix = HIDDEN_FLAG.split("{")[0]
+    return [f.removeprefix(prefix) for f in flags or [] if f.startswith(prefix)]
+
+
 def _extract(session: Session, syllabus: Syllabus, llm: LLMClient, storage: ObjectStorage) -> None:
+    hidden = _hidden_of(syllabus.injection_flags)  # 다시 분석할 때도 처음 찾은 숨은 글자 표시는 남긴다
     if not syllabus.raw_text and syllabus.source_file_key:
         doc = document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
         syllabus.raw_text = doc.text
         syllabus.quality_score = doc.quality
         syllabus.page_offsets = doc.page_offsets
+        hidden = doc.hidden
     if len(syllabus.raw_text.strip()) < 40:
         raise LLMError("document has no readable text")
 
     flags = injection.detect(syllabus.raw_text)
-    syllabus.injection_flags = [N_("{line}행: {text}").format(line=f.line_no, text=f.text) for f in flags]
+    syllabus.injection_flags = injection_flags(syllabus.raw_text, hidden)
     result = extract_syllabus(llm, injection.sanitize(syllabus.raw_text, flags))
     extraction = result.output
     syllabus.extracted_json = extraction.model_dump()
@@ -438,8 +456,12 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
         evaluation.summary = output.no_match_reason
         summary_en = output.no_match_reason_en
         missing_concepts = []
-    if student.injection_flags:
+    hidden = _hidden_of(student.injection_flags)
+    if len(hidden) < len(student.injection_flags or []):
         warnings.append(N_("판정을 유도하는 의심 문구가 있어 해당 줄을 분석에서 제외했어요."))
+        warnings_en.append("")
+    if hidden:
+        warnings.append(N_("사람 눈에 보이지 않게 숨긴 글자(투명·흰 글씨·아주 작은 글씨)가 있어 분석에서 제외했어요."))
         warnings_en.append("")
 
     missing_materials = output.missing_materials or (
@@ -599,7 +621,11 @@ def process_student_transcript(session: Session, student_id: int, *, llm: LLMCli
         filename = transcript.file_key.rsplit("/", 1)[-1]
         text = document_to_text(llm, storage.get(transcript.file_key), filename).text
         masked = mask_pii(text)
-        result = llm.parse(load_prompt("transcript").render(transcript=masked.text), TranscriptExtraction, effort="low")
+        result = llm.parse(
+            load_prompt("transcript").render(transcript=injection.sanitize(masked.text, injection.detect(masked.text))),
+            TranscriptExtraction,
+            effort="low",
+        )
     except LLMError as exc:
         session.rollback()
         transcript.status = TranscriptStatus.FAILED

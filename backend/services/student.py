@@ -271,7 +271,7 @@ def upload_account_transcript(
         transcript = transcript_repo.add(session, StudentTranscript(student_id=student.id, uploaded_at=utcnow()))
     elif transcript.file_key:
         storage.delete(transcript.file_key)
-    key = storage.new_key("transcripts", file.filename)
+    key = storage.new_key("transcripts", file.filename, student.institution_id)
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
     transcript.file_key = key
     transcript.status = TranscriptStatus.PROCESSING
@@ -348,7 +348,7 @@ def add_syllabi(
                 continue
             audit.record(session, student, "syllabus.retry", "syllabus", str(existing.id), request=request.id)
             continue
-        key = storage.new_key("syllabi", f.filename)
+        key = storage.new_key("syllabi", f.filename, request.target_institution_id)
         storage.put(key, f.data, doc_text.CONTENT_TYPES[ext])
         syllabus = syllabus_repo.add(
             session,
@@ -466,6 +466,15 @@ def store_supplement_by_staff(
     return syllabus, key
 
 
+def _tenant_of(session: Session, syllabus: Syllabus) -> int | None:
+    """파일을 소유한 대상 대학 (학생 강의계획서는 요청의 대상 대학, 기준 강의계획서는 그 대학)."""
+    if syllabus.transfer_request_id:
+        request = request_repo.get(session, syllabus.transfer_request_id)
+        if request is not None:
+            return request.target_institution_id
+    return syllabus.institution_id
+
+
 def _save_supplement(
     session: Session,
     storage: ObjectStorage,
@@ -475,7 +484,7 @@ def _save_supplement(
     open_requests: list[MaterialRequest],
 ) -> str:
     ext = doc_text.validate_upload(file.filename, file.data, get_settings().max_upload_mb)
-    key = storage.new_key("supplements", file.filename)
+    key = storage.new_key("supplements", file.filename, _tenant_of(session, syllabus))
     storage.put(key, file.data, doc_text.CONTENT_TYPES[ext])
     material_repo.add_file(
         session,

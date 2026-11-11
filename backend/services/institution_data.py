@@ -14,7 +14,6 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from backend.ai.injection import detect
 from backend.ai.llm_client import LLMClient
 from backend.config import get_settings
 from backend.db.base import utcnow
@@ -517,7 +516,7 @@ def upload_reference(
     if course is None or course.institution_id != institution_id:
         raise NotFoundError(tr("과목을 찾을 수 없어요."))
     ext = doc_text.validate_upload(filename, data, get_settings().max_upload_mb)
-    key = storage.new_key("references", filename)
+    key = storage.new_key("references", filename, institution_id)
     storage.put(key, data, doc_text.CONTENT_TYPES[ext])
     syllabus = syllabus_repo.add(
         session,
@@ -587,7 +586,7 @@ def process_reference(
     syllabus.raw_text = text
     syllabus.quality_score = quality
     syllabus.page_offsets = doc.page_offsets
-    syllabus.injection_flags = [N_("{line}행: {text}").format(line=f.line_no, text=f.text) for f in detect(text)]
+    syllabus.injection_flags = analysis.injection_flags(text, doc.hidden)
     syllabus.status = SyllabusStatus.READY
     course.reference_syllabus_id = syllabus.id
     session.commit()
