@@ -869,5 +869,43 @@ ALTER TABLE policy_rules ADD CONSTRAINT ck_policy_rules_rule_type_valid CHECK (r
 
 UPDATE alembic_version SET version_num='0014' WHERE alembic_version.version_num = '0013';
 
+-- Running upgrade 0014 -> 0015
+
+CREATE TABLE sis_ack_requests (
+    institution_id BIGINT NOT NULL, 
+    idempotency_key VARCHAR(100) NOT NULL, 
+    request_hash VARCHAR(64) NOT NULL, 
+    response JSONB NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_sis_ack_requests PRIMARY KEY (id), 
+    CONSTRAINT fk_sis_ack_requests_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id), 
+    CONSTRAINT uq_sis_ack_requests_key UNIQUE (institution_id, idempotency_key)
+);
+
+CREATE TABLE sis_syncs (
+    decision_id BIGINT NOT NULL, 
+    institution_id BIGINT NOT NULL, 
+    status VARCHAR(10) NOT NULL, 
+    external_reference_id VARCHAR(100), 
+    attempts INTEGER NOT NULL, 
+    last_error TEXT NOT NULL, 
+    acknowledged_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_sis_syncs PRIMARY KEY (id), 
+    CONSTRAINT ck_sis_syncs_status_valid CHECK (status IN ('pending', 'applied', 'failed')), 
+    CONSTRAINT fk_sis_syncs_decision_id_decisions FOREIGN KEY(decision_id) REFERENCES decisions (id), 
+    CONSTRAINT fk_sis_syncs_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id), 
+    CONSTRAINT uq_sis_syncs_decision UNIQUE (decision_id)
+);
+
+CREATE INDEX ix_sis_syncs_institution_id ON sis_syncs (institution_id);
+
+CREATE INDEX ix_sis_syncs_status ON sis_syncs (status);
+
+UPDATE alembic_version SET version_num='0015' WHERE alembic_version.version_num = '0014';
+
 COMMIT;
 

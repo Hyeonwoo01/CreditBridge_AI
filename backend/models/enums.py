@@ -170,3 +170,11 @@ class PrivacyStatus(StrEnum):
     REQUESTED = "requested"  # 학생 요청
     REVIEWED = "reviewed"  # 심사관 처리 완료, 관리자 승인 대기
     COMPLETED = "completed"  # 관리자 승인, 삭제 완료
+
+
+class SisSyncStatus(StrEnum):
+    """판정의 학사정보시스템 반영 상태 (리뷰 v3 P1-4). 결과를 받기 전(행 없음)은 대기로 본다."""
+
+    PENDING = "pending"  # 관리자가 '다시 보내기'로 되돌림
+    APPLIED = "applied"
+    FAILED = "failed"

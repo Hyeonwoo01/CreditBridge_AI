@@ -50,3 +50,7 @@ class ConcurrentChangeError(DecisionValidationError):
 class DocumentParseError(LLMError):
     """문서를 끝까지 읽지 못했다 (한 쪽이라도 읽기 실패, 글자 수 상한 초과). 일부만 읽은 글을 정상 문서처럼
     분석하지 않고, 분석 실패와 같이 처리한다 (리뷰 v3 P0-7)."""
+
+
+class IdempotencyConflictError(CreditBridgeError):
+    """같은 Idempotency-Key로 다른 내용을 보냈다 (API 409)."""

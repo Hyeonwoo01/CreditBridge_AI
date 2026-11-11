@@ -21,6 +21,7 @@ from backend.models.notification import Notification
 from backend.models.policy_rule import PolicyRule
 from backend.models.privacy_request import PrivacyRequest
 from backend.models.push_subscription import PushSubscription
+from backend.models.sis_sync import SisAckRequest, SisSync
 from backend.models.student_transcript import StudentTranscript
 from backend.models.supplement_file import SupplementFile
 from backend.models.syllabus import Syllabus
@@ -51,6 +52,8 @@ __all__ = [
     "PolicyRule",
     "PrivacyRequest",
     "PushSubscription",
+    "SisAckRequest",
+    "SisSync",
     "StudentTranscript",
     "SupplementFile",
     "Syllabus",

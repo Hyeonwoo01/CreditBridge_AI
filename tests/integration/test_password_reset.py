@@ -114,7 +114,9 @@ def test_reset_token_rejects_tampering_and_expiry(seeded: Session, monkeypatch: 
     user = seeded.scalars(select(User).where(User.email == "jiwon@student.example")).one()
     token = auth.reset_token(user)
     assert auth.user_for_reset_token(seeded, token) is user
-    assert auth.user_for_reset_token(seeded, token[:-2] + "xx") is None
+    # 서명 가운데 글자를 바꾼다 (base64 마지막 글자는 남는 비트가 있어 바꿔도 같은 값이 될 수 있다)
+    swapped = "A" if token[-6] != "A" else "B"
+    assert auth.user_for_reset_token(seeded, token[:-6] + swapped + token[-5:]) is None
     monkeypatch.setattr(auth, "RESET_MAX_AGE", -1)
     assert auth.user_for_reset_token(seeded, token) is None
 

@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (29개)
+## 1. 엔티티 한눈에 보기 (31개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -37,6 +37,8 @@
 | 개인정보·운영 | `privacy_requests` | 문서 삭제 요청과 처리 단계 | FR-13 |
 | | `notifications` | 화면 알림과 알림 메일·웹 푸시 | FR-19·20 |
 | | `push_subscriptions` | 웹 푸시를 받는 기기(브라우저) 구독 | FR-20 |
+| | `sis_syncs` | 판정의 학사정보시스템 반영 결과 (반영됨·실패·다시 보내기 대기) | FR-24, 리뷰 v3 P1-4 |
+| | `sis_ack_requests` | 반영 결과 요청의 Idempotency-Key와 처음 응답 | FR-24, 리뷰 v3 P1-4 |
 | | `audit_logs` | 주요 행위 기록 (추가 전용) | FR-10 |
 
 ## 2. ER 다이어그램
@@ -76,6 +78,7 @@ erDiagram
     users ||--o{ decisions : "판정 교수"
     courses |o--o{ decisions : "인정 대상 과목"
     decisions ||--o{ appeals : "이의 대상 판정"
+    decisions ||--o| sis_syncs : "SIS 반영 상태"
     appeals |o--o{ decisions : "재판정"
     course_evaluations ||--o{ appeals : "이의 신청"
     appeals ||--o{ appeal_files : "근거 자료"
@@ -286,6 +289,12 @@ erDiagram
         bigint id PK
         bigint user_id FK
         varchar endpoint UK
+    }
+    sis_syncs {
+        bigint id PK
+        bigint decision_id FK
+        varchar status
+        varchar external_reference_id
     }
     audit_logs {
         bigint id PK
@@ -525,6 +534,10 @@ erDiagram
 
 **push_subscriptions** — 웹 푸시 구독(FR-20, Alembic 0002). `user_id` FK(IX), `endpoint` VARCHAR(1000) UQ(브라우저 푸시 서비스 주소, 기기마다 다름), `p256dh` VARCHAR(200)·`auth` VARCHAR(100)(내용 암호화 키, RFC 8291), `last_sent_at` null. 같은 브라우저에서 다른 계정으로 구독하면 그 계정으로 옮기고, 푸시 서비스가 만료(404·410)를 알리거나 사용자가 끄면 행을 지운다. 알림보다 나중에 구독한 기기에는 그 알림을 보내지 않는다.
 
+**sis_syncs** — 판정 하나가 학사정보시스템에 반영됐는지 (Alembic 0015, 리뷰 v3 P1-4). `decision_id` FK→decisions UQ(`uq_sis_syncs_decision`, 판정당 한 행), `institution_id` FK(IX), `status` VARCHAR(10)(pending·applied·failed, CHECK, IX — 행이 없으면 대기), `external_reference_id` VARCHAR(100) null(SIS 쪽 기록 번호), `attempts` INT(실패로 보고된 횟수), `last_error` TEXT, `acknowledged_at`(마지막 결과를 받은 시각), `created_at`, `updated_at`. 판정은 추가 전용이라 반영 상태는 이 표에 둔다. 이미 반영된 판정에 다른 번호가 오면 고치지 않고 대사 불일치로 알린다.
+
+**sis_ack_requests** — 반영 결과 요청의 Idempotency-Key (Alembic 0015). `institution_id` FK, `idempotency_key` VARCHAR(100), (`institution_id`, `idempotency_key`) UQ, `request_hash` VARCHAR(64)(같은 키에 다른 내용이면 409), `response` JSONB(처음 응답 — 같은 키로 다시 오면 그대로 돌려줌), `created_at`.
+
 **audit_logs** — 추가 전용(INSERT만). `actor_id` FK→users null(시스템 행위는 null, `actor_id, action` 복합 IX), `action` VARCHAR(50)(IX), `target_type` VARCHAR(50)·`target_id` VARCHAR(36)(대상, 외래키 없음, `target_type, target_id` 복합 IX), `payload_json` JSONB(id·판정값만, 이름·학번·성적 없음).
 
 ## 4. 관계
@@ -566,6 +579,7 @@ erDiagram
 | 27 | 대상·출신 대학, 과목 – 동등 과목표 | 1 : N | equivalencies.* | FR-11·26 |
 | 29 | 판정 – 배분 – 출신 과목 | 1 : N · 1 : N | credit_allocations.decision_id, syllabus_id | 리뷰 v3 P0-3 (N:1 합쳐 인정) |
 | 28 | 대상 대학 – 환산 규칙 – 판정 | 1 : N · 0..1 : N | credit_conversion_rules.target_institution_id, decisions.conversion_rule_id | 리뷰 v3 P0-1·2 |
+| 30 | 판정 – SIS 반영 상태 | 1 : 0..1 | sis_syncs.decision_id | 리뷰 v3 P1-4 |
 
 ### 4.1 API가 쓰는 데이터 (API_Spec.md 연결)
 

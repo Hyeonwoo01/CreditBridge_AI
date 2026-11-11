@@ -151,6 +151,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M10 | POST | `/admin/privacy/{id}` | 관리자 | `csrf_token` | 303→M9 | P08 | FR-13 |
 | M11 | GET | `/admin/sis` | 관리자 | – | HTML | P15 | FR-24 |
 | M12 | POST | `/admin/sis` | 관리자 | `action`(issue·revoke), `csrf_token` | HTML(새 토큰 한 번만) / 303 | P15 | FR-24 |
+| M27 | POST | `/admin/sis/retry` | 관리자 | `decision_ids[]`(반영 실패한 판정), `csrf_token` | 303→M11`#reconciliation` (실패 → 다시 보내기 대기, SIS가 `status=unsent`로 다시 가져감) | P15 | 리뷰 v3 P1-4 |
 | M13 | GET | `/admin/audit` | 관리자 | `action`, `target_type`, `target_id`, `since`·`until`(UTC 날짜 YYYY-MM-DD), `page` | HTML (소속 기관 기록, 50건씩) | P16 | FR-10 |
 | M14 | GET | `/admin/accounts` | 관리자 | `q`(이메일 일부), `role`, `status`(active·inactive·all), `page` | HTML (50건씩, 학생 이름 없음) | P24 | FR-12 |
 | M15 | GET | `/admin/accounts/{id}` | 관리자 | – | HTML / 404(다른 기관) | P24 | FR-12·19 |
@@ -165,7 +166,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- | --- | --- |
 | J1 | GET | `/api/v1/evaluations/{id}` | 세션 | 분석 결과(추천)와 사람 판정, 심사 상태 `case_state`·상태 토큰 `case_token` | FR-05~09 |
 | J2 | POST | `/api/v1/decisions` | 세션 + `X-CSRF-Token` | 최종 판정 저장 (F4와 같은 규칙, `case_token`을 보내면 그 사이 바뀐 건은 409) | FR-09·10 |
-| J3 | GET | `/api/v1/sis/decisions` | `Authorization: Bearer cbsis_...` | 확정 판정 내보내기 | FR-24 |
+| J3 | GET | `/api/v1/sis/decisions` | `Authorization: Bearer cbsis_...` | 확정 판정 내보내기 (`status`로 반영 상태 고르기, 판정마다 `idempotency_key`) | FR-24 |
+| J4 | POST | `/api/v1/sis/acks` | `Authorization: Bearer cbsis_...` + `Idempotency-Key` | 판정마다 반영 결과(applied·failed, SIS 기록 번호) 보고 | 리뷰 v3 P1-4 |
 
 버전: JSON API는 경로에 버전(`/api/v1`)을 붙인다. 응답 모양이 바뀌면(필드 삭제·의미 변경) `/api/v2`를 새로 열고 v1을 한동안 함께 둔다. 필드 추가는 같은 버전에서 한다.
 버전 없는 옛 경로(`/api/evaluations/{id}`, `/api/decisions`, `/api/sis/decisions`)는 이미 연동한 시스템을 위해 같은 동작으로 남겨 두되 폐기 예정이다: 성공 응답에 `Deprecation: true`와 `Link: </api/v1/...>; rel="successor-version"` 헤더를 붙이고, OpenAPI 문서(`/api/docs`)에도 deprecated로 표시한다.
@@ -213,10 +215,28 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
   "decisions": [ { "decision_id": 31, "replaces_decision_id": 12, "student_id": 1,
     "source_institution": "Hankuk University (한국대학교)", "source_course": "PHY 101",
     "result": "direct", "target_course": "PHYSICS 1250", "accepted_credits": 3.0, "credit_unit": "us_semester",
-    "credit_basis": "partial", "source_credits": 3.0, "source_credit_unit": "kr_credit", "combined_source_courses": "", "decided_at": "2026-10-13T09:00:00" } ] }
+    "credit_basis": "partial", "source_credits": 3.0, "source_credit_unit": "kr_credit", "combined_source_courses": "", "decided_at": "2026-10-13T09:00:00",
+    "idempotency_key": "cb-decision-31", "sync_status": "pending", "external_reference_id": "" } ] }
 ```
 
 심사 건마다 현재 유효한 판정 한 줄. `accepted_credits`는 교수가 확정한 인정 학점(대상 대학 단위)이고, 0009 이전 판정은 비어 있어 학사처가 확인해 넣는다. (예전 `credits` 열은 출신 학점이었어서 `source_credits`로 바꿨다.) 이의 신청 재판정이면 `replaces_decision_id`에 대체한 판정. `target_course`는 판정 때 과목 코드(0013 이후 판정은 `decisions.course_snapshot`)라 나중에 카탈로그에서 코드가 바뀌어도 같은 값을 보낸다 (리뷰 v3 P0-8). 이름·학번은 보내지 않고 내부 번호(`student_id`)만. 401: 토큰 없음·폐기됨.
+
+`status`(기본 all): `unsent`(아직 반영 안 됨 = 대기 + 실패), `pending`, `failed`, `applied`. 잘못된 값은 422. `idempotency_key`는 판정마다 바뀌지 않는 키(`cb-decision-{decision_id}`)라, SIS는 이 키로 같은 판정을 두 번 반영하지 않는다(CB-REG-002). `sync_status`·`external_reference_id`는 J4로 받은 마지막 결과.
+
+### J4 `POST /api/v1/sis/acks` (리뷰 v3 P1-4)
+
+헤더: `Authorization: Bearer cbsis_...`, `Idempotency-Key: <요청마다 새 키, 100자 이하>`. 쿠키가 아니라 연동 토큰으로 인증하므로 CSRF 토큰은 쓰지 않는다.
+
+```json
+{ "results": [
+  { "decision_id": 31, "status": "applied", "external_reference_id": "SIS-2026-0042" },
+  { "decision_id": 32, "status": "failed", "error": "unknown course code" } ] }
+```
+
+- 200: `{"idempotency_key": "...", "results": [{"decision_id": 31, "outcome": "recorded", "status": "applied"}, ...]}`. 줄마다 `outcome`: `recorded`(기록), `duplicate`(이미 같은 번호로 반영됨), `conflict`(이미 다른 번호로 반영됨 — 고치지 않음, 대사 필요), `superseded`(재판정으로 대체된 판정 — 새 판정을 반영할 것), `rejected`(형식 오류·다른 기관 판정).
+- 같은 `Idempotency-Key`로 같은 내용을 다시 보내면 처음 응답을 그대로 주고 `Idempotent-Replay: true` 헤더를 붙인다(아무것도 바뀌지 않음). 같은 키에 다른 내용이면 409.
+- 422: 키 없음, `results`가 1~500개 목록이 아님. 401: 토큰 없음·폐기됨.
+- 실패로 보고한 판정은 J3 `status=unsent`에 다시 나오고(CB-REG-003), 관리자가 P15에서 다시 보내기(M27)로 되돌릴 수도 있다.
 
 ## 4. 화면별 버튼 ↔ API 매칭
 
@@ -242,7 +262,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P11 | F1 | `views.professor_items`, `views.professor_recent`, `views.colleagues` | 배정된 심사(재판정·대리 표시), 최근 판정한 심사 20건(판정 결과·재판정 결과·문서 삭제 종료), 부재 설정·대리 교수 후보 |
 | P13 | C1 · C2 | `views.evaluation_view(with_audit=True)` | 사람 판정·당시 AI 추천, 경과, AI 추천, 개념별 근거, 과거 판정, 감사 로그 |
 | P14 | A12 | `notifications.inbox`, `push.device_count` | 알림 50건씩 페이지 (저장된 한국어 원문을 화면 언어로), 푸시 받는 기기 수 |
-| P15 | M11 | `sis.has_token` | 토큰 상태 (발급 직후에만 원문) |
+| P15 | M11 | `sis.has_token`, `sis.reconciliation` | 토큰 상태 (발급 직후에만 원문), 반영 확인: 지금 유효한 판정·반영됨·대기·실패 수, 실패 목록(실패 횟수·오류), 반영 뒤 재판정돼 다시 보내야 할 판정 |
 | P16 | M13 | `stats.audit_page` | 소속 기관 감사 로그(조건별, 50건씩)·행위자 역할·필터 선택지(그 기관 기록에 나온 행위·대상 종류) |
 | P18 | M2 | `institution_data.overview` | 과목 수·계정 수(역할별, 비활성 제외)·첫 비밀번호 대기·출신 대학, 교수 없는 학과, 과목별 기준 강의계획서 상태, 출신 대학 목록 |
 | P21 | S14 | `appeals.appealable`, `appeals.student_rows` | 이의 신청할 수 있는 과목, 낸 이의 신청·처리 경과 |

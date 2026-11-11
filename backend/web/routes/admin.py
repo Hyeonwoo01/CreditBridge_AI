@@ -224,7 +224,28 @@ def approve_privacy(
 
 @router.get("/sis")
 def sis(request: Request, user: User = Admin, session: Session = Depends(get_db)) -> Response:
-    return render(request, "admin/sis.html", user=user, has_token=sis_service.has_token(session, user))
+    return render(
+        request,
+        "admin/sis.html",
+        user=user,
+        has_token=sis_service.has_token(session, user),
+        recon=sis_service.reconciliation(session, user),
+    )
+
+
+@router.post("/sis/retry")
+def sis_retry(
+    request: Request,
+    decision_ids: list[int] = Form([]),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """반영에 실패한 판정을 다시 보내기 대기로 (리뷰 v3 P1-4). SIS가 status=unsent로 다시 가져간다."""
+    check_csrf(request, csrf_token)
+    count = sis_service.retry(session, user, decision_ids)
+    flash(request, tr("{n}건을 다시 보내기 대기로 돌렸어요. 학사정보시스템이 다음에 가져갈 때 함께 나가요.", n=count))
+    return RedirectResponse("/admin/sis#reconciliation", status_code=303)
 
 
 @router.post("/sis")
@@ -242,7 +263,8 @@ def sis_token(
         flash(request, tr("연동 토큰을 폐기했어요. 이 토큰으로는 더 이상 내보낼 수 없어요."))
         return RedirectResponse("/admin/sis", status_code=303)
     token = sis_service.issue_token(session, user)
-    return render(request, "admin/sis.html", user=user, has_token=True, token=token)
+    recon = sis_service.reconciliation(session, user)
+    return render(request, "admin/sis.html", user=user, has_token=True, token=token, recon=recon)
 
 
 # ---------- 기관 데이터: 계정·과목 CSV, 출신 대학, 기준 강의계획서 ----------

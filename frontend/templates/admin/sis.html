@@ -1,5 +1,33 @@
 {% extends "base.html" %}
-{% block nav %}{% include "admin/_nav.html" %}{% endblock %}
+{% block nav %}{% include "admin/_nav.html" %}
+{# 대사 (리뷰 v3 P1-4): 지금 유효한 판정이 학사정보시스템에 반영됐는지 #}
+<section id="reconciliation" class="mt-8 grid scroll-mt-20 gap-3" aria-labelledby="recon-title">
+  <h2 id="recon-title" class="section-title">{{ _("반영 확인 (대사)") }}</h2>
+  <p class="text-sm text-muted">{{ _("학사정보시스템이 보낸 반영 결과로 셉니다. 결과가 오지 않은 판정은 대기예요.") }}</p>
+  <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    {% for label, value, tone in [(_('지금 유효한 판정'), recon.total, ''), (_('반영됨'), recon.applied, 'text-approve'), (_('대기'), recon.pending, ''), (_('실패'), recon.failed | length, 'text-reject')] %}
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ label }}</dt><dd class="text-[22px] leading-tight font-semibold tabular-nums {{ tone if value else '' }}" data-recon="{{ loop.index }}">{{ value }}</dd></div>
+    {% endfor %}
+  </dl>
+  {% if recon.resend %}
+  <div class="rounded-md border border-hairline p-4 text-sm" role="status">
+    <p class="font-semibold">{{ _("반영한 뒤 이의 신청으로 재판정된 판정 {n}건 — 새 판정을 다시 반영해야 해요.", n=(recon.resend | length)) }}</p>
+    <ul class="mt-2 grid gap-1 text-muted">{% for old, new in recon.resend %}<li>{{ _("판정 #{old} (SIS {ref}) → 새 판정 #{new}", old=old.decision_id, ref=(old.external_reference_id or '–'), new=new.id) }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if recon.failed %}
+  <form method="post" action="/admin/sis/retry" class="grid gap-2">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <ul class="grid divide-y divide-hairline rounded-lg border border-hairline bg-white text-sm">
+      {% for d, sync in recon.failed %}
+      <li class="flex flex-wrap items-center gap-3 px-4 py-3"><input type="checkbox" name="decision_ids" value="{{ d.id }}" checked aria-label="{{ _('판정 #{id}', id=d.id) }}"><span class="font-semibold">{{ _("판정 #{id}", id=d.id) }}</span><span class="text-muted">{{ _("실패 {n}회", n=sync.attempts) }}</span><span class="min-w-0 flex-1 break-all text-reject">{{ sync.last_error }}</span></li>
+      {% endfor %}
+    </ul>
+    <button class="btn-secondary w-fit">{{ _("고른 판정 다시 보내기") }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
 {% block content %}
 <header class="grid gap-2">
   <h1 class="page-title">{{ _("학사정보시스템 연동") }}</h1>
@@ -17,7 +45,8 @@
   <p>{{ _("상태:") }} <strong>{{ _('토큰 발급됨') if has_token else _('토큰 없음') }}</strong></p>
   <pre class="overflow-x-auto rounded-sm bg-parchment p-3 text-xs">GET /api/v1/sis/decisions?since=2026-01-01T00:00:00Z
 Authorization: Bearer cbsis_...</pre>
-  <p class="text-muted">{{ _("응답 필드: decision_id, replaces_decision_id, student_id, source_institution, source_course, result, target_course, credits, decided_at. 같은 내용은 심사관 화면의 CSV 내보내기로도 받을 수 있어요.") }}</p>
+  <p class="text-muted">{{ _("응답 필드: decision_id, replaces_decision_id, student_id, source_institution, source_course, result, target_course, accepted_credits, credit_unit, decided_at, idempotency_key, sync_status. 같은 내용은 심사관 화면의 CSV 내보내기로도 받을 수 있어요.") }}</p>
+  <p class="text-muted">{{ _("중복 반영 방지: 판정마다 바뀌지 않는 idempotency_key를 함께 보내요. 학사정보시스템은 반영한 뒤 결과를 POST /api/v1/sis/acks로 알려 주세요(Idempotency-Key 헤더 필요). 실패한 판정만 다시 가져가려면 ?status=unsent를 쓰세요.") }}</p>
   <div class="flex flex-wrap gap-2">
     <form method="post" action="/admin/sis" {% if has_token %}data-confirm="{{ _('새 토큰을 발급하면 지금 토큰은 바로 쓸 수 없게 돼요. 계속할까요?') }}"{% endif %}>
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -27,5 +56,33 @@ Authorization: Bearer cbsis_...</pre>
     <form method="post" action="/admin/sis"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-secondary" name="action" value="revoke">{{ _("토큰 폐기") }}</button></form>
     {% endif %}
   </div>
+</section>
+
+{# 대사 (리뷰 v3 P1-4): 지금 유효한 판정이 학사정보시스템에 반영됐는지 #}
+<section id="reconciliation" class="mt-8 grid scroll-mt-20 gap-3" aria-labelledby="recon-title">
+  <h2 id="recon-title" class="section-title">{{ _("반영 확인 (대사)") }}</h2>
+  <p class="text-sm text-muted">{{ _("학사정보시스템이 보낸 반영 결과로 셉니다. 결과가 오지 않은 판정은 대기예요.") }}</p>
+  <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    {% for label, value, tone in [(_('지금 유효한 판정'), recon.total, ''), (_('반영됨'), recon.applied, 'text-approve'), (_('대기'), recon.pending, ''), (_('실패'), recon.failed | length, 'text-reject')] %}
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ label }}</dt><dd class="text-[22px] leading-tight font-semibold tabular-nums {{ tone if value else '' }}" data-recon="{{ loop.index }}">{{ value }}</dd></div>
+    {% endfor %}
+  </dl>
+  {% if recon.resend %}
+  <div class="rounded-md border border-hairline p-4 text-sm" role="status">
+    <p class="font-semibold">{{ _("반영한 뒤 이의 신청으로 재판정된 판정 {n}건 — 새 판정을 다시 반영해야 해요.", n=(recon.resend | length)) }}</p>
+    <ul class="mt-2 grid gap-1 text-muted">{% for old, new in recon.resend %}<li>{{ _("판정 #{old} (SIS {ref}) → 새 판정 #{new}", old=old.decision_id, ref=(old.external_reference_id or '–'), new=new.id) }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if recon.failed %}
+  <form method="post" action="/admin/sis/retry" class="grid gap-2">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <ul class="grid divide-y divide-hairline rounded-lg border border-hairline bg-white text-sm">
+      {% for d, sync in recon.failed %}
+      <li class="flex flex-wrap items-center gap-3 px-4 py-3"><input type="checkbox" name="decision_ids" value="{{ d.id }}" checked aria-label="{{ _('판정 #{id}', id=d.id) }}"><span class="font-semibold">{{ _("판정 #{id}", id=d.id) }}</span><span class="text-muted">{{ _("실패 {n}회", n=sync.attempts) }}</span><span class="min-w-0 flex-1 break-all text-reject">{{ sync.last_error }}</span></li>
+      {% endfor %}
+    </ul>
+    <button class="btn-secondary w-fit">{{ _("고른 판정 다시 보내기") }}</button>
+  </form>
+  {% endif %}
 </section>
 {% endblock %}
