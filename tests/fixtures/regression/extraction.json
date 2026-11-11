@@ -1,0 +1,137 @@
+{
+ "c_programming.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 1223,
+  "sha256": "74fdf21c7f4339bc1b5cb6202afbb2d05c608b636ed19f3c36c00e318e12f684",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   1223
+  ]
+ },
+ "calculus.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 1611,
+  "sha256": "134fc56fde7e3b7505abb396bac14de557f7657818f77603d31018035a47e358",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   1611
+  ]
+ },
+ "data_structures.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 1039,
+  "sha256": "fd55e472c5ead124a941c0851954fdd8c97c7a0ecbaba49f1a642f968eab579a",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   1039
+  ]
+ },
+ "general_chemistry.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 1181,
+  "sha256": "d979ded3477e88faee636da8b27eb428e89d23a2a1412a2d26d50caba807243a",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   1181
+  ]
+ },
+ "general_physics.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 1188,
+  "sha256": "8f31776b324e0a1e2e36008234d899ed347a69389f36393d55e9c345dd532e65",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   1188
+  ]
+ },
+ "korean_history.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 593,
+  "sha256": "121db8582396a8fa19b199594f51716ba07e2d94f89be042eaf07eb33ac0e615",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   593
+  ]
+ },
+ "linear_algebra_detailed.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 1394,
+  "sha256": "06f3be367eb285322e949e4664fc023cad930d7b46980b34f67e57bac17f3573",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   1394
+  ]
+ },
+ "linear_algebra_sparse.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 190,
+  "sha256": "ebd106075599fddb5975990c7023a7204bdb795f1246345c967d2b21397bbde9",
+  "first_line": "Hankuk University",
+  "offsets": [
+   0,
+   190
+  ]
+ },
+ "transcript.pdf": {
+  "pages": 1,
+  "scanned_index": [],
+  "quality": 1.0,
+  "hidden": 0,
+  "chars": 397,
+  "sha256": "c32686d07052e98f8e24a37e48577f2f3089dfca4d6f26ccedd2ddbf51f25943",
+  "first_line": "Hankuk University Official Transcript (demo, not a real record)",
+  "offsets": [
+   0,
+   397
+  ]
+ },
+ "mixed_scan.pdf": {
+  "pages": 3,
+  "scanned_index": [
+   1
+  ],
+  "quality": 0.667,
+  "hidden": 0,
+  "chars": 178,
+  "sha256": "14f0c37d3236a9df6d0cfa0d865ae87d06f88459f2c16ba46857f73dbc6140be",
+  "first_line": "Week 1: Sets and functions. Week 1: Sets and functions. Week 1: Sets and functions. ",
+  "offsets": [
+   0,
+   86,
+   87,
+   178
+  ]
+ },
+ "transcript_masked": "Hankuk University Official Transcript (demo, not a real record)\nName: L** J****\nStudent ID: [MASKED-ID]\nCode | Course Title | Credits | Grade\nMATH 101 | Calculus I | 3 | A\nMATH 201 | Linear Algebra | 3 | B+\nCSE 204 | Data Structures | 3 | A-\nPHY 101 | General Physics I | 4 | B0\nHIS 110 | Understanding Korean History | 2 | A\nCHEM 101 | General Chemistry I | 3 | C+\nCSE 103 | C Programming | 3 | D\n"
+}

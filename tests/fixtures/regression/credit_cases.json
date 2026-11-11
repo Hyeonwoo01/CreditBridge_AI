@@ -1,0 +1,98 @@
+{
+  "_about": "학점 계산 회귀 표 (리뷰 v3 P0-8). 규칙을 바꾸면 기대값을 사람이 확인해 고치고 커밋한다. 이유(reason)는 backend/services/credits.py의 상수 이름.",
+  "convert": [
+    {"id": "CB-CREDIT-001 학점 없음은 기본값 없이 보류", "source": null, "from": "kr_credit", "to": "us_semester", "rules": [], "on": "2026-03-01", "value": null, "reason": "NO_SOURCE_CREDITS"},
+    {"id": "학점 0은 없는 것과 같음", "source": 0, "from": "kr_credit", "to": "us_semester", "rules": [], "on": "2026-03-01", "value": null, "reason": "NO_SOURCE_CREDITS"},
+    {"id": "출신 단위 미정", "source": 3, "from": null, "to": "us_semester", "rules": [], "on": "2026-03-01", "value": null, "reason": "NO_SOURCE_UNIT"},
+    {"id": "대상 단위 미정", "source": 3, "from": "kr_credit", "to": null, "rules": [], "on": "2026-03-01", "value": null, "reason": "NO_TARGET_UNIT"},
+    {"id": "같은 단위는 1:1", "source": 3, "from": "us_semester", "to": "us_semester", "rules": [], "on": "2026-03-01", "value": 3.0, "reason": null},
+    {"id": "기타 단위끼리는 규칙 필요", "source": 3, "from": "other", "to": "other", "rules": [], "on": "2026-03-01", "value": null, "reason": "NO_RULE"},
+    {"id": "CB-CREDIT-002 쿼터→학기 규칙 없음", "source": 4, "from": "us_quarter", "to": "us_semester", "rules": [], "on": "2026-03-01", "value": null, "reason": "NO_RULE"},
+    {"id": "쿼터→학기 2/3", "source": 4, "from": "us_quarter", "to": "us_semester", "rules": [{"factor": 0.667, "from": "2020-01-01", "to": null}], "on": "2026-03-01", "value": 2.67, "reason": null},
+    {"id": "ECTS→학기 0.5", "source": 6, "from": "ects", "to": "us_semester", "rules": [{"factor": 0.5, "from": "2020-01-01", "to": null}], "on": "2026-03-01", "value": 3.0, "reason": null},
+    {"id": "규칙 시작 전 날짜", "source": 3, "from": "kr_credit", "to": "us_semester", "rules": [{"factor": 1, "from": "2026-09-01", "to": null}], "on": "2026-03-01", "value": null, "reason": "NO_RULE"},
+    {"id": "규칙 끝난 다음 날", "source": 3, "from": "kr_credit", "to": "us_semester", "rules": [{"factor": 1, "from": "2020-01-01", "to": "2026-02-28"}], "on": "2026-03-01", "value": null, "reason": "NO_RULE"},
+    {"id": "규칙 마지막 날은 유효", "source": 3, "from": "kr_credit", "to": "us_semester", "rules": [{"factor": 1, "from": "2020-01-01", "to": "2026-03-01"}], "on": "2026-03-01", "value": 3.0, "reason": null},
+    {"id": "더 최근에 시작한 규칙이 이김", "source": 3, "from": "kr_credit", "to": "us_semester", "rules": [{"factor": 1, "from": "2020-01-01", "to": null}, {"factor": 0.8, "from": "2025-01-01", "to": null}], "on": "2026-03-01", "value": 2.4, "reason": null},
+    {"id": "같은 날 시작한 규칙 둘은 충돌", "source": 3, "from": "kr_credit", "to": "us_semester", "rules": [{"factor": 1, "from": "2025-01-01", "to": null}, {"factor": 0.8, "from": "2025-01-01", "to": null}], "on": "2026-03-01", "value": null, "reason": "RULE_CONFLICT"},
+    {"id": "반올림 0.01", "source": 3, "from": "kr_credit", "to": "us_semester", "rules": [{"factor": 0.333, "from": "2020-01-01", "to": null}], "on": "2026-03-01", "value": 1.0, "reason": null}
+  ],
+  "suggest": [
+    {"id": "불인정은 0", "result": "none", "value": 3, "target": 3, "expect": 0.0},
+    {"id": "직접 인정은 대상 과목 학점까지", "result": "direct", "value": 4.5, "target": 3, "expect": 3.0},
+    {"id": "직접 인정, 환산값이 더 작음", "result": "direct", "value": 2, "target": 3, "expect": 2.0},
+    {"id": "선택 인정은 환산값", "result": "elective", "value": 2.5, "target": null, "expect": 2.5},
+    {"id": "환산 불가면 제안 없음", "result": "direct", "value": null, "target": 3, "expect": null}
+  ],
+  "basis": [
+    {"id": "불인정", "result": "none", "accepted": 0, "target": 3, "expect": "not_accepted"},
+    {"id": "선택 인정", "result": "elective", "accepted": 3, "target": null, "expect": "elective"},
+    {"id": "CB-CREDIT-003 3학점 중 2학점 부분 인정", "result": "direct", "accepted": 2, "target": 3, "expect": "partial"},
+    {"id": "전부 인정", "result": "direct", "accepted": 3, "target": 3, "expect": "full"}
+  ],
+  "validate": [
+    {"id": "불인정인데 학점 있음", "result": "none", "accepted": 1, "value": 3, "target": 3, "problem": "불인정은 인정 학점이 0이어야 해요."},
+    {"id": "불인정 0은 통과", "result": "none", "accepted": 0, "value": 3, "target": 3, "problem": null},
+    {"id": "인정인데 0", "result": "elective", "accepted": 0, "value": 3, "target": null, "problem": "인정하는 판정은 인정 학점이 0보다 커야 해요."},
+    {"id": "대상 과목보다 많음", "result": "direct", "accepted": 4, "value": 6, "target": 3, "problem": "대상 과목 학점({credits})보다 많이 인정할 수 없어요."},
+    {"id": "환산 학점보다 많음", "result": "elective", "accepted": 4, "value": 3, "target": null, "problem": "환산한 출신 학점({credits})보다 많이 인정할 수 없어요."},
+    {"id": "환산 불가여도 직접 적은 값은 통과", "result": "elective", "accepted": 3, "value": null, "target": null, "problem": null},
+    {"id": "30 초과는 단위 확인", "result": "elective", "accepted": 31, "value": null, "target": null, "problem": "인정 학점이 너무 커요. 단위를 확인해 주세요."}
+  ],
+  "split": [
+    {"id": "한 과목", "accepted": 3, "remaining": [3], "expect": [3]},
+    {"id": "같은 비율", "accepted": 3, "remaining": [2, 2], "expect": [1.5, 1.5]},
+    {"id": "비례, 마지막이 나머지", "accepted": 3, "remaining": [1, 2], "expect": [1.0, 2.0]},
+    {"id": "나누어떨어지지 않음", "accepted": 1, "remaining": [1, 1, 1], "expect": [0.33, 0.33, 0.34]},
+    {"id": "남은 학점 0", "accepted": 2, "remaining": [0, 0], "expect": [2, 0.0]}
+  ],
+  "simulate": [
+    {
+      "id": "추천 범위와 추가 비용",
+      "rows": [
+        {"rec": "direct", "conf": "high", "source": 3, "target": 4},
+        {"rec": "direct", "conf": "medium", "source": 3, "target": 3},
+        {"rec": "insufficient", "conf": "low", "source": 3, "target": 3},
+        {"rec": "none", "conf": "medium", "source": 2, "target": 3}
+      ],
+      "degree": 120, "tuition": 1000, "per_semester": 15, "cap": null,
+      "expect": {"low": 3, "high": 9, "source": 11, "unknown": 0, "sem_low": 8, "sem_high": 8, "cost_low": 2000, "cost_high": 8000}
+    },
+    {
+      "id": "CB-CREDIT-005 성적 미달은 합계에서도 뺌",
+      "rows": [{"rec": "direct", "conf": "high", "source": 3, "target": 3, "grade": "D"}, {"rec": "direct", "conf": "high", "source": 3, "target": 3}],
+      "degree": 120, "tuition": 1000, "per_semester": 15, "cap": null,
+      "expect": {"low": 3, "high": 3, "source": 3, "unknown": 0, "sem_low": 8, "sem_high": 8, "cost_low": 0, "cost_high": 0}
+    },
+    {
+      "id": "CB-CREDIT-006 심사 중 과목은 확정에 넣지 않고 범위로",
+      "rows": [{"rec": "direct", "conf": "high", "source": 3, "target": 3, "decided": "direct", "accepted": 3, "allocated": 3}, {"rec": "direct", "conf": "medium", "source": 3, "target": 3}],
+      "degree": 120, "tuition": 1000, "per_semester": 15, "cap": null,
+      "expect": {"low": 3, "high": 6, "source": 6, "unknown": 0, "sem_low": 8, "sem_high": 8, "cost_low": 0, "cost_high": 3000}
+    },
+    {
+      "id": "CB-CREDIT-001 학점 모르는 과목은 빼고 셈",
+      "rows": [{"rec": "direct", "conf": "high", "source": null, "target": 3}, {"rec": "direct", "conf": "high", "source": 3, "target": 3}],
+      "degree": 120, "tuition": 1000, "per_semester": 15, "cap": null,
+      "expect": {"low": 3, "high": 3, "source": 3, "unknown": 1, "sem_low": 8, "sem_high": 8, "cost_low": 0, "cost_high": 0}
+    },
+    {
+      "id": "CB-CREDIT-003 부분 인정 2학점이 대상 4학점보다 우선",
+      "rows": [{"rec": "direct", "conf": "high", "source": 3, "target": 4, "decided": "direct", "accepted": 2, "allocated": 2}],
+      "degree": 120, "tuition": 1000, "per_semester": 15, "cap": null,
+      "expect": {"low": 2, "high": 2, "source": 3, "unknown": 0, "sem_low": 8, "sem_high": 8, "cost_low": 1000, "cost_high": 1000}
+    },
+    {
+      "id": "졸업 학점 정책 미정이면 학기 계산 안 함",
+      "rows": [{"rec": "direct", "conf": "high", "source": 3, "target": 3}],
+      "degree": null, "tuition": 1000, "per_semester": 15, "cap": null,
+      "expect": {"low": 3, "high": 3, "source": 3, "unknown": 0, "sem_low": null, "sem_high": null, "cost_low": 0, "cost_high": 0}
+    },
+    {
+      "id": "편입 상한을 넘는 학점은 자름",
+      "rows": [{"rec": "direct", "conf": "high", "source": 3, "target": 3, "decided": "direct", "accepted": 3, "allocated": 3}, {"rec": "elective", "conf": "high", "source": 3, "target": 3, "decided": "elective", "accepted": 3, "allocated": 3}],
+      "degree": 120, "tuition": 1000, "per_semester": 15, "cap": 4,
+      "expect": {"low": 4, "high": 4, "source": 6, "unknown": 0, "sem_low": 8, "sem_high": 8}
+    }
+  ]
+}

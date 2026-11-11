@@ -62,6 +62,23 @@ from backend.services import versions as version_service
 from backend.services.decisions import HistoryItem, history
 
 
+@dataclass(frozen=True)
+class DecidedCourse:
+    code: str
+    title: str
+
+
+def decided_course(session: Session, decision: Decision | None) -> DecidedCourse | None:
+    """판정의 대상 과목: 판정 때 남긴 값(0013 이후)이 먼저, 없으면 지금 카탈로그 (리뷰 v3 P0-8 결정 재현)."""
+    if decision is None or decision.target_course_id is None:
+        return None
+    target = (decision.course_snapshot or {}).get("target")
+    if target:
+        return DecidedCourse(str(target["code"]), str(target["title"]))
+    course = catalog_repo.get_course(session, decision.target_course_id)
+    return DecidedCourse(course.code, course.title) if course else None
+
+
 @dataclass
 class EvaluationView:
     evaluation: CourseEvaluation
@@ -72,7 +89,7 @@ class EvaluationView:
     candidate: Course | None
     decision: Decision | None = None
     decided_by: User | None = None
-    decided_target: Course | None = None
+    decided_target: DecidedCourse | None = None  # 판정 때 대상 과목 (스냅샷 우선)
     assignment: Assignment | None = None
     reviewer: User | None = None
     history: list[HistoryItem] = field(default_factory=list)
@@ -194,9 +211,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         else None,
         decision=decision,
         decided_by=user_repo.get_by_id(session, decision.decided_by) if decision else None,
-        decided_target=catalog_repo.get_course(session, decision.target_course_id)
-        if decision and decision.target_course_id
-        else None,
+        decided_target=decided_course(session, decision),
         assignment=assignment,
         reviewer=user_repo.get_by_id(session, assignment.reviewer_id) if assignment else None,
         history=history(session, evaluation),

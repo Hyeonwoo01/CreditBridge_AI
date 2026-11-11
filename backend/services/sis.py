@@ -43,6 +43,11 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _snapshot_target(decision: Decision) -> str | None:
+    target = (decision.course_snapshot or {}).get("target")
+    return str(target["code"]) if target else None
+
+
 def export_rows(session: Session, institution_id: int, since: datetime | None = None) -> list[dict[str, Any]]:
     """심사 건마다 현재 유효한 판정 한 줄."""
     rows = decision_repo.all_for_institution(session, institution_id)
@@ -74,7 +79,9 @@ def export_rows(session: Session, institution_id: int, since: datetime | None = 
                 "source_institution": request.source_institution.name if request else "",
                 "source_course": s.course_code or s.course_title,
                 "result": d.result,
-                "target_course": courses[d.target_course_id].code if d.target_course_id in courses else "",
+                # 판정 때 과목 코드 (0013 이후 판정). 그 뒤 카탈로그에서 코드가 바뀌어도 판정 때 값을 보낸다
+                "target_course": _snapshot_target(d)
+                or (courses[d.target_course_id].code if d.target_course_id in courses else ""),
                 # 교수가 확정한 인정 학점 (0009 이전 판정은 비어 있음 — 학사처가 확인해 입력)
                 "accepted_credits": d.accepted_credits if d.accepted_credits is not None else "",
                 "credit_unit": d.credit_unit or "",

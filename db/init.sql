@@ -853,5 +853,11 @@ ALTER TABLE syllabi ADD CONSTRAINT ck_syllabi_applicability_valid CHECK (applica
 
 UPDATE alembic_version SET version_num='0012' WHERE alembic_version.version_num = '0011';
 
+-- Running upgrade 0012 -> 0013
+
+ALTER TABLE decisions ADD COLUMN course_snapshot JSONB;
+
+UPDATE alembic_version SET version_num='0013' WHERE alembic_version.version_num = '0012';
+
 COMMIT;
 

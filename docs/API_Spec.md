@@ -215,7 +215,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
     "credit_basis": "partial", "source_credits": 3.0, "source_credit_unit": "kr_credit", "combined_source_courses": "", "decided_at": "2026-10-13T09:00:00" } ] }
 ```
 
-심사 건마다 현재 유효한 판정 한 줄. `accepted_credits`는 교수가 확정한 인정 학점(대상 대학 단위)이고, 0009 이전 판정은 비어 있어 학사처가 확인해 넣는다. (예전 `credits` 열은 출신 학점이었어서 `source_credits`로 바꿨다.) 이의 신청 재판정이면 `replaces_decision_id`에 대체한 판정. 이름·학번은 보내지 않고 내부 번호(`student_id`)만. 401: 토큰 없음·폐기됨.
+심사 건마다 현재 유효한 판정 한 줄. `accepted_credits`는 교수가 확정한 인정 학점(대상 대학 단위)이고, 0009 이전 판정은 비어 있어 학사처가 확인해 넣는다. (예전 `credits` 열은 출신 학점이었어서 `source_credits`로 바꿨다.) 이의 신청 재판정이면 `replaces_decision_id`에 대체한 판정. `target_course`는 판정 때 과목 코드(0013 이후 판정은 `decisions.course_snapshot`)라 나중에 카탈로그에서 코드가 바뀌어도 같은 값을 보낸다 (리뷰 v3 P0-8). 이름·학번은 보내지 않고 내부 번호(`student_id`)만. 401: 토큰 없음·폐기됨.
 
 ## 4. 화면별 버튼 ↔ API 매칭
 

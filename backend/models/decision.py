@@ -48,3 +48,5 @@ class Decision(IdMixin, Base):
     policy_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
     # 판정 때 증거 상태 (출처·진위·적용 학기·학기·파일 해시, 0012부터)
     evidence_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # 판정 때 대상·출신 과목, 환산 규칙, 추천 규칙 버전 (0013부터). 카탈로그가 바뀌어도 내보내기·리포트는 이 값을 쓴다
+    course_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

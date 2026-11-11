@@ -33,7 +33,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
-from backend.services import audit, case_state, notifications
+from backend.services import audit, case_state, notifications, scoring
 from backend.services import credits as credit_service
 from backend.services import evidence_status as evidence_service
 from backend.services import policy as policy_service
@@ -162,6 +162,50 @@ def snapshot(evaluation: CourseEvaluation, course: Course | None) -> dict[str, A
         "level": evaluation.level_flag,
         "prompt_version": evaluation.prompt_version,
         "model": evaluation.model,
+    }
+
+
+def course_snapshot(
+    target: Course | None,
+    syllabus: Syllabus,
+    combined: list[Syllabus],
+    conversion: credit_service.Conversion,
+    source_institution: str | None,
+) -> dict[str, Any]:
+    """판정 때의 과목·환산 규칙 값 (리뷰 v3 P0-8 결정 재현). 카탈로그·규칙이 바뀌어도 이 값으로 다시 보여 준다."""
+    rule = conversion.rule
+    return {
+        "target": {
+            "id": target.id,
+            "code": target.code,
+            "title": target.title,
+            "credits": float(target.credits),
+            "department": target.department_name,
+        }
+        if target
+        else None,
+        "sources": [
+            {
+                "syllabus_id": s.id,
+                "code": s.course_code,
+                "title": s.course_title,
+                "credits": s.credits,
+                "content_hash": s.content_hash,
+            }
+            for s in [syllabus, *combined]
+        ],
+        "source_institution": source_institution,
+        "conversion": {
+            "source_credits": conversion.source_credits,
+            "source_unit": conversion.source_unit,
+            "target_unit": conversion.target_unit,
+            "value": conversion.value,
+            "rule_id": rule.id if rule else None,
+            "factor": float(rule.factor) if rule else None,
+            "method": rule.method if rule else None,
+            "reason": conversion.reason,
+        },
+        "rules_version": scoring.RULES_VERSION,
     }
 
 
@@ -420,6 +464,15 @@ def decide(
             conversion_rule_id=conversion.rule.id if conversion.rule else None,
             policy_snapshot=_policy_snapshot(session, request),
             evidence_snapshot=evidence_service.snapshot(session, primary),
+            course_snapshot=course_snapshot(
+                target,
+                primary,
+                [c for c, _ in combined],
+                conversion,
+                request.source_institution.name if request else None,
+            )
+            if primary is not None
+            else None,
         ),
     )
     allocation_repo.supersede_for_evaluation(session, evaluation.id, decision.id)
