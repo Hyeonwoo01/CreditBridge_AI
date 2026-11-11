@@ -624,7 +624,7 @@ docs/API_Spec.md(API 명세: 엔드포인트·화면 버튼 대응·조회 API),
 - uv run mypy backend
 - uv run pytest tests/unit tests/integration   (통합 테스트는 PostgreSQL 필요: TEST_DATABASE_URL)
 - 스키마를 바꿨다면 Alembic 마이그레이션 파일을 함께 추가
-- 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지와 README 변경 이력도 함께 고치기
+- 화면(URL·배치·문구·상태)을 바꿨다면 docs/screens/의 해당 페이지를 함께 고치기. README 변경 이력에는 화면을 새로 만들거나 없앴을 때, 배치·흐름을 크게 바꿨을 때만 한 줄 남긴다 (작은 변경은 커밋 메시지로 충분)
 - 화면 문구를 추가·수정했다면 backend/locales/en.json에 영어를 넣고 uv run python -m scripts.i18n_check 통과 (테스트 tests/unit/test_i18n.py도 같은 검사)
 - 템플릿에 새 Tailwind 클래스를 썼다면 scripts/build_css.sh로 frontend/static/css/app.css를 다시 빌드
 - 새 의존성이 필요하면 추가하지 말고 먼저 사람에게 물어볼 것
