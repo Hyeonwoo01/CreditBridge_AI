@@ -20,6 +20,8 @@ def get_evaluation(
     return {
         "id": v.evaluation.id,
         "status": v.evaluation.status,
+        "case_state": v.case_state,
+        "case_token": v.case_token,  # 판정 저장(POST /decisions) 때 함께 보내면 동시 수정을 막는다
         "recommendation": v.evaluation.recommendation,
         "coverage": v.evaluation.coverage,
         "confidence": v.evaluation.confidence,

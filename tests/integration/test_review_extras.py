@@ -166,16 +166,41 @@ def test_appeal_accept_and_redecide_keeps_original_decision(client: TestClient, 
     token = login(client, "rachel@msu.example")
     appeal = seeded.scalars(select(Appeal).where(Appeal.course_evaluation_id == ev.id)).one()
     page = client.get("/review/appeals").text
-    assert reason in page and f'value="{prof.id}" selected' in page  # 원 판정 교수가 기본값
+    # 원 판정 교수는 재판정할 수 없다 (리뷰 v3 P0-6): 목록에서 빠지고, 골라 보내도 거부된다
+    other = next(
+        u
+        for u in seeded.scalars(
+            select(User).where(User.department_id == prof.department_id, User.role == "professor", User.is_active)
+        )
+        if u.id != prof.id
+    )
+    assert reason in page and f'value="{prof.id}"' not in page and f'value="{other.id}"' in page
     r = client.post(
         f"/review/appeals/{appeal.id}",
         data={"action": "accept", "reviewer_id": prof.id, "note": "자료 재검토", "csrf_token": token},
+    )
+    assert "재판정할 학과 교수를 선택" in r.text
+    r = client.post(
+        f"/review/appeals/{appeal.id}",
+        data={"action": "accept", "reviewer_id": other.id, "note": "자료 재검토", "csrf_token": token},
         follow_redirects=False,
     )
     assert r.status_code == 303
-    assert any("재판정이 배정" in m for m in notes_for(seeded, prof.email))
+    assert any("재판정이 배정" in m for m in notes_for(seeded, other.email))
+    # 같은 이의 신청을 두 번 처리할 수 없다
+    assert (
+        "이미 처리한 이의 신청"
+        in client.post(
+            f"/review/appeals/{appeal.id}", data={"action": "dismiss", "note": "중복", "csrf_token": token}
+        ).text
+    )
 
+    # 원 판정 교수는 배정되지 않았으므로 재판정할 수 없다
     token = login(client, prof.email)
+    r = client.post(f"/professor/evaluations/{ev.id}/decision", data={"action": "approve", "csrf_token": token})
+    assert r.status_code == 403
+
+    token = login(client, other.email)
     assert "이의 신청 재판정" in client.get("/professor").text
     page = client.get(f"/professor/evaluations/{ev.id}").text
     assert "재판정하기" in page and reason in page

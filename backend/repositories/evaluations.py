@@ -172,3 +172,9 @@ def release_assignment(session: Session, assignment: Assignment) -> None:
     """담당 교수를 비운다 (계정 비활성화 때 다른 교수가 없으면). 배정 기록은 남는다."""
     assignment.is_active = False
     session.flush()
+
+
+def lock(session: Session, evaluation_id: int) -> CourseEvaluation | None:
+    """심사 건 행을 잠근다 (SELECT … FOR UPDATE). 같은 건에 대한 동시 판정·배정이 차례로 처리된다."""
+    stmt = select(CourseEvaluation).where(CourseEvaluation.id == evaluation_id).with_for_update()
+    return session.scalars(stmt).first()

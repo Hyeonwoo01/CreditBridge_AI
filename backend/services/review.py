@@ -17,7 +17,7 @@ from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
-from backend.services import audit, notifications
+from backend.services import audit, case_state, notifications
 from backend.services import policy as policy_service
 from backend.services.decisions import HistoryItem, ai_result, close_request_if_done, conflicts, history
 
@@ -486,13 +486,16 @@ def assign_options(
     return AssignOptions(professors, default)
 
 
-def assign_to(session: Session, user: User, evaluation_id: int, reviewer_id: int) -> User:
+def assign_to(
+    session: Session, user: User, evaluation_id: int, reviewer_id: int, case_token: str | None = None
+) -> User:
     """특정 교수에게 배정하거나 다른 교수로 바꾼다 (심사관·관리자). 이전 배정은 기록으로 남는다."""
     institution_id = ensure_assigner(user)
     evaluation = evaluation_repo.get(session, evaluation_id)
     in_queue = {e.id for e, _, _ in policy_service.review_queue(session, institution_id)}
     if evaluation is None or evaluation.id not in in_queue:
         raise NotFoundError(tr("판정 전인 소속 기관 심사 건만 배정할 수 있어요."))
+    evaluation = case_state.ensure(session, evaluation.id, "assign", case_token)
     reviewer = user_repo.get_by_id(session, reviewer_id)
     if (
         reviewer is None

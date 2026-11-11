@@ -24,8 +24,9 @@
       <label class="field"><span>{{ _("재판정 교수") }}</span>
         <select name="reviewer_id" class="input h-11">
           <option value="">{{ _("선택") }}</option>
-          {% for p in row.reviewer_options %}<option value="{{ p.id }}" {% if p.id == row.default_reviewer_id %}selected{% endif %}>{{ p.name }}{% if p.id == row.default_reviewer_id %} {{ _("(원 판정·대리)") }}{% endif %}</option>{% endfor %}
+          {% for p in row.reviewer_options %}<option value="{{ p.id }}" {% if p.id == row.default_reviewer_id %}selected{% endif %}>{{ p.name }}{% if p.id == row.default_reviewer_id %} {{ _("(원 판정 교수의 대리)") }}{% endif %}</option>{% endfor %}
         </select>
+        <span class="text-muted">{{ _("원 판정 교수는 고를 수 없어요 (다른 교수가 다시 봐요).") if row.reviewer_options else _("같은 학과에 원 판정 교수 말고 다른 교수가 없어요. 관리자에게 교수 계정을 요청해 주세요.") }}</span>
       </label>
       <label class="field"><span>{{ _("메모 (기각 시 필수, 학생에게 전달)") }}</span><input class="input h-11" name="note" maxlength="1000"></label>
       <button class="btn-primary h-11" name="action" value="accept">{{ _("받아들이고 재판정 배정") }}</button>

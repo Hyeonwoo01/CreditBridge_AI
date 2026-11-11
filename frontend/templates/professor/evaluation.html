@@ -3,7 +3,7 @@
 {# 정보가 빽빽한 화면은 넓은 작업 폭(docs/DESIGN.md: 워크스페이스 확장형) #}
 {% block width %}max-w-[1440px]{% endblock %}
 {% block content %}
-<p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">{{ _("← 배정된 심사") }}</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">{{ _("판정 근거 리포트") }}</a>{% if not v.decision or v.awaiting_redecision %} · <a class="font-semibold text-primary underline" href="#decision">{{ _('재판정하기') if v.decision else _('판정하기') }} ↓</a>{% endif %}</p>
+<p class="mb-4 text-sm text-muted"><a class="underline" href="/professor">{{ _("← 배정된 심사") }}</a> · <span class="chip" data-case-state="{{ v.case_state }}">{{ _("상태: {state}", state=(v.case_state | case_state)) }}</span> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">{{ _("판정 근거 리포트") }}</a>{% if not v.decision or v.awaiting_redecision %} · <a class="font-semibold text-primary underline" href="#decision">{{ _('재판정하기') if v.decision else _('판정하기') }} ↓</a>{% endif %}</p>
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
 {% include "partials/notes.html" %}
@@ -18,6 +18,7 @@
 <form method="post" action="/professor/evaluations/{{ v.evaluation.id }}/decision" id="decision" class="card mt-10 grid scroll-mt-16 gap-5"
       data-decision-form data-ai="{{ ai }}" data-candidate="{{ v.candidate.id if v.candidate else '' }}" data-past='{{ past | tojson }}'>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="case_token" value="{{ v.case_token }}">
   <h2 class="section-title">{{ _('이의 신청 재판정') if v.decision else _('최종 판정') }}</h2>
   {% if v.decision %}<p class="text-sm text-muted">{{ _("학생의 이의 사유와 원 판정을 확인하고 다시 판정해 주세요. 원 판정은 지워지지 않고 기록으로 남아요.") }}</p>{% endif %}
   {% if error and not reopen %}<p class="text-sm text-reject">{{ error }}</p>{% endif %}

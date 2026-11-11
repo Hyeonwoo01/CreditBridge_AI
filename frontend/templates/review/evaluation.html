@@ -4,7 +4,7 @@
 {# 정보가 빽빽한 화면은 넓은 작업 폭(docs/DESIGN.md: 워크스페이스 확장형) #}
 {% block width %}max-w-[1440px]{% endblock %}
 {% block content %}
-<p class="mb-4 text-sm text-muted"><a class="underline" href="/review">{{ _("← 심사 큐") }}</a> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">{{ _("판정 근거 리포트") }}</a></p>
+<p class="mb-4 text-sm text-muted"><a class="underline" href="/review">{{ _("← 심사 큐") }}</a> · <span class="chip" data-case-state="{{ v.case_state }}">{{ _("상태: {state}", state=(v.case_state | case_state)) }}</span> · <a class="underline" href="/evaluations/{{ v.evaluation.id }}/report">{{ _("판정 근거 리포트") }}</a></p>
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
 {% include "partials/notes.html" %}
@@ -12,6 +12,7 @@
 {# 증거 상태 (리뷰 v3 P0-5): 심사관이 출처·진위·적용 학기를 확인 방법과 함께 정한다. 의심은 자동 불인정이 아니라 판정 보류 #}
 <form id="evidence-status" method="post" action="/review/evaluations/{{ v.evaluation.id }}/evidence-status" class="card mt-6 grid scroll-mt-20 gap-3 md:grid-cols-2">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="case_token" value="{{ v.case_token }}">
   <div class="grid gap-1 md:col-span-2">
     <h2 class="font-semibold">{{ _("증거 상태") }}</h2>
     <p class="text-sm text-muted">{{ _("파일 해시는 같은 파일인지만 알려 줘요. 진위는 확인한 방법과 함께 정하고, 의심되면 판정을 보류하고 학생에게 공식 자료를 받아요(자동 불인정 아님). 학생에게는 메모가 보이지 않아요.") }}{% if v.syllabus.verified_at %} {{ _("· 마지막 확인 {time}", time=(v.syllabus.verified_at.strftime('%Y-%m-%d'))) }}{% endif %}</p>
@@ -27,6 +28,7 @@
 {% if not v.decision and v.evaluation.is_latest and v.request.status != 'draft' %}
 <form id="assign" method="post" action="/review/evaluations/{{ v.evaluation.id }}/assign" class="card mt-6 grid scroll-mt-20 gap-3">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="case_token" value="{{ v.case_token }}">
   <h2 class="font-semibold">{{ _("담당 교수 배정") }}</h2>
   <p class="text-sm text-muted">{% if v.reviewer %}{{ _("지금 담당: {name}. 다른 교수로 바꾸면 이전 교수에게도 알림이 가요.", name=v.reviewer.name) }}{% elif not v.candidate %}{{ _("후보 과목이 없어 학과로 자동 배정할 수 없어요. 학생의 편입 전공 학과 교수를 먼저 골라 두었어요.") }}{% else %}{{ _("교수를 골라 배정하면 교수에게 알림과 근거 요약이 함께 가요.") }}{% endif %}</p>
   <div class="flex flex-wrap items-end gap-2">

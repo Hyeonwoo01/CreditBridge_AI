@@ -41,3 +41,7 @@ class LLMRefusalError(LLMError):
 
 class LLMNotConfiguredError(LLMError):
     """AI 설정(LLM_PROVIDER에 맞는 API 키·모델)이 없어 AI를 부를 수 없음. 분석은 실패로 표시하고 안내한다."""
+
+
+class ConcurrentChangeError(DecisionValidationError):
+    """화면을 연 뒤 다른 사람이 같은 심사 건을 바꿨다 (낙관적 잠금). 덮어쓰지 않고 다시 보게 한다."""

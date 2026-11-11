@@ -43,6 +43,7 @@ from backend.schemas.results import CandidateResult, EvaluationResult, EvidenceV
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import accounts as account_service
 from backend.services import appeals as appeal_service
+from backend.services import case_state
 from backend.services import credits as credit_service
 from backend.services import decisions as decision_service
 from backend.services import evidence_feedback as feedback_service
@@ -97,6 +98,8 @@ class EvaluationView:
     taken_term: str | None = None  # 성적표에 적힌 실제 수강 학기 (증거 적용 학기 비교)
     span_ids: dict[tuple[str, int, int, str], int] = field(default_factory=dict)
     feedback: dict[int, str] = field(default_factory=dict)
+    case_state: str = ""  # 상태 머신의 지금 상태 (case_state.CaseState)
+    case_token: str = ""  # 화면을 열 때의 상태 토큰. 저장 폼에 실어 동시 수정을 막는다
 
     def span_id(self, side: str, evidence: EvidenceView, course_code: str, concept: str) -> int | None:
         return self.span_ids.get((side, evidence.char_start, evidence.char_end, f"{course_code}|{concept}"[:255]))
@@ -210,6 +213,8 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.feedback = feedback_service.mine(session, user, evaluation.id)
         view.credit = decision_service.credit_conversion(session, evaluation)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
+    view.case_state = case_state.state_of(session, evaluation)
+    view.case_token = case_state.token(session, evaluation)
     view.grade_failed = syllabus.id in policy_service.grade_failed_syllabus_ids(session, [syllabus.id])
     # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)
     if not (user.role == Role.STUDENT and request.status == RequestStatus.CLOSED):

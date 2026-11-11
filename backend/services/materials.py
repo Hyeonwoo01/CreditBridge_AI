@@ -18,7 +18,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.security.permissions import ensure_can_view_evaluation
-from backend.services import audit, notifications
+from backend.services import audit, case_state, notifications
 
 # 요청 화면에서 고를 수 있는 기본 항목. 분석이 제안한 자료(missing_materials)와 함께 보여준다
 STANDARD_ITEMS = [
@@ -32,7 +32,7 @@ MAX_ITEMS = 10
 
 
 def request_materials(
-    session: Session, actor: User, evaluation_id: int, items: list[str], note: str
+    session: Session, actor: User, evaluation_id: int, items: list[str], note: str, case_token: str | None = None
 ) -> MaterialRequest:
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
@@ -46,6 +46,7 @@ def request_materials(
             raise PermissionDeniedError(tr("본인에게 배정된 건만 보완 자료를 요청할 수 있어요."))
     if decision_repo.for_evaluation(session, evaluation.id) is not None:
         raise CreditBridgeError(tr("이미 판정된 건이에요. 보완 자료는 판정 전에만 요청할 수 있어요."))
+    evaluation = case_state.ensure(session, evaluation.id, "request_materials", case_token)
     cleaned = list(dict.fromkeys(i.strip()[:200] for i in items if i.strip()))[:MAX_ITEMS]
     note = note.strip()
     if not cleaned and not note:

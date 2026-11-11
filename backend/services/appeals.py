@@ -24,7 +24,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.security.permissions import can_view_evaluation
-from backend.services import audit, notifications
+from backend.services import audit, case_state, notifications
 from backend.services import student as student_service
 from backend.services.student import UploadedFile
 
@@ -59,7 +59,7 @@ class AppealRow:
     syllabus: Syllabus
     request: TransferRequest
     reviewer_options: list[User]  # 재판정을 맡길 수 있는 학과 교수
-    default_reviewer_id: int | None  # 원 판정 교수 (부재면 대리 심사자)
+    default_reviewer_id: int | None  # 원 판정 교수가 부재면 대리 심사자, 아니면 비움 (원 판정 교수는 재판정 불가)
     files: list[AppealFile] = field(default_factory=list)
 
 
@@ -163,11 +163,17 @@ def _load(session: Session, evaluator: User, appeal_id: int) -> tuple[Appeal, Co
         raise PermissionDeniedError(tr("소속 기관의 이의 신청만 처리할 수 있어요."))
     if appeal.status != AppealStatus.SUBMITTED:
         raise CreditBridgeError(tr("이미 처리한 이의 신청이에요."))
+    # 행을 잠가 두 심사관이 같은 이의 신청을 동시에 처리하지 못하게 한다
+    evaluation = case_state.ensure(session, evaluation.id, "appeal_process")
+    appeal_repo.refresh(session, appeal)
+    if appeal.status != AppealStatus.SUBMITTED:
+        raise CreditBridgeError(tr("이미 처리한 이의 신청이에요."))
     return appeal, evaluation, request
 
 
 def _department_professors(session: Session, evaluation: CourseEvaluation, institution_id: int) -> list[User]:
-    """재판정을 맡길 수 있는 교수: 판정한 대상 과목(없으면 AI 후보 과목)의 학과, 그것도 없으면 원 판정 교수의 학과."""
+    """재판정을 맡길 수 있는 교수: 판정한 대상 과목(없으면 AI 후보 과목)의 학과, 그것도 없으면 원 판정 교수의 학과.
+    원 판정 교수는 뺀다 (이의 신청은 다른 교수가 다시 본다)."""
     decision = decision_repo.for_evaluation(session, evaluation.id)
     course_id = (decision.target_course_id if decision else None) or evaluation.candidate_course_id
     course = catalog_repo.get_course(session, course_id) if course_id else None
@@ -175,7 +181,8 @@ def _department_professors(session: Session, evaluation: CourseEvaluation, insti
     if department_id is None and decision is not None:
         decider = user_repo.get_by_id(session, decision.decided_by)
         department_id = decider.department_id if decider else None
-    return user_repo.professors_in(session, institution_id, department_id)
+    professors = user_repo.professors_in(session, institution_id, department_id)
+    return [p for p in professors if decision is None or p.id != decision.decided_by]
 
 
 def accept(session: Session, evaluator: User, appeal_id: int, reviewer_id: int | None, note: str) -> Appeal:

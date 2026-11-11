@@ -95,6 +95,7 @@ def assign_one(
     request: Request,
     evaluation_id: int,
     reviewer_id: int = Form(...),
+    case_token: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Evaluator,
     session: Session = Depends(get_db),
@@ -102,7 +103,7 @@ def assign_one(
     """심사관이 교수를 골라 배정하거나 바꾼다 (후보 과목이 없어 학과로 자동 배정할 수 없는 건 포함)."""
     check_csrf(request, csrf_token)
     try:
-        reviewer = review_service.assign_to(session, user, evaluation_id, reviewer_id)
+        reviewer = review_service.assign_to(session, user, evaluation_id, reviewer_id, case_token or None)
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
@@ -132,6 +133,7 @@ def request_materials(
     evaluation_id: int,
     items: list[str] = Form([]),
     note: str = Form(""),
+    case_token: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Evaluator,
     session: Session = Depends(get_db),
@@ -139,7 +141,7 @@ def request_materials(
     """보완 자료 요청 (FR-22)."""
     check_csrf(request, csrf_token)
     try:
-        material_service.request_materials(session, user, evaluation_id, items, note)
+        material_service.request_materials(session, user, evaluation_id, items, note, case_token or None)
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
@@ -187,6 +189,7 @@ def evidence_status(
     academic_term: str = Form(""),
     verification_method: str = Form(""),
     verification_note: str = Form(""),
+    case_token: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Evaluator,
     session: Session = Depends(get_db),
@@ -203,6 +206,7 @@ def evidence_status(
             academic_term,
             verification_method,
             verification_note,
+            case_token or None,
         )
     except CreditBridgeError as exc:
         session.rollback()

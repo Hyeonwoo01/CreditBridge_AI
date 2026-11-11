@@ -22,6 +22,11 @@ def get(session: Session, appeal_id: int) -> Appeal | None:
     return session.get(Appeal, appeal_id)
 
 
+def refresh(session: Session, appeal: Appeal) -> None:
+    """잠금을 얻은 뒤 다른 트랜잭션이 커밋한 상태를 다시 읽는다."""
+    session.refresh(appeal)
+
+
 def for_evaluation(session: Session, evaluation_id: int) -> list[Appeal]:
     stmt = select(Appeal).where(Appeal.course_evaluation_id == evaluation_id).order_by(Appeal.id)
     return list(session.scalars(stmt))

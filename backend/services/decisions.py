@@ -33,7 +33,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
-from backend.services import audit, notifications
+from backend.services import audit, case_state, notifications
 from backend.services import credits as credit_service
 from backend.services import evidence_status as evidence_service
 from backend.services import policy as policy_service
@@ -308,12 +308,14 @@ def decide(
     acknowledge_conflict: bool,
     accepted_credits: float | None = None,
     combined_syllabus_ids: list[int] | None = None,
+    case_token: str | None = None,
 ) -> Decision:
     """accepted_credits: 교수가 적은 인정 학점(대상 대학 단위). 비우면 환산 규칙으로 계산한 제안값을 쓰고,
     환산할 수 없으면 인정하는 판정은 직접 적어야 한다 (학점을 지어내지 않음).
     combined_syllabus_ids: 이 과목과 합쳐 하나로 인정할 같은 학생의 다른 출신 과목(N:1). 인정 학점은 과목별 남은
     학점에 비례해 나눠 원장(credit_allocations)에 한 줄씩 남긴다. 한 출신 과목 학점의 이중 사용과 같은 대상 과목의
-    이중 인정은 막는다."""
+    이중 인정은 막는다.
+    case_token: 화면을 열 때의 상태 토큰. 그 사이 다른 사람이 판정·배정 등을 바꿨으면 덮어쓰지 않는다 (P0-6)."""
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
         raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
@@ -322,6 +324,10 @@ def decide(
     appeal = appeal_service.accepted_for(session, evaluation.id) if current is not None else None
     if current is not None and (appeal is None or appeal.decision_id != current.id):
         raise DecisionValidationError(tr("이미 판정된 건이에요. 이의 신청으로 재심사를 진행해 주세요."))
+    # 행을 잠그고 상태(최신 분석인지, 판정 가능한 상태인지)와 토큰을 확인한다. 동시에 두 판정이 저장되지 않는다
+    evaluation = case_state.ensure(session, evaluation.id, "decide", case_token)
+    if current is not None and current.decided_by == professor.id:
+        raise DecisionValidationError(tr("이의 신청 재판정은 원 판정 교수가 아닌 다른 교수가 해야 해요."))
     if action not in DecisionAction.__members__.values():
         raise DecisionValidationError(tr("승인·수정·반려 중 하나를 선택해 주세요."))
     hold = evidence_service.hold_reason(syllabus_repo.get(session, evaluation.syllabus_id))

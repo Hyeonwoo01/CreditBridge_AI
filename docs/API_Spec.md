@@ -94,12 +94,12 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | R2 | POST | `/review/assign` | 심사관 | `evaluation_ids[]`, `tab`, `csrf_token` | 303→R1 (이미 교수가 있는 건은 건너뜀) | P05 | FR-18 |
 | R3 | GET | `/review/export.csv` | 심사관 | – | 파일(CSV) | P05·P10 | FR-24 |
 | R4 | GET | `/review/evaluations/{id}` | 심사관(소속 기관) | – | HTML | P06 | FR-05~11·22·25 |
-| R14 | POST | `/review/evaluations/{id}/assign` | 심사관(소속 기관, 판정 전) | `reviewer_id`, `csrf_token` | 303→R4 + 플래시 (같은 교수면 거절, 바꾸면 이전 교수에게 알림) | P06 | FR-18 |
-| R5 | POST | `/review/evaluations/{id}/materials` | 심사관 | `items[]`, `note`, `csrf_token` | 303→R4 | P06 | FR-22 |
+| R14 | POST | `/review/evaluations/{id}/assign` | 심사관(소속 기관, 판정 전) | `reviewer_id`, `case_token`, `csrf_token` | 303→R4 + 플래시 (같은 교수면 거절, 바꾸면 이전 교수에게 알림, 화면을 연 뒤 바뀌었으면 저장 안 함) | P06 | FR-18 |
+| R5 | POST | `/review/evaluations/{id}/materials` | 심사관 | `items[]`, `note`, `case_token`, `csrf_token` | 303→R4 | P06 | FR-22 |
 | R13 | POST | `/review/evaluations/{id}/supplement` | 심사관(소속 기관, 판정 전·최신 분석) | `file`(PDF·JPG·PNG), `csrf_token` | 303→R1 (재분석은 작업 큐) / 오류는 303→R4`#supplement` | P06 | FR-22, 권한 매트릭스 문서 업로드 |
-| R15 | POST | `/review/evaluations/{id}/evidence-status` | 심사관(소속 기관) | `source_kind`, `authenticity`(unverified·verified·partially_verified·suspicious·rejected), `academic_term`, `verification_method`(확인됨·일부 확인이면 필수), `verification_note`(의심·채택 안 함이면 필수, 학생 비공개), `csrf_token` | 303→R4`#evidence-status` (적용 학기는 성적표 수강 학기와 비교해 자동, 의심·채택 안 함으로 바꾸면 학생에게 공식 자료 안내 알림) | P06 | 리뷰 v3 P0-5 |
+| R15 | POST | `/review/evaluations/{id}/evidence-status` | 심사관(소속 기관) | `source_kind`, `authenticity`(unverified·verified·partially_verified·suspicious·rejected), `academic_term`, `verification_method`(확인됨·일부 확인이면 필수), `verification_note`(의심·채택 안 함이면 필수, 학생 비공개), `case_token`, `csrf_token` | 303→R4`#evidence-status` (적용 학기는 성적표 수강 학기와 비교해 자동, 의심·채택 안 함으로 바꾸면 학생에게 공식 자료 안내 알림) | P06 | 리뷰 v3 P0-5 |
 | R6 | GET | `/review/appeals` | 심사관 | – | HTML | P07 | FR-23 |
-| R7 | POST | `/review/appeals/{id}` | 심사관 | `action`(accept·dismiss), `reviewer_id`(accept), `note`(dismiss 필수), `csrf_token` | 303→R6 | P07 | FR-23 |
+| R7 | POST | `/review/appeals/{id}` | 심사관 | `action`(accept·dismiss), `reviewer_id`(accept, 원 판정 교수는 고를 수 없음), `note`(dismiss 필수), `csrf_token` | 303→R6 (심사 건 행을 잠가 같은 이의 신청을 두 번 처리하지 않음) | P07 | FR-23 |
 | R8 | GET | `/review/privacy` | 심사관 | – | HTML | P08 | FR-13 |
 | R9 | POST | `/review/privacy/{id}` | 심사관 | `csrf_token` | 303→R8 | P08 | FR-13 |
 | R10 | GET | `/review/equivalencies` | 심사관 | `q`(출신 과목·출신 대학·대상 과목 일부), `result`(direct·elective·none), `page`(50건씩) | HTML | P09 | FR-26 |
@@ -113,8 +113,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | F1 | GET | `/professor` | 교수 | – | HTML | P11 | FR-18·19 |
 | F2 | POST | `/professor/away` | 교수 | `days`(0=복귀), `delegate_id`, `csrf_token` | 303→F1 | P11 | FR-19 |
 | F3 | GET | `/professor/evaluations/{id}` | 교수(배정·판정 건) | – | HTML | P12 | FR-05~11·16·20·25 |
-| F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `accepted_credits`(인정 학점·대상 대학 단위, 비우면 승인된 환산 규칙으로 계산 — 환산할 수 없으면 인정 판정은 필수), `combined_syllabus_ids[]`(합쳐 하나로 인정할 같은 학생의 다른 출신 과목, N:1), `csrf_token` | 303→F1 / 409(경보 확인 필요)·422 HTML | P12 | FR-09·10·11 |
-| F5 | POST | `/professor/evaluations/{id}/materials` | 교수(배정 건) | `items[]`, `note`, `csrf_token` | 303→F3 | P12 | FR-22 |
+| F4 | POST | `/professor/evaluations/{id}/decision` | 교수(배정 건) | `action`(approve·modify·reject), `result`, `target_course_id`, `reason_codes[]`, `reason_memo`, `acknowledge_conflict`, `accepted_credits`(인정 학점·대상 대학 단위, 비우면 승인된 환산 규칙으로 계산 — 환산할 수 없으면 인정 판정은 필수), `combined_syllabus_ids[]`(합쳐 하나로 인정할 같은 학생의 다른 출신 과목, N:1), `case_token`(화면을 열 때의 상태 토큰), `csrf_token` | 303→F1 / 409(경보 확인 필요·화면을 연 뒤 다른 사람이 바꿈)·422(지금 상태에서 판정 불가: 이전 분석·판정 완료 등, 이의 신청 재판정을 원 판정 교수가 하려 함) HTML | P12 | FR-09·10·11 |
+| F5 | POST | `/professor/evaluations/{id}/materials` | 교수(배정 건) | `items[]`, `note`, `case_token`, `csrf_token` | 303→F3 | P12 | FR-22 |
 | F6 | POST | `/professor/evaluations/{id}/evidence/{span_id}` | 교수(배정·판정 건) | `verdict`(correct·wrong), `csrf_token`(또는 `X-CSRF-Token` 헤더) | HTMX면 버튼 조각 HTML, 아니면 303→F3 / 404(다른 분석의 구절·알 수 없는 값) | P12 | FR-06 (AI 근거 정확도) |
 
 ### 2.5 여러 역할 공용 (심사 건)
@@ -162,8 +162,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 
 | # | 메서드 | 경로 | 인증 | 설명 | FR |
 | --- | --- | --- | --- | --- | --- |
-| J1 | GET | `/api/v1/evaluations/{id}` | 세션 | 분석 결과(추천)와 사람 판정 | FR-05~09 |
-| J2 | POST | `/api/v1/decisions` | 세션 + `X-CSRF-Token` | 최종 판정 저장 (F4와 같은 규칙) | FR-09·10 |
+| J1 | GET | `/api/v1/evaluations/{id}` | 세션 | 분석 결과(추천)와 사람 판정, 심사 상태 `case_state`·상태 토큰 `case_token` | FR-05~09 |
+| J2 | POST | `/api/v1/decisions` | 세션 + `X-CSRF-Token` | 최종 판정 저장 (F4와 같은 규칙, `case_token`을 보내면 그 사이 바뀐 건은 409) | FR-09·10 |
 | J3 | GET | `/api/v1/sis/decisions` | `Authorization: Bearer cbsis_...` | 확정 판정 내보내기 | FR-24 |
 
 버전: JSON API는 경로에 버전(`/api/v1`)을 붙인다. 응답 모양이 바뀌면(필드 삭제·의미 변경) `/api/v2`를 새로 열고 v1을 한동안 함께 둔다. 필드 추가는 같은 버전에서 한다.
@@ -179,6 +179,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 {
   "id": 6,
   "status": "done",
+  "case_state": "under_review",
+  "case_token": "3f9a0c1e7b2d4a58",
   "recommendation": "direct",
   "coverage": 0.9,
   "confidence": "high",
@@ -188,19 +190,19 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 }
 ```
 
-판정 확률(%)은 MVP에서 계산·제공하지 않는다. 오류: 401 로그인 필요, 403 권한 없음, 404 없음.
+판정 확률(%)은 MVP에서 계산·제공하지 않는다. `case_state`는 심사 상태(리뷰 v3 P0-6: draft·analyzing·analysis_failed·superseded·needs_information·assignment_pending·under_review·decided·appeal_submitted·appeal_review·closed), `case_token`은 지금 상태를 나타내는 토큰으로 J2에 그대로 보내면 그 사이 바뀐 건을 덮어쓰지 않는다. 오류: 401 로그인 필요, 403 권한 없음, 404 없음.
 
 ### J2 `POST /api/v1/decisions`
 
 ```json
 { "evaluation_id": 6, "action": "reject", "result": null, "target_course_id": null,
   "reason_codes": ["level_difference"], "reason_memo": "", "acknowledge_conflict": false,
-  "accepted_credits": null, "combined_syllabus_ids": [] }
+  "accepted_credits": null, "combined_syllabus_ids": [], "case_token": "3f9a0c1e7b2d4a58" }
 ```
 
 - 201: `{"id": 31, "result": "none", "decided_by": 7, "accepted_credits": 0.0, "credit_unit": "us_semester", "credit_basis": "not_accepted"}` — `decided_by`는 로그인한 교수 id로 서버가 정한다 (요청으로 받지 않음).
-- 409: 같은 강의계획서 과거 판정과 결과가 달라 확인이 필요 (`acknowledge_conflict: true`로 다시).
-- 422: 사유 누락(반려·추천과 다른 판정), '기타'인데 메모 없음, 정보 부족 건을 그대로 승인, 인정 학점이 대상 과목·환산 학점보다 많음, 환산할 수 없는데 인정 학점을 비움, 같은 대상 과목을 이미 인정함, 출신 과목에서 아직 쓰지 않은 학점보다 많이 인정, 환산할 수 없는 과목을 합침 등.
+- 409: 같은 강의계획서 과거 판정과 결과가 달라 확인이 필요 (`acknowledge_conflict: true`로 다시), 또는 `case_token`이 지금 토큰과 달라 다른 사람이 먼저 바꿈 (J1로 다시 읽고 판단). `case_token`은 선택이지만 보내기를 권한다.
+- 422: 사유 누락(반려·추천과 다른 판정), '기타'인데 메모 없음, 정보 부족 건을 그대로 승인, 인정 학점이 대상 과목·환산 학점보다 많음, 환산할 수 없는데 인정 학점을 비움, 같은 대상 과목을 이미 인정함, 출신 과목에서 아직 쓰지 않은 학점보다 많이 인정, 환산할 수 없는 과목을 합침, 지금 상태에서 판정할 수 없음(이전 분석·판정 완료·분석 중 등), 이의 신청 재판정을 원 판정 교수가 하려 함 등.
 - 403: 배정 교수가 아님.
 
 ### J3 `GET /api/v1/sis/decisions?since=2026-10-01T00:00:00Z`

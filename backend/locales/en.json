@@ -21,7 +21,6 @@
   "(optional, up to {files} files)"
  ],
  "(심사관 처리 전)": "(before evaluator processing)",
- "(원 판정·대리)": "(original decider / substitute)",
  "(으)로 바뀌었어요.": ".",
  "(최대 {max_pct}%)": "(up to {max_pct}%)",
  "(후보)": "(candidate)",
@@ -1689,5 +1688,23 @@
  "확인 방법": "Verification method",
  "예: 출신 대학 포털 강의계획서와 대조": "e.g. compared with the syllabus on the source portal",
  "메모 (의심·채택 안 함이면 필수)": "Note (required if suspicious or not accepted)",
- "증거 상태 저장": "Save evidence status"
+ "증거 상태 저장": "Save evidence status",
+ "AI 분석 실패": "AI analysis failed",
+ "이전 분석 (최신 결과 있음)": "Earlier analysis (a newer result exists)",
+ "보완 자료 대기": "Waiting for more materials",
+ "교수 심사 중": "Under professor review",
+ "이의 신청 재판정 중": "Appeal re-decision in progress",
+ "다시 분석한 최신 결과가 있어요. 최신 결과 화면에서 처리해 주세요.": "A newer re-analysis exists. Please act on the latest result instead.",
+ "AI 분석이 끝난 뒤에 처리할 수 있어요.": "You can act on this once the AI analysis finishes.",
+ "AI 분석이 실패한 건이에요. 다시 분석한 뒤 처리해 주세요.": "The AI analysis failed for this case. Re-run the analysis first.",
+ "이미 판정된 건이에요. 정정은 이의 신청 재판정으로만 할 수 있어요.": "This case is already decided. Corrections can only be made through an appeal re-decision.",
+ "문서 삭제로 종료된 건이에요.": "This case was closed because its documents were deleted.",
+ "학생이 아직 심사를 요청하지 않은 건이에요.": "The student has not submitted this case for review yet.",
+ "화면을 연 뒤 다른 사람이 이 심사 건을 바꿨어요. 새로 고침해 바뀐 내용을 확인한 뒤 다시 해 주세요.": "Someone else changed this case after you opened it. Refresh, check what changed, and try again.",
+ "지금 상태({state})에서는 할 수 없는 처리예요.": "This action isn't allowed in the current state ({state}).",
+ "이의 신청 재판정은 원 판정 교수가 아닌 다른 교수가 해야 해요.": "An appeal must be re-decided by a professor other than the one who made the original decision.",
+ "상태: {state}": "Status: {state}",
+ "(원 판정 교수의 대리)": "(delegate of the original professor)",
+ "원 판정 교수는 고를 수 없어요 (다른 교수가 다시 봐요).": "The original professor can't be chosen (another professor reviews it again).",
+ "같은 학과에 원 판정 교수 말고 다른 교수가 없어요. 관리자에게 교수 계정을 요청해 주세요.": "There's no other professor in this department besides the original one. Ask an admin for another professor account."
 }

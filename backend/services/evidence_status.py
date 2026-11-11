@@ -21,7 +21,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.security.permissions import ensure_can_view_evaluation
-from backend.services import audit, notifications
+from backend.services import audit, case_state, notifications
 
 SOURCE_LABELS = {
     SourceKind.STUDENT_UPLOADED: N_("학생 제출"),
@@ -120,6 +120,7 @@ def update(
     academic_term: str,
     method: str,
     note: str,
+    case_token: str | None = None,
 ) -> Syllabus:
     """심사관이 증거의 출처·진위·적용 학기를 정한다. 진위를 의심·채택 안 함으로 바꾸면 학생에게 소명·보완을 안내한다."""
     if evaluator.role != Role.EVALUATOR:
@@ -128,6 +129,7 @@ def update(
     if evaluation is None:
         raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
     ensure_can_view_evaluation(session, evaluator, evaluation)
+    evaluation = case_state.ensure(session, evaluation.id, "evidence_status", case_token)
     syllabus = syllabus_repo.get(session, evaluation.syllabus_id)
     if syllabus is None:
         raise NotFoundError(tr("강의계획서를 찾을 수 없어요."))

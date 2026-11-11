@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
-from backend.errors import CreditBridgeError, DecisionValidationError
+from backend.errors import ConcurrentChangeError, CreditBridgeError, DecisionValidationError
 from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import Role
@@ -65,6 +65,7 @@ def decide(
     acknowledge_conflict: bool = Form(False),
     accepted_credits: str = Form(""),
     combined_syllabus_ids: list[int] = Form([]),
+    case_token: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
@@ -92,6 +93,13 @@ def decide(
             acknowledge_conflict,
             accepted_credits=_credits(accepted_credits),
             combined_syllabus_ids=combined_syllabus_ids,
+            case_token=case_token or None,
+        )
+    except ConcurrentChangeError as exc:
+        session.rollback()
+        view = views.evaluation_view(session, user, evaluation_id)
+        return render(
+            request, "professor/evaluation.html", status_code=409, user=user, v=view, error=str(exc), form=form
         )
     except decision_service.ConflictNeedsAcknowledgement as exc:
         session.rollback()
@@ -162,6 +170,7 @@ def request_materials(
     evaluation_id: int,
     items: list[str] = Form([]),
     note: str = Form(""),
+    case_token: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
@@ -169,7 +178,7 @@ def request_materials(
     """보완 자료 요청 (FR-22)."""
     check_csrf(request, csrf_token)
     try:
-        material_service.request_materials(session, user, evaluation_id, items, note)
+        material_service.request_materials(session, user, evaluation_id, items, note, case_token or None)
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
