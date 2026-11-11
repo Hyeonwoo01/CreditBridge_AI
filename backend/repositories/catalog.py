@@ -231,3 +231,8 @@ def add_conversion_rule(session: Session, rule: CreditConversionRule) -> CreditC
     session.add(rule)
     session.flush()
     return rule
+
+
+def department_rows(session: Session, institution_id: int) -> list[Department]:
+    stmt = select(Department).where(Department.institution_id == institution_id).order_by(Department.name)
+    return list(session.scalars(stmt))

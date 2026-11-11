@@ -35,6 +35,7 @@ from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
 from backend.services import audit, notifications
 from backend.services import credits as credit_service
+from backend.services import policy as policy_service
 
 # 강의계획서 내용이 이 비율 이상 같으면 '같은 강의계획서'로 본다. 첫 측정 후 확정한다 (기능명세서 FR-11).
 SIMILARITY_MIN = 0.80
@@ -184,6 +185,14 @@ def _validate_reasons(codes: list[str], memo: str, required: bool) -> tuple[list
     return codes, memo
 
 
+def _policy_snapshot(session: Session, request: TransferRequest | None) -> dict[str, Any] | None:
+    """판정 때 이 학생에게 적용된 학칙 정책 (규칙 id·값). 정책이 바뀌어도 이 판정 기록은 그대로 남는다."""
+    student = user_repo.get_by_id(session, request.student_id) if request else None
+    if request is None or student is None:
+        return None
+    return policy_service.for_student(session, student, request.target_institution_id).snapshot()
+
+
 def credit_conversion(session: Session, evaluation: CourseEvaluation) -> credit_service.Conversion:
     """이 심사 건의 출신 학점을 대상 대학 단위로 환산한 결과 (판정 화면 안내·판정 저장에 같이 쓴다)."""
     request = request_repo.get(session, evaluation.transfer_request_id) if evaluation.transfer_request_id else None
@@ -210,7 +219,7 @@ def combinable_sources(
             for s in syllabus_repo.of_request(session, other.id)
             if s.id != evaluation.syllabus_id and s.status == SyllabusStatus.READY
         ]
-        failed = request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
+        failed = policy_service.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
         converter = credit_service.for_request(session, other)
         out += [(s, converter.convert(s)) for s in syllabi if s.id not in failed]
     return out
@@ -399,6 +408,7 @@ def decide(
             source_credits=conversion.source_credits,
             source_credit_unit=conversion.source_unit,
             conversion_rule_id=conversion.rule.id if conversion.rule else None,
+            policy_snapshot=_policy_snapshot(session, request),
         ),
     )
     allocation_repo.supersede_for_evaluation(session, evaluation.id, decision.id)
@@ -471,7 +481,7 @@ def close_request_if_done(session: Session, request: TransferRequest) -> None:
     if request.status != RequestStatus.SUBMITTED:
         return
     syllabi = syllabus_repo.of_request(session, request.id)
-    failed = request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
+    failed = policy_service.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
     latest = [evaluation_repo.latest_for_syllabus(session, s.id) for s in syllabi]
     decided = decision_repo.for_evaluations(session, [e.id for e in latest if e])
     if latest and all(e and (e.id in decided or e.syllabus_id in failed) for e in latest):

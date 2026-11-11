@@ -1,8 +1,7 @@
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.models import TranscriptEntry, TransferRequest
-from backend.models.enums import PASSING_GRADES
 
 
 def get(session: Session, request_id: int) -> TransferRequest | None:
@@ -42,17 +41,22 @@ def transcript_entries(session: Session, request_id: int) -> list[TranscriptEntr
     return list(session.scalars(stmt))
 
 
-def failing_grade() -> ColumnElement[bool]:
-    """성적표 줄의 성적이 인정 최저 성적 미달 (C- 이하·F 등)."""
-    return TranscriptEntry.grade.is_not(None) & func.upper(func.trim(TranscriptEntry.grade)).not_in(PASSING_GRADES)
-
-
-def grade_failed_syllabus_ids(session: Session, syllabus_ids: list[int]) -> set[int]:
-    """성적표에 미달 성적으로 연결된 강의계획서 id."""
+def grades_with_student(session: Session, syllabus_ids: list[int]) -> list[tuple[int, str | None, int, int]]:
+    """강의계획서에 연결된 성적표 성적과 그 학생·편입 대학: (강의계획서 id, 성적, 학생 id, 대상 대학 id).
+    성적 기준 미달 여부는 학생마다 다른 학칙 정책으로 판단한다 (services/policy.py)."""
     if not syllabus_ids:
-        return set()
-    stmt = select(TranscriptEntry.syllabus_id).where(TranscriptEntry.syllabus_id.in_(syllabus_ids), failing_grade())
-    return {i for i in session.scalars(stmt) if i is not None}
+        return []
+    stmt = (
+        select(
+            TranscriptEntry.syllabus_id,
+            TranscriptEntry.grade,
+            TransferRequest.student_id,
+            TransferRequest.target_institution_id,
+        )
+        .join(TransferRequest, TransferRequest.id == TranscriptEntry.transfer_request_id)
+        .where(TranscriptEntry.syllabus_id.in_(syllabus_ids))
+    )
+    return [(sid, grade, student, target) for sid, grade, student, target in session.execute(stmt) if sid is not None]
 
 
 def replace_transcript_entries(session: Session, request_id: int, entries: list[TranscriptEntry]) -> None:

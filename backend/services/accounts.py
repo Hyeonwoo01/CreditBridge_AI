@@ -140,6 +140,7 @@ def update_account(
     department_id: int | None,
     delegate_id: int | None,
     source_institution_id: int | None = None,
+    admission_year: str | None = None,
 ) -> list[str]:
     """교직원 이름·학과·대리 심사자, 학생 편입 전공·출신 대학을 고친다. 바뀐 항목 이름을 돌려준다 (없으면 빈 목록).
     학생 정보를 바꿔도 이미 만든 편입 요청은 그때의 값을 그대로 둔다."""
@@ -191,6 +192,13 @@ def update_account(
         if source_institution_id != user.source_institution_id:
             user.source_institution_id = source_institution_id
             changed.append("source_institution")
+        if admission_year is not None:  # 입학연도: 입학연도별 학칙 정책에 쓴다 (빈 값은 모름)
+            year = admission_year.strip()
+            if year and not (year.isdigit() and 1990 <= int(year) <= 2100):
+                raise CreditBridgeError(tr("입학연도는 네 자리 연도로 적어 주세요."))
+            if (int(year) if year else None) != user.admission_year:
+                user.admission_year = int(year) if year else None
+                changed.append("admission_year")
 
     if user.role == Role.PROFESSOR:
         if delegate_id:

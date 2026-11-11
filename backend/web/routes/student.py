@@ -14,6 +14,7 @@ from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import appeals as appeal_service
 from backend.services import notifications as notification_service
+from backend.services import policy as policy_service
 from backend.services import precedents as precedent_service
 from backend.services import privacy as privacy_service
 from backend.services import student as student_service
@@ -56,7 +57,7 @@ def transcript_page(request: Request, user: User = Student, session: Session = D
         "student/transcript.html",
         user=user,
         transcript=student_service.account_transcript(session, user),
-        grade_failed=student_service.grade_failed,
+        grade_failed=policy_service.for_student(session, user).grade_failed,
     )
 
 

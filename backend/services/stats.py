@@ -19,10 +19,10 @@ from backend.repositories import appeals as appeal_repo
 from backend.repositories import audit as audit_repo
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
-from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import privacy as privacy_repo
 from backend.repositories import requests as request_repo
 from backend.repositories import users as user_repo
+from backend.services import policy as policy_service
 from backend.services.evidence_feedback import PromptQuality, quality_by_prompt
 from backend.services.privacy import is_overdue
 
@@ -146,7 +146,7 @@ def institution_stats(session: Session, user: User) -> Stats:
     stats.monthly = [(m, per_month.get(m, 0)) for m in _months(now)]
 
     # 학과별 처리 지표: 판정 대상 과목(판정했으면 판정 과목, 아니면 AI 후보)의 학과 기준
-    waiting = evaluation_repo.review_queue(session, institution_id)
+    waiting = policy_service.review_queue(session, institution_id)
     stats.queue_waiting = len(waiting)
     candidate_of = {e.id: e.candidate_course_id for _, e, _ in rows}
     course_ids: list[int] = [e.candidate_course_id for e, _, _ in waiting if e.candidate_course_id]
@@ -373,6 +373,6 @@ def workspace_counts(session: Session, user: User) -> WorkspaceCounts | None:
     return WorkspaceCounts(
         institution=institution.name if institution else "",
         submitted=len(request_repo.submitted_of_institution(session, user.institution_id)),
-        waiting=len(evaluation_repo.review_queue(session, user.institution_id)),
+        waiting=len(policy_service.review_queue(session, user.institution_id)),
         decided=len({e.id for _, e, _ in rows}),
     )

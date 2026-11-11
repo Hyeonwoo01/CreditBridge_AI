@@ -15,10 +15,10 @@ from backend.repositories import catalog as catalog_repo
 from backend.repositories import decisions as decision_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import materials as material_repo
-from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import audit, notifications
+from backend.services import policy as policy_service
 from backend.services.decisions import HistoryItem, ai_result, close_request_if_done, conflicts, history
 
 # 심사 큐 필터. all 외에는 겹치지 않는 신뢰도 구분이고, conflict는 과거 판정과 어긋나는 건만 따로 모아 본다
@@ -86,7 +86,7 @@ def unassigned_count(session: Session, user: User) -> int:
     institution_id = ensure_assigner(user)
     return sum(
         1
-        for evaluation, _, _ in evaluation_repo.review_queue(session, institution_id)
+        for evaluation, _, _ in policy_service.review_queue(session, institution_id)
         if evaluation_repo.active_assignment(session, evaluation.id) is None
     )
 
@@ -116,7 +116,7 @@ def queue(
     page: int = 1,
 ) -> QueueView:
     institution_id = ensure_evaluator(evaluator)
-    raw = evaluation_repo.review_queue(session, institution_id)
+    raw = policy_service.review_queue(session, institution_id)
     courses = catalog_repo.courses_by_ids(session, [e.candidate_course_id for e, _, _ in raw if e.candidate_course_id])
     materials = material_repo.for_syllabi(session, [s.id for _, s, _ in raw])
     open_by_syllabus: dict[int, int] = {}
@@ -245,7 +245,7 @@ def auto_assign(session: Session, evaluator: User, evaluation_ids: list[int]) ->
     institution_id = ensure_assigner(evaluator)
     assigned, problems = 0, []
     # 판정 전인 소속 기관 심사 건만 (초안·판정 끝난 건·다른 기관 건은 건너뛴다)
-    in_queue = {e.id for e, _, _ in evaluation_repo.review_queue(session, institution_id)}
+    in_queue = {e.id for e, _, _ in policy_service.review_queue(session, institution_id)}
     for evaluation_id in evaluation_ids:
         evaluation = evaluation_repo.get(session, evaluation_id)
         if (
@@ -276,7 +276,7 @@ def assign_ready(session: Session, request: TransferRequest) -> int:
         return 0
     syllabi = syllabus_repo.of_request(session, request.id)
     asked = {m.syllabus_id for m in material_repo.for_syllabi(session, [s.id for s in syllabi]) if m.status == "open"}
-    failed = request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
+    failed = policy_service.grade_failed_syllabus_ids(session, [s.id for s in syllabi])
     assigned = 0
     for syllabus in syllabi:
         evaluation = evaluation_repo.latest_for_syllabus(session, syllabus.id)
@@ -305,7 +305,7 @@ def release_grade_failed(session: Session, request: TransferRequest) -> int:
         return 0
     syllabi = syllabus_repo.of_request(session, request.id)
     released = 0
-    for syllabus_id in request_repo.grade_failed_syllabus_ids(session, [s.id for s in syllabi]):
+    for syllabus_id in policy_service.grade_failed_syllabus_ids(session, [s.id for s in syllabi]):
         evaluation = evaluation_repo.latest_for_syllabus(session, syllabus_id)
         if evaluation is None or decision_repo.for_evaluation(session, evaluation.id) is not None:
             continue
@@ -426,7 +426,7 @@ def assignment_board(session: Session, admin: User, show: str) -> AssignmentBoar
     if admin.role != Role.ADMIN or admin.institution_id is None:
         raise PermissionDeniedError(tr("기관 관리자만 사용할 수 있어요."))
     institution_id = admin.institution_id
-    queue_rows = evaluation_repo.review_queue(session, institution_id)
+    queue_rows = policy_service.review_queue(session, institution_id)
     courses = catalog_repo.courses_by_ids(
         session, [e.candidate_course_id for e, _, _ in queue_rows if e.candidate_course_id]
     )
@@ -490,7 +490,7 @@ def assign_to(session: Session, user: User, evaluation_id: int, reviewer_id: int
     """특정 교수에게 배정하거나 다른 교수로 바꾼다 (심사관·관리자). 이전 배정은 기록으로 남는다."""
     institution_id = ensure_assigner(user)
     evaluation = evaluation_repo.get(session, evaluation_id)
-    in_queue = {e.id for e, _, _ in evaluation_repo.review_queue(session, institution_id)}
+    in_queue = {e.id for e, _, _ in policy_service.review_queue(session, institution_id)}
     if evaluation is None or evaluation.id not in in_queue:
         raise NotFoundError(tr("판정 전인 소속 기관 심사 건만 배정할 수 있어요."))
     reviewer = user_repo.get_by_id(session, reviewer_id)

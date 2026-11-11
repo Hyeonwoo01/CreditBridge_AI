@@ -26,7 +26,6 @@ from backend.services import review as review_service
 from backend.services import sis as sis_service
 from backend.services import stats as stats_service
 from backend.services.csv_import import safe_cell
-from backend.services.student import DEFAULT_TRANSFER_CAP
 from backend.web.nav import nav_badges
 from backend.web.notify import send_notifications
 from backend.web.templating import flash, render
@@ -163,15 +162,16 @@ def update_account(
     department_id: int | None = Form(None),
     delegate_user_id: int | None = Form(None),
     source_institution_id: int | None = Form(None),
+    admission_year: str | None = Form(None),
     csrf_token: str = Form(""),
     user: User = Admin,
     session: Session = Depends(get_db),
 ) -> Response:
-    """교직원 이름, 교수·심사관 학과, 교수 대리 심사자, 학생 편입 전공·출신 대학 수정 (역할은 바꾸지 않는다)."""
+    """교직원 이름·학과·대리 심사자, 학생 편입 전공·출신 대학·입학연도 수정 (역할은 바꾸지 않는다)."""
     check_csrf(request, csrf_token)
     try:
         changed = account_service.update_account(
-            session, user, user_id, name, department_id, delegate_user_id, source_institution_id
+            session, user, user_id, name, department_id, delegate_user_id, source_institution_id, admission_year
         )
     except CreditBridgeError as exc:
         session.rollback()
@@ -259,6 +259,7 @@ def _data_page(request: Request, user: User, session: Session, status_code: int 
         course_columns=institution_data.COURSE_COLUMNS,
         email_enabled=notifications.email_enabled(),
         credit_rules=institution_data.conversion_rules(session, user),
+        policies=institution_data.policy_overview(session, user),
         credit_systems=list(CreditSystem),
         conversion_methods=list(ConversionMethod),
         today=utcnow().date(),
@@ -341,23 +342,58 @@ def import_courses(
     return RedirectResponse("/admin/data#courses", status_code=303)
 
 
-@router.post("/data/transfer-cap")
-def transfer_cap(
+@router.post("/data/policies")
+def add_policy(
     request: Request,
-    cap: str = Form(""),
+    rule_type: str = Form(""),
+    department: str = Form(""),
+    admission_year: str = Form(""),
+    value: str = Form(""),
+    accept_pass: bool = Form(False),
+    effective_from: str = Form(""),
+    source: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Admin,
     session: Session = Depends(get_db),
 ) -> Response:
+    """학칙 정책 규칙 초안 추가 (승인 전에는 판정·계산에 쓰지 않음)."""
     check_csrf(request, csrf_token)
     try:
-        saved = institution_data.set_transfer_cap(session, user, cap)
+        institution_data.add_policy_rule(
+            session, user, rule_type, department, admission_year, value, accept_pass, effective_from, source
+        )
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
     else:
-        flash(request, tr("편입 학점 상한을 {cap}학점으로 정했어요.", cap=saved or DEFAULT_TRANSFER_CAP))
-    return RedirectResponse("/admin/data#transfer-cap", status_code=303)
+        flash(request, tr("정책 초안을 추가했어요. 승인하면 적용돼요."))
+    return RedirectResponse("/admin/data#policies", status_code=303)
+
+
+@router.post("/data/policies/{rule_id}/{action}")
+def change_policy(
+    request: Request,
+    rule_id: int,
+    action: str,
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """정책 규칙 승인(approve) 또는 끝내기(retire)."""
+    check_csrf(request, csrf_token)
+    try:
+        if action == "approve":
+            institution_data.approve_policy_rule(session, user, rule_id)
+            flash(request, tr("정책을 승인했어요. 새로 계산하는 예상치와 판정부터 적용돼요."))
+        elif action == "retire":
+            institution_data.retire_policy_rule(session, user, rule_id)
+            flash(request, tr("정책을 끝냈어요. 지난 판정에 남은 정책 기록은 그대로예요."))
+        else:
+            raise CreditBridgeError(tr("알 수 없는 값이에요."))
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    return RedirectResponse("/admin/data#policies", status_code=303)
 
 
 @router.post("/data/credit-systems")

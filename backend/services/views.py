@@ -50,6 +50,7 @@ from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
 from backend.services import notes as note_service
 from backend.services import notifications as notification_service
+from backend.services import policy as policy_service
 from backend.services import privacy as privacy_service
 from backend.services import reminders as reminder_service
 from backend.services import review as review_service
@@ -207,7 +208,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.feedback = feedback_service.mine(session, user, evaluation.id)
         view.credit = decision_service.credit_conversion(session, evaluation)
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
-    view.grade_failed = syllabus.id in request_repo.grade_failed_syllabus_ids(session, [syllabus.id])
+    view.grade_failed = syllabus.id in policy_service.grade_failed_syllabus_ids(session, [syllabus.id])
     # 문서 삭제로 종료된 요청: 학생 화면에서는 이의 신청도 함께 지운 것으로 보고 숨긴다 (교직원은 처리 기록으로 봄)
     if not (user.role == Role.STUDENT and request.status == RequestStatus.CLOSED):
         view.appeals = appeal_service.for_evaluation(session, evaluation.id)
@@ -295,10 +296,12 @@ def request_view(
     request = student_service.get_own_request(session, student, request_id)
     rows = student_service.course_rows(session, request)
     target = request.target_institution
+    plan_degree, per_semester, _ = student_service.plan_values(policy_service.for_student(session, student, target.id))
     simulation = student_service.simulate(
         rows,
-        degree_credits=degree or target.degree_credits or 120,
+        degree_credits=degree or plan_degree,
         tuition_per_credit=tuition if tuition is not None else (target.tuition_per_credit or 1000),
+        credits_per_semester=per_semester,
     )
     processing = any(
         r.syllabus.status in ("uploaded", "processing")
@@ -339,7 +342,7 @@ class StudentTotal:
     courses: int
     decided: int
     requests: int  # 합친 요청 수
-    cap: int = student_service.DEFAULT_TRANSFER_CAP  # 편입 학점 상한
+    cap: int | None = None  # 편입 학점 상한 (학칙 정책, 미정이면 None)
     over_cap: bool = False  # 졸업 학점에 넣기로 한 과목의 인정 학점(많이 인정될 때)이 상한을 넘음
     raw_high: float = 0.0  # 상한으로 자르기 전 많이 인정될 때의 학점
     choices: list[RequestSummary] = field(default_factory=list)  # 졸업 학점에 넣을지 고를 수 있는 과목
@@ -385,6 +388,15 @@ def student_home(session: Session, student: User) -> StudentHome:
     # 합계는 한 편입 대학 기준 (졸업 학점이 대학마다 달라서): 소속 대학, 없으면 가장 최근 요청의 대학.
     # 문서 삭제로 종료된 요청과 학생이 졸업 학점에서 뺀 과목은 합계에서 뺀다
     total_inst = target or (requests[0].target_institution if requests else None)
+    plans: dict[int, tuple[int | None, int | None, int | None]] = {}
+
+    def plan(institution_id: int) -> tuple[int | None, int | None, int | None]:
+        if institution_id not in plans:
+            plans[institution_id] = student_service.plan_values(
+                policy_service.for_student(session, student, institution_id)
+            )
+        return plans[institution_id]
+
     for r in requests:
         rows = student_service.course_rows(session, r)
         inst = r.target_institution
@@ -396,7 +408,7 @@ def student_home(session: Session, student: User) -> StudentHome:
         summaries.append(
             RequestSummary(
                 r,
-                student_service.simulate(rows, inst.degree_credits or 120, inst.tuition_per_credit or 1000),
+                student_service.simulate(rows, plan(inst.id)[0], inst.tuition_per_credit or 1000, plan(inst.id)[1]),
                 student_service.readiness(session, r),
                 len(rows),
                 sum(1 for row in rows if row.decision is not None),
@@ -418,8 +430,8 @@ def student_home(session: Session, student: User) -> StudentHome:
     total = None
     merged = student_service.merged_rows(groups)
     if total_inst is not None and (merged or pending):
-        cap = student_service.transfer_cap(total_inst)
-        raw = student_service.simulate(merged, total_inst.degree_credits or 120, total_inst.tuition_per_credit or 1000)
+        degree_credits, per_semester, cap = plan(total_inst.id)
+        raw = student_service.simulate(merged, degree_credits, total_inst.tuition_per_credit or 1000, per_semester)
         choices = [
             sm
             for sm in summaries
@@ -433,7 +445,7 @@ def student_home(session: Session, student: User) -> StudentHome:
             sum(1 for row in merged if row.decision is not None),
             sum(1 for rows in groups if rows) + pending,
             cap=cap,
-            over_cap=raw.credits_high > cap,
+            over_cap=cap is not None and raw.credits_high > cap,
             raw_high=raw.credits_high,
             choices=choices,
             left_out=sum(1 for sm in choices if not sm.request.counted),

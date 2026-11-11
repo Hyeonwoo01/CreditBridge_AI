@@ -76,3 +76,7 @@ dkim@msu.example
 - 저장하면 감사 로그 `account.update`에 바뀐 항목 이름(`name`·`department`·`delegate`·`major`·`source_institution`)만 남기고 값(이름)은 남기지 않는다.
 - 학생의 편입 전공은 학생 계정의 학과(`users.department_id`), 출신 대학은 `users.source_institution_id`. 학생이 편입 요청을 만들 때 그대로 복사되고, 나중에 바꿔도 이미 만든 요청은 그대로다.
 - 서비스: `backend/services/accounts.py`, 조회: `user_repo.search`(이메일 일부·역할·활성 여부, 역할·이메일 순).
+
+## 입학연도 (2026-11-11)
+
+학생 계정 수정의 "편입 정보"에 **입학연도**(네 자리, 비우면 모름)를 더했다. 입학연도별 학칙 정책(P18 학칙 정책)에 쓴다.

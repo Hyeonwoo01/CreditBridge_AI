@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 87개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 88개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -139,7 +139,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M7 | POST | `/admin/data/accounts/active` | 관리자 | `email`, `action`(deactivate·reactivate), `next`(선택, `/admin/accounts/{id}`만), `csrf_token` | 303→M2`#account-active` 또는 M15 | P18 | FR-12 |
 | M8 | POST | `/admin/data/institutions` | 관리자 | `name`, `country`, `csrf_token` | 303→M2`#institutions` (우리 대학 목록에 추가. 다른 대학이 만든 같은 이름 행은 함께 씀) | P18 | – |
 | M20 | POST | `/admin/data/courses/{id}/reference/remove` | 관리자 | `csrf_token` | 303→M2`#courses` + 플래시 (과목 연결만 끊음, 강의계획서 행은 남김) | P18 | FR-05 |
-| M22 | POST | `/admin/data/transfer-cap` | 관리자 | `cap`(1~300, 빈 값=기본 60), `csrf_token` | 303→M2`#transfer-cap` + 플래시 | P18 | FR-15 |
+| M22 | POST | `/admin/data/policies` | 관리자 | `rule_type`(min_grade·transfer_cap·degree_credits·semester_load), `value`(최저 성적 A+~F 또는 학점 수), `department`(빈 값=모든 학과), `admission_year`(빈 값=모든 입학연도), `accept_pass`, `effective_from`, `source`, `csrf_token` | 303→M2`#policies` (초안 — 승인 전에는 쓰지 않음) | P18 | 리뷰 v3 P0-4 (예전 `/admin/data/transfer-cap`을 대신함) |
+| M26 | POST | `/admin/data/policies/{id}/{action}` | 관리자 | action: approve(초안만, 같은 범위의 열린 규칙은 전날로 끝냄, 같은 날 시작이면 충돌로 거절)·retire(끝냄, 지우지 않음), `csrf_token` | 303→M2`#policies` | P18 | 리뷰 v3 P0-4 |
 | M23 | POST | `/admin/data/credit-systems` | 관리자 | `institution_ids[]`, `systems[]`(같은 순서, 빈 값=모름), `csrf_token` | 303→M2`#credit-units` + 플래시 (우리 대학과 우리 목록의 출신 대학만) | P18 | 리뷰 v3 P0-1 |
 | M24 | POST | `/admin/data/conversion-rules` | 관리자 | `source_system`, `factor`(0~5), `method`, `effective_from`, `note`, `csrf_token` | 303→M2`#credit-units` (같은 단위 쌍의 열린 규칙은 전날로 끝냄, 같은 날 시작 규칙은 충돌로 거절) | P18 | 리뷰 v3 P0-1 |
 | M25 | POST | `/admin/data/conversion-rules/{id}/end` | 관리자 | `csrf_token` | 303→M2`#credit-units` (오늘까지로 끝냄, 지우지 않음) | P18 | 리뷰 v3 P0-1 |
@@ -322,7 +323,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P18 | 계정 가져오기 | M5 |
 | P18 | 설정 링크 메일 보내기 / 임시 비밀번호 발급 (확인창) | M6 |
 | P18 | 비활성화 (확인창) · 다시 활성화 | M7 `action=deactivate` · `action=reactivate` |
-| P18 | 편입 학점 상한 저장 | M22 |
+| P18 | 학칙 정책 초안 추가 · 승인 · 끝내기(확인창) | M22 · M26 |
 | P18 | 학점 단위 저장 · 환산 규칙 추가 · 끝내기(확인창) | M23 · M24 · M25 |
 | P18 | 출신 대학 추가 | M8 |
 | P18 | 출신 대학 지우기 (확인창, 쓰지 않는 대학만) | M21 |

@@ -30,6 +30,7 @@ def row(
         candidate_code="X",
         candidate_credits=target,
         transcript_grade=grade,
+        failed_grade=grade in {"C-", "D+", "D", "F"},  # 학칙 정책(C 이상)으로 판단한 결과를 넣는다
         conversion=conv,
         allocated=allocated,
     )
@@ -42,7 +43,7 @@ def test_simulation_ranges_and_cost() -> None:
         row("insufficient", "low", 3, 3),
         row("none", "medium", 2, 3),
     ]
-    sim = simulate(rows, degree_credits=120, tuition_per_credit=1000)
+    sim = simulate(rows, degree_credits=120, tuition_per_credit=1000, credits_per_semester=15)
     assert (sim.credits_low, sim.credits_high) == (3, 9)
     assert sim.source_credits == 11
     assert sim.extra_cost_low == 2000 and sim.extra_cost_high == 8000  # (11-9)*1000, (11-3)*1000
@@ -50,13 +51,13 @@ def test_simulation_ranges_and_cost() -> None:
 
 
 def test_failing_grade_and_decisions_override_ai() -> None:
-    sim = simulate([row("direct", "high", 3, 3, grade="D"), row("direct", "high", 3, 3, decided="none")], 120, 1000)
+    sim = simulate([row("direct", "high", 3, 3, grade="D"), row("direct", "high", 3, 3, decided="none")], 120, 1000, 15)
     assert sim.credits_high == 0
 
 
 def test_unknown_credits_are_left_out_not_guessed() -> None:
     # 예전에는 학점이 없으면 3.0을 넣었다: 이제는 계산에서 빼고 몇 과목을 뺐는지 알린다
-    sim = simulate([row("direct", "high", None, 3), row("direct", "high", 3, 3)], 120, 1000)
+    sim = simulate([row("direct", "high", None, 3), row("direct", "high", 3, 3)], 120, 1000, 15)
     assert (sim.credits_low, sim.credits_high, sim.source_credits) == (3, 3, 3)
     assert sim.unknown == 1 and sim.unknown_reason == "no credits"
 
@@ -64,16 +65,25 @@ def test_unknown_credits_are_left_out_not_guessed() -> None:
 def test_professor_accepted_credits_win_over_estimates() -> None:
     # 교수가 부분 인정 2학점으로 확정했으면 대상 과목 4학점이 아니라 2학점을 쓴다
     # (확정 학점은 승인된 배분 원장의 합계로 센다)
-    sim = simulate([row("direct", "high", 3, 4, decided="direct", accepted=2, allocated=2)], 120, 1000)
+    sim = simulate([row("direct", "high", 3, 4, decided="direct", accepted=2, allocated=2)], 120, 1000, 15)
     assert (sim.credits_low, sim.credits_high) == (2, 2)
     # 환산할 수 없는 과목이어도 교수가 확정한 값은 쓴다
-    sim = simulate([row("direct", "high", None, 4, decided="elective", accepted=3, allocated=3)], 120, 1000)
+    sim = simulate([row("direct", "high", None, 4, decided="elective", accepted=3, allocated=3)], 120, 1000, 15)
     assert (sim.credits_low, sim.credits_high, sim.unknown) == (3, 3, 0)
     # 다른 과목과 합쳐 인정돼 이 과목 판정은 없지만 원장에 배분이 있으면 그 값을 쓴다 (두 번 세지 않음)
     sim = simulate(
-        [row("direct", "high", 3, 4, allocated=2), row("none", "low", 3, 4, decided="none", accepted=0)], 120, 1000
+        [row("direct", "high", 3, 4, allocated=2), row("none", "low", 3, 4, decided="none", accepted=0)], 120, 1000, 15
     )
     assert (sim.credits_low, sim.credits_high) == (2, 2)
+
+
+def test_semesters_need_degree_and_load_policies() -> None:
+    sim = simulate([row("direct", "high", 3, 3)], None, 1000, 15)
+    assert sim.semesters_low is None and sim.semesters_high is None  # 졸업 학점 정책 미정
+    sim = simulate([row("direct", "high", 3, 3)], 120, 1000, None)
+    assert sim.semesters_low is None  # 학기당 이수 학점 정책 미정
+    sim = simulate([row("direct", "high", 3, 3)], 120, 1000, 12)
+    assert sim.semesters_low == 10 and sim.credits_per_semester == 12  # (120-3)/12 올림
 
 
 def test_transcript_link_score() -> None:

@@ -763,5 +763,63 @@ INSERT INTO credit_allocations
 
 UPDATE alembic_version SET version_num='0010' WHERE alembic_version.version_num = '0009';
 
+-- Running upgrade 0010 -> 0011
+
+CREATE TABLE policy_rules (
+    institution_id BIGINT NOT NULL, 
+    rule_type VARCHAR(30) NOT NULL, 
+    department_id BIGINT, 
+    admission_year INTEGER, 
+    parameters JSONB NOT NULL, 
+    effective_from DATE NOT NULL, 
+    effective_to DATE, 
+    status VARCHAR(10) NOT NULL, 
+    source TEXT NOT NULL, 
+    created_by BIGINT, 
+    approved_by BIGINT, 
+    approved_at TIMESTAMP WITHOUT TIME ZONE, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_policy_rules PRIMARY KEY (id), 
+    CONSTRAINT ck_policy_rules_rule_type_valid CHECK (rule_type IN ('min_grade', 'transfer_cap', 'degree_credits', 'semester_load')), 
+    CONSTRAINT ck_policy_rules_status_valid CHECK (status IN ('draft', 'approved', 'retired')), 
+    CONSTRAINT ck_policy_rules_admission_year_range CHECK (admission_year IS NULL OR admission_year BETWEEN 1990 AND 2100), 
+    CONSTRAINT ck_policy_rules_effective_range CHECK (effective_to IS NULL OR effective_to >= effective_from), 
+    CONSTRAINT fk_policy_rules_approved_by_users FOREIGN KEY(approved_by) REFERENCES users (id), 
+    CONSTRAINT fk_policy_rules_created_by_users FOREIGN KEY(created_by) REFERENCES users (id), 
+    CONSTRAINT fk_policy_rules_department_id_departments FOREIGN KEY(department_id) REFERENCES departments (id), 
+    CONSTRAINT fk_policy_rules_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id)
+);
+
+CREATE INDEX ix_policy_rules_institution_id ON policy_rules (institution_id);
+
+CREATE INDEX ix_policy_rules_status ON policy_rules (status);
+
+ALTER TABLE decisions ADD COLUMN policy_snapshot JSONB;
+
+ALTER TABLE users ADD COLUMN admission_year INTEGER;
+
+INSERT INTO policy_rules (institution_id, rule_type, parameters, effective_from, status, source,
+                                      approved_at, created_at)
+            SELECT id, 'min_grade', jsonb_build_object('min_grade', 'C', 'accept_pass', true), DATE '2000-01-01', 'approved', '0011 이전 설정을 옮김 — 실제 학칙으로 확인 필요', now(), now()
+            FROM institutions WHERE is_target;
+
+INSERT INTO policy_rules (institution_id, rule_type, parameters, effective_from, status, source,
+                                      approved_at, created_at)
+            SELECT id, 'transfer_cap', jsonb_build_object('credits', COALESCE(max_transfer_credits, 60)), DATE '2000-01-01', 'approved', '0011 이전 설정을 옮김 — 실제 학칙으로 확인 필요', now(), now()
+            FROM institutions WHERE is_target;
+
+INSERT INTO policy_rules (institution_id, rule_type, parameters, effective_from, status, source,
+                                      approved_at, created_at)
+            SELECT id, 'degree_credits', jsonb_build_object('credits', COALESCE(degree_credits, 120)), DATE '2000-01-01', 'approved', '0011 이전 설정을 옮김 — 실제 학칙으로 확인 필요', now(), now()
+            FROM institutions WHERE is_target;
+
+INSERT INTO policy_rules (institution_id, rule_type, parameters, effective_from, status, source,
+                                      approved_at, created_at)
+            SELECT id, 'semester_load', jsonb_build_object('credits', 15), DATE '2000-01-01', 'approved', '0011 이전 설정을 옮김 — 실제 학칙으로 확인 필요', now(), now()
+            FROM institutions WHERE is_target;
+
+UPDATE alembic_version SET version_num='0011' WHERE alembic_version.version_num = '0010';
+
 COMMIT;
 

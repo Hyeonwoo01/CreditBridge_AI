@@ -18,6 +18,7 @@ from backend.models.institution import Institution
 from backend.models.institution_source import InstitutionSource
 from backend.models.material_request import MaterialRequest
 from backend.models.notification import Notification
+from backend.models.policy_rule import PolicyRule
 from backend.models.privacy_request import PrivacyRequest
 from backend.models.push_subscription import PushSubscription
 from backend.models.student_transcript import StudentTranscript
@@ -47,6 +48,7 @@ __all__ = [
     "InstitutionSource",
     "MaterialRequest",
     "Notification",
+    "PolicyRule",
     "PrivacyRequest",
     "PushSubscription",
     "StudentTranscript",

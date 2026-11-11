@@ -197,13 +197,40 @@
   </div>
 </section>
 
-<section id="transfer-cap" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="cap-title">
-  <h2 id="cap-title" class="section-title">{{ _("편입 학점 상한") }}</h2>
-  <p class="text-sm text-muted">{{ _("편입으로 인정받을 수 있는 최대 학점이에요. 학생의 인정 학점이 이보다 많으면 학생이 지도교수와 상의해 졸업 학점에 넣을 과목을 골라요. 비우면 60학점으로 봐요.") }}</p>
-  <form method="post" action="/admin/data/transfer-cap" class="card flex flex-wrap items-end gap-3">
+{# 학칙 정책 (리뷰 v3 P0-4): 승인된 규칙만 적용, 범위가 구체적인 규칙이 우선, 맞는 규칙이 없으면 미정(기본값 없음) #}
+<section id="policies" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="policy-title">
+  <h2 id="policy-title" class="section-title">{{ _("학칙 정책") }}</h2>
+  <p class="text-sm text-muted">{{ _("인정 최저 성적·편입 학점 상한·졸업 학점·학기당 이수 학점을 학칙대로 정해요. 초안을 만든 뒤 승인해야 적용되고, 학과·입학연도를 정한 규칙이 대학 전체 규칙보다 우선해요. 맞는 규칙이 없으면 기본값 없이 '미정'으로 두고 그 값은 계산하지 않아요. 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만들어요(지난 판정에 남은 정책 기록은 그대로).") }}</p>
+  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    {% for t, res in policies.current.items() %}
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ t | policy_type }} {{ _("(대학 전체)") }}</dt>
+      <dd class="font-semibold">{% if res.status == 'resolved' %}{{ res.params | policy_value }}{% elif res.status == 'conflict' %}<span class="text-reject">{{ _("충돌") }}</span>{% else %}<span class="text-elective">{{ _("미정") }}</span>{% endif %}</dd></div>
+    {% endfor %}
+  </dl>
+  <div class="card grid gap-0 p-0 text-sm">
+    {% for r in policies.rules %}
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3 first:border-t-0">
+      <span><span class="font-semibold">{{ r.rule_type | policy_type }}</span> {{ r.parameters | policy_value }}
+        <span class="text-xs text-muted">· {{ policies.departments.get(r.department_id, _('모든 학과')) if r.department_id else _('모든 학과') }} · {{ _("{year}학년도 입학", year=(r.admission_year)) if r.admission_year else _('모든 입학연도') }} · {{ _("{start}부터", start=(r.effective_from)) }}{% if r.effective_to %} {{ _("{end}까지", end=(r.effective_to)) }}{% endif %}{% if r.source %} · {{ r.source }}{% endif %}</span></span>
+      <span class="flex items-center gap-2">
+        <span class="{{ {'approved': 'badge-approve', 'draft': 'badge-elective'}.get(r.status, 'badge') }}">{{ {'approved': _('승인'), 'draft': _('초안'), 'retired': _('끝남')}[r.status] }}</span>
+        {% if r.status == 'draft' %}<form method="post" action="/admin/data/policies/{{ r.id }}/approve"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-text btn-sm text-xs">{{ _("승인") }}</button></form>{% endif %}
+        {% if r.status == 'draft' or (r.status == 'approved' and (not r.effective_to or r.effective_to > today)) %}<form method="post" action="/admin/data/policies/{{ r.id }}/retire" data-confirm="{{ _('이 정책을 끝낼까요? 맞는 규칙이 없으면 그 값은 미정이 돼요.') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-text btn-sm text-xs">{{ _("끝내기") }}</button></form>{% endif %}
+      </span>
+    </div>
+    {% else %}<p class="px-5 py-6 text-center text-muted">{{ _("아직 정책이 없어요.") }}</p>{% endfor %}
+  </div>
+  <form method="post" action="/admin/data/policies" class="card grid gap-3 md:grid-cols-2">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label class="field"><span>{{ _("최대 학점") }}</span><input class="input h-11" type="number" name="cap" min="1" max="300" value="{{ o.institution.max_transfer_credits or '' }}" placeholder="60"></label>
-    <button class="btn-primary h-11">{{ _("저장") }}</button>
+    <p class="text-sm font-semibold md:col-span-2">{{ _("정책 초안 추가") }}</p>
+    <label class="field"><span>{{ _("종류") }}</span><select name="rule_type" class="input h-11">{% for t in policies.current %}<option value="{{ t }}">{{ t | policy_type }}</option>{% endfor %}</select></label>
+    <label class="field"><span>{{ _("값") }} <span class="text-muted">{{ _("(최저 성적은 C처럼, 나머지는 학점 수)") }}</span></span><input class="input h-11" name="value" required maxlength="5" placeholder="C / 60"></label>
+    <label class="field"><span>{{ _("학과 (비우면 모든 학과)") }}</span><select name="department" class="input h-11"><option value="">{{ _("모든 학과") }}</option>{% for name in policies.departments.values() %}<option value="{{ name }}">{{ name }}</option>{% endfor %}</select></label>
+    <label class="field"><span>{{ _("입학연도 (비우면 모든 입학연도)") }}</span><input class="input h-11" type="number" name="admission_year" min="1990" max="2100"></label>
+    <label class="field"><span>{{ _("시작일") }}</span><input class="input h-11" type="date" name="effective_from" value="{{ today.isoformat() }}"></label>
+    <label class="flex items-center gap-2 text-sm md:self-end"><input type="checkbox" name="accept_pass" value="true" class="size-4" checked> {{ _("P/PASS/S 성적 인정 (최저 성적 정책만)") }}</label>
+    <label class="field md:col-span-2"><span>{{ _("근거 (학칙 조항·문서)") }}</span><input class="input h-11" name="source" maxlength="500"></label>
+    <button class="btn-primary h-11 w-fit">{{ _("초안 추가") }}</button>
   </form>
 </section>
 

@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (28개)
+## 1. 엔티티 한눈에 보기 (29개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -23,6 +23,7 @@
 | AI 분석 | `course_evaluations` | 강의계획서 한 건의 AI 분석 결과(재분석마다 새 행) | FR-05~08·16 |
 | | `evidence_spans` | 원문 검증을 통과한 근거 구절 위치 | FR-06·25 |
 | | `evidence_feedback` | 교수가 근거 구절마다 누른 맞음·틀림 (AI 근거 정확도) | FR-06 |
+| | `policy_rules` | 학칙 정책 규칙 (성적 기준·편입 상한·졸업 학점·학기당 학점, 학과·입학연도 범위, 초안·승인·끝남) | 리뷰 v3 P0-4 |
 | | `credit_allocations` | 승인된 학점 배분 원장 (판정마다 출신 과목별 인정 학점 한 줄, 재판정이면 대체됨) | 리뷰 v3 P0-3 |
 | | `credit_conversion_rules` | 대상 대학이 승인한 학점 환산 규칙 (출신 단위 → 대상 단위, 유효기간) | 리뷰 v3 P0-1 |
 | 심사 | `assignments` | 교수 배정·대리 재배정 이력 | FR-18·19 |
@@ -479,7 +480,10 @@ erDiagram
 | credit_unit · source_credit_unit | VARCHAR(20) | null, CHECK | 인정 학점·출신 학점의 단위 |
 | credit_basis | VARCHAR(12) | null, CHECK | full · partial · elective · not_accepted |
 | source_credits | DECIMAL(5,2) | null | 판정 때 쓴 출신 학점 (성적표 값이 먼저, 없으면 강의계획서) |
+| policy_snapshot | JSONB | null | 판정 때 적용한 학칙 정책 (규칙 종류 → 상태·규칙 id·값, 0011부터). 정책이 바뀌어도 그대로 |
 | conversion_rule_id | BIGINT | FK→credit_conversion_rules, null | 적용한 환산 규칙 (같은 단위거나 교수가 직접 적었으면 비움) |
+
+**policy_rules** — `institution_id` FK(IX), `rule_type` VARCHAR(30)(min_grade·transfer_cap·degree_credits·semester_load, CHECK), `department_id` FK→departments null(모든 학과), `admission_year` INT null(1990~2100, 모든 입학연도), `parameters` JSONB({min_grade, accept_pass} 또는 {credits}), `effective_from` DATE, `effective_to` DATE null, `status` VARCHAR(10)(draft·approved·retired, IX), `source` TEXT(근거 학칙), `created_by`·`approved_by` FK→users null, `approved_at`, `created_at`. 승인된 규칙 중 학생 범위에 맞고 가장 구체적인 것(학과·입학연도를 정한 수)을 쓰고, 같은 구체성에서 값이 다르면 충돌, 없으면 미정(기본값 없음). 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만든다. 0011이 대상 대학마다 이전 설정(C 이상·P/PASS/S, 상한·졸업 학점, 학기당 15)을 대학 전체 승인 규칙으로 옮겼다. `institutions.max_transfer_credits`·`degree_credits`는 더 쓰지 않는다(기록용).
 
 **credit_allocations** — `student_id` FK→users(IX), `decision_id` FK→decisions(IX), `syllabus_id` FK→syllabi(IX, 출신 과목), `target_course_id` FK→courses null(선택 학점이면 없음), `credits` DECIMAL(5,2)(>0, 대상 대학 단위), `credit_unit`, `status` VARCHAR(12)(active·superseded, IX), `superseded_by_decision_id` FK→decisions null, `created_at`. 판정이 출신 과목마다 한 줄씩 남기고 여러 과목을 합쳐 인정(N:1)하면 과목별 남은 학점에 비례해 나눈다. 학생의 확정 인정 학점은 active 줄의 합계다. 재판정하면 지우지 않고 superseded로 바꾼다. 같은 출신 과목(같은 출신 대학·과목 코드) active 합계는 환산 학점을 넘지 않고, 같은 학생의 같은 대상 과목은 다른 판정에서 다시 인정하지 않는다 — 판정 서비스가 검사(N:1은 한 판정의 여러 줄이 같은 대상을 가리켜 DB 유니크로 표현하지 않음). 0010이 0009 뒤 인정 학점이 있는 판정을 옮겼다.
 

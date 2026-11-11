@@ -20,12 +20,13 @@ from backend.models import (
     Decision,
     Institution,
     InstitutionSource,
+    PolicyRule,
     Syllabus,
     SyllabusChunk,
     TransferRequest,
     User,
 )
-from backend.models.enums import ConversionMethod, CreditSystem
+from backend.models.enums import ConversionMethod, CreditSystem, PolicyRuleType, PolicyStatus
 from backend.services.analysis import content_hash
 from backend.services.auth import hash_password
 from backend.services.institution_data import department_named
@@ -138,6 +139,26 @@ def seed(session: Session) -> None:
             note="데모용 예시 규칙",
         )
     )
+    # 예시 학칙 정책 (승인됨): C 이상·P/PASS/S 인정, 편입 학점 상한 60, 졸업 120, 학기당 15
+    for rule_type, params in (
+        (PolicyRuleType.MIN_GRADE, {"min_grade": "C", "accept_pass": True}),
+        (PolicyRuleType.TRANSFER_CAP, {"credits": 60}),
+        (PolicyRuleType.DEGREE_CREDITS, {"credits": 120}),
+        (PolicyRuleType.SEMESTER_LOAD, {"credits": 15}),
+    ):
+        session.add(
+            PolicyRule(
+                institution_id=msu.id,
+                rule_type=rule_type,
+                parameters=params,
+                effective_from=date(2020, 1, 1),
+                status=PolicyStatus.APPROVED,
+                source="데모용 예시 학칙",
+                created_by=admin.id,
+                approved_by=admin.id,
+                approved_at=utcnow(),
+            )
+        )
     professors = {
         "Mathematics": [("dkim@msu.example", "Daniel Kim"), ("lchen@msu.example", "Laura Chen")],
         "Computer Science and Engineering": [("oali@msu.example", "Omar Ali"), ("spark@msu.example", "Sarah Park")],

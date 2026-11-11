@@ -25,6 +25,7 @@ from backend.repositories import notifications as notification_repo
 from backend.repositories import privacy as privacy_repo
 from backend.repositories import users as user_repo
 from backend.services import notifications
+from backend.services import policy as policy_service
 
 ONCE_PER = timedelta(hours=20)  # 같은 종류의 기한 알림을 다시 쌓기 전 최소 간격
 
@@ -61,7 +62,7 @@ def plan(session: Session, institution_id: int, now: datetime | None = None, set
     now = now or utcnow()
     sla = timedelta(days=settings.review_sla_days)
     out = Plan()
-    for evaluation, _, request in evaluation_repo.review_queue(session, institution_id):
+    for evaluation, _, request in policy_service.review_queue(session, institution_id):
         assignment = evaluation_repo.active_assignment(session, evaluation.id)
         if assignment is None:
             waiting_since = request.submitted_at or evaluation.created_at

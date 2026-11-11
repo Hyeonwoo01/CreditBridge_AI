@@ -91,6 +91,21 @@ class AllocationStatus(StrEnum):
     SUPERSEDED = "superseded"  # 재판정으로 대체됨 (기록으로만 남음)
 
 
+class PolicyRuleType(StrEnum):
+    """학칙 정책 규칙 종류 (리뷰 v3 P0-4). 값은 규칙 parameters에 둔다."""
+
+    MIN_GRADE = "min_grade"  # {"min_grade": "C", "accept_pass": true}
+    TRANSFER_CAP = "transfer_cap"  # {"credits": 60}
+    DEGREE_CREDITS = "degree_credits"  # {"credits": 120}
+    SEMESTER_LOAD = "semester_load"  # {"credits": 15} 학기당 이수 학점 (남은 학기 계산)
+
+
+class PolicyStatus(StrEnum):
+    DRAFT = "draft"  # 판정·계산에 쓰지 않음
+    APPROVED = "approved"
+    RETIRED = "retired"
+
+
 class EvidenceSide(StrEnum):
     SOURCE = "source"  # 학생 강의계획서
     TARGET = "target"  # 대상 대학 기준 강의계획서
@@ -127,8 +142,3 @@ class PrivacyStatus(StrEnum):
     REQUESTED = "requested"  # 학생 요청
     REVIEWED = "reviewed"  # 심사관 처리 완료, 관리자 승인 대기
     COMPLETED = "completed"  # 관리자 승인, 삭제 완료
-
-
-# 편입 학점 인정 최저 성적: C 이상(C+·C·C0)과 P·PASS·S. 성적표에서 이보다 낮은 과목(C- 이하·D·F 등)은
-# 인정 대상이 아니라 교수 심사 없이 제외한다 (판정 기록은 만들지 않음)
-PASSING_GRADES = frozenset({"A+", "A", "A0", "A-", "B+", "B", "B0", "B-", "C+", "C", "C0", "P", "PASS", "S"})

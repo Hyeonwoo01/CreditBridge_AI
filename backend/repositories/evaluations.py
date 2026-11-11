@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import exists, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from backend.models import (
@@ -9,10 +9,8 @@ from backend.models import (
     Decision,
     EvidenceSpan,
     Syllabus,
-    TranscriptEntry,
     TransferRequest,
 )
-from backend.repositories.requests import failing_grade
 
 
 def get(session: Session, evaluation_id: int) -> CourseEvaluation | None:
@@ -76,13 +74,12 @@ def spans_of(session: Session, evaluation_id: int) -> list[EvidenceSpan]:
     return list(session.scalars(select(EvidenceSpan).where(EvidenceSpan.course_evaluation_id == evaluation_id)))
 
 
-def review_queue(
+def unfiltered_review_queue(
     session: Session, target_institution_id: int
 ) -> list[tuple[CourseEvaluation, Syllabus, TransferRequest]]:
-    """제출된 요청의 최신 분석 결과 중 아직 판정되지 않은 것.
-    성적이 인정 최저 성적 미달인 과목은 심사 대상이 아니라 뺀다."""
+    """제출된 요청의 최신 분석 결과 중 아직 판정되지 않은 것 (성적 기준 미달 과목은 학생마다 다른 학칙 정책이라
+    여기서 빼지 않는다 — 화면·배정은 services/policy.review_queue를 쓴다)."""
     decided = select(Decision.course_evaluation_id)
-    grade_failed = exists().where(TranscriptEntry.syllabus_id == Syllabus.id, failing_grade())
     stmt = (
         select(CourseEvaluation, Syllabus, TransferRequest)
         .join(Syllabus, Syllabus.id == CourseEvaluation.syllabus_id)
@@ -93,7 +90,6 @@ def review_queue(
             CourseEvaluation.is_latest.is_(True),
             CourseEvaluation.status == "done",
             CourseEvaluation.id.not_in(decided),
-            ~grade_failed,
         )
         .order_by(TransferRequest.submitted_at, CourseEvaluation.id)
     )

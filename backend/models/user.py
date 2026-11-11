@@ -27,6 +27,8 @@ class User(IdMixin, CreatedAtMixin, Base):
     department_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("departments.id"), index=True)
     # 학생의 출신(전적) 대학. 관리자가 계정을 만들 때 정하고 학생은 바꾸지 않는다. 교직원은 비움
     source_institution_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("institutions.id"))
+    # 학생의 (편입) 입학연도. 학칙 정책을 입학연도별로 다르게 적용할 때 쓴다 (비우면 입학연도별 규칙은 맞지 않음)
+    admission_year: Mapped[int | None] = mapped_column(default=None)
     # 부재 시 대리 심사자 (FR-19)
     delegate_user_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("users.id"))
     away_until: Mapped[date | None] = mapped_column(default=None)

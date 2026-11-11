@@ -23,13 +23,24 @@ from backend.documents.storage import ObjectStorage
 from backend.errors import CreditBridgeError, LLMError, LLMNotConfiguredError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Assignment, Course, CreditConversionRule, Department, Institution, Syllabus, User
-from backend.models.enums import ConversionMethod, CreditSystem, Role, SyllabusStatus
+from backend.models import (
+    Assignment,
+    Course,
+    CreditConversionRule,
+    Department,
+    Institution,
+    PolicyRule,
+    Syllabus,
+    User,
+)
+from backend.models.enums import ConversionMethod, CreditSystem, PolicyRuleType, PolicyStatus, Role, SyllabusStatus
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
+from backend.repositories import policies as policy_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import analysis, audit, csv_import, notifications, review
+from backend.services import policy as policy_service
 from backend.services.auth import RESET_AFTER, ensure_not_demo, hash_password, temporary_password, unusable_password
 
 logger = logging.getLogger(__name__)
@@ -439,28 +450,6 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
 # ---------- 출신 대학 ----------
 
 
-def set_transfer_cap(session: Session, admin: User, value: str) -> int | None:
-    """편입 학점 상한을 정한다 (비우면 기본 60학점). 넘으면 학생이 졸업 학점에 넣을 과목을 고른다."""
-    institution_id = ensure_admin(admin)
-    institution = catalog_repo.get_institution(session, institution_id)
-    if institution is None:
-        raise NotFoundError(tr("소속 대학을 찾을 수 없어요."))
-    value = value.strip()
-    if value and not (value.isdigit() and 1 <= int(value) <= 300):
-        raise CreditBridgeError(tr("편입 학점 상한은 1~300 사이 숫자로 적어 주세요."))
-    institution.max_transfer_credits = int(value) if value else None
-    audit.record(
-        session,
-        admin,
-        "institution.transfer_cap",
-        "institution",
-        str(institution_id),
-        cap=institution.max_transfer_credits,
-    )
-    session.commit()
-    return institution.max_transfer_credits
-
-
 def add_source_institution(session: Session, admin: User, name: str, country: str) -> Institution:
     """④ 출신 대학 목록에 올린다. 다른 대학이 같은 이름으로 먼저 만든 행이 있으면 그 행을 함께 쓴다."""
     institution_id = ensure_admin(admin)
@@ -645,6 +634,22 @@ def bootstrap_admin(
             must_change_password=True,
         ),
     )
+    if degree_credits and not policy_repo.of_institution(session, institution.id):
+        # 운영자가 직접 적은 졸업 학점은 승인된 학칙 정책으로 둔다 (나머지 정책은 관리자가 화면에서 정함)
+        policy_repo.add(
+            session,
+            PolicyRule(
+                institution_id=institution.id,
+                rule_type=PolicyRuleType.DEGREE_CREDITS,
+                parameters={"credits": degree_credits},
+                effective_from=utcnow().date(),
+                status=PolicyStatus.APPROVED,
+                source="create_admin --degree",
+                created_by=admin.id,
+                approved_by=admin.id,
+                approved_at=utcnow(),
+            ),
+        )
     audit.record(session, None, "account.bootstrap", "user", str(admin.id), institution=institution.id)
     session.commit()
     return institution, CreatedAccount(email, name, Role.ADMIN, password)
@@ -758,5 +763,139 @@ def end_conversion_rule(session: Session, admin: User, rule_id: int) -> CreditCo
     if rule.effective_to is None or rule.effective_to > today:
         rule.effective_to = max(today, rule.effective_from)
         audit.record(session, admin, "credit_rule.end", "credit_conversion_rule", str(rule.id), until=today.isoformat())
+    session.commit()
+    return rule
+
+
+# ---------- 학칙 정책 규칙 (리뷰 v3 P0-4) ----------
+
+POLICY_RANGES = {
+    PolicyRuleType.TRANSFER_CAP: (1, 300),
+    PolicyRuleType.DEGREE_CREDITS: (1, 400),
+    PolicyRuleType.SEMESTER_LOAD: (1, 40),
+}
+
+
+@dataclass(frozen=True)
+class PolicyOverview:
+    rules: list[PolicyRule]
+    departments: dict[int, str]  # 학과 id → 이름 (규칙 범위 표시)
+    current: dict[str, policy_service.Resolution]  # 대학 전체(학과·입학연도 없음)에 지금 적용되는 값
+
+
+def policy_overview(session: Session, admin: User) -> PolicyOverview:
+    institution_id = ensure_admin(admin)
+    rules = policy_repo.of_institution(session, institution_id)
+    departments = {d.id: d.name for d in catalog_repo.department_rows(session, institution_id)}
+    current = policy_service.for_context(rules, policy_service.Context(institution_id)).resolutions
+    return PolicyOverview(rules, departments, current)
+
+
+def add_policy_rule(
+    session: Session,
+    admin: User,
+    rule_type: str,
+    department: str,
+    admission_year: str,
+    value: str,
+    accept_pass: bool,
+    effective_from: str,
+    source: str,
+) -> PolicyRule:
+    """정책 초안. 승인 전에는 판정·계산에 쓰지 않는다."""
+    institution_id = ensure_admin(admin)
+    if rule_type not in set(PolicyRuleType):
+        raise CreditBridgeError(tr("정책 종류를 목록에서 골라 주세요."))
+    params: dict[str, object]
+    value = value.strip()
+    if rule_type == PolicyRuleType.MIN_GRADE:
+        if value.upper() not in policy_service.GRADE_LEVELS:
+            raise CreditBridgeError(tr("인정 최저 성적은 A+~F 중에서 적어 주세요 (예: C)."))
+        params = {"min_grade": value.upper(), "accept_pass": accept_pass}
+    else:
+        low, high = POLICY_RANGES[PolicyRuleType(rule_type)]
+        if not (value.isdigit() and low <= int(value) <= high):
+            raise CreditBridgeError(tr("학점은 {low}~{high} 사이 숫자로 적어 주세요.", low=low, high=high))
+        params = {"credits": int(value)}
+    dept = None
+    if department.strip():
+        dept = catalog_repo.department_by_name(session, institution_id, department.strip())
+        if dept is None:
+            raise CreditBridgeError(tr("학과를 목록에서 골라 주세요."))
+    year = admission_year.strip()
+    if year and not (year.isdigit() and 1990 <= int(year) <= 2100):
+        raise CreditBridgeError(tr("입학연도는 네 자리 연도로 적어 주세요."))
+    try:
+        start = date.fromisoformat(effective_from.strip()) if effective_from.strip() else utcnow().date()
+    except ValueError as exc:
+        raise CreditBridgeError(tr("시작일은 날짜로 적어 주세요.")) from exc
+    rule = policy_repo.add(
+        session,
+        PolicyRule(
+            institution_id=institution_id,
+            rule_type=rule_type,
+            department_id=dept.id if dept else None,
+            admission_year=int(year) if year else None,
+            parameters=params,
+            effective_from=start,
+            status=PolicyStatus.DRAFT,
+            source=source.strip()[:500],
+            created_by=admin.id,
+        ),
+    )
+    audit.record(session, admin, "policy.create", "policy_rule", str(rule.id), rule_type=rule_type, params=params)
+    session.commit()
+    return rule
+
+
+def _own_rule(session: Session, admin: User, rule_id: int) -> PolicyRule:
+    institution_id = ensure_admin(admin)
+    rule = policy_repo.get(session, rule_id)
+    if rule is None or rule.institution_id != institution_id:
+        raise NotFoundError(tr("정책을 찾을 수 없어요."))
+    return rule
+
+
+def approve_policy_rule(session: Session, admin: User, rule_id: int) -> PolicyRule:
+    """초안을 승인한다. 같은 종류·같은 범위에서 끝나지 않은 이전 규칙은 새 규칙 전날로 끝낸다.
+    같은 날 시작하는 승인 규칙이 있으면 충돌을 만들지 않게 거절한다."""
+    rule = _own_rule(session, admin, rule_id)
+    if rule.status != PolicyStatus.DRAFT:
+        raise CreditBridgeError(tr("초안만 승인할 수 있어요."))
+    same_scope = [
+        r
+        for r in policy_repo.of_institution(session, rule.institution_id)
+        if r.id != rule.id
+        and r.status == PolicyStatus.APPROVED
+        and r.rule_type == rule.rule_type
+        and r.department_id == rule.department_id
+        and r.admission_year == rule.admission_year
+    ]
+    if any(r.effective_from == rule.effective_from for r in same_scope):
+        raise CreditBridgeError(
+            tr("같은 범위에 같은 날 시작하는 승인된 정책이 있어요. 그 정책을 끝낸 뒤 승인해 주세요.")
+        )
+    for previous in same_scope:
+        if previous.effective_from < rule.effective_from and (
+            previous.effective_to is None or previous.effective_to >= rule.effective_from
+        ):
+            previous.effective_to = rule.effective_from - timedelta(days=1)
+    rule.status = PolicyStatus.APPROVED
+    rule.approved_by = admin.id
+    rule.approved_at = utcnow()
+    audit.record(session, admin, "policy.approve", "policy_rule", str(rule.id), rule_type=rule.rule_type)
+    session.commit()
+    return rule
+
+
+def retire_policy_rule(session: Session, admin: User, rule_id: int) -> PolicyRule:
+    """정책을 끝낸다 (지우지 않음). 승인된 규칙은 오늘까지 유효하고, 초안은 바로 끝난다."""
+    rule = _own_rule(session, admin, rule_id)
+    if rule.status == PolicyStatus.RETIRED:
+        return rule
+    if rule.status == PolicyStatus.APPROVED:
+        rule.effective_to = max(utcnow().date(), rule.effective_from)
+    rule.status = PolicyStatus.RETIRED if rule.status == PolicyStatus.DRAFT else rule.status
+    audit.record(session, admin, "policy.retire", "policy_rule", str(rule.id), rule_type=rule.rule_type)
     session.commit()
     return rule

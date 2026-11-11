@@ -13,6 +13,7 @@ from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, transl
 from backend.security.csrf import csrf_token
 from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
+from backend.services.policy import TYPE_LABELS as POLICY_TYPE_LABEL
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).resolve().parents[2] / "frontend" / "templates")
 
@@ -139,6 +140,14 @@ def utc(value: datetime | None) -> str:
     return "–" if value is None else value.strftime("%Y-%m-%d %H:%M") + " UTC"
 
 
+def policy_value(params: Mapping[str, Any]) -> str:
+    """정책 규칙 값의 화면 글: 최저 성적은 'C 이상 (P/PASS/S 인정)', 나머지는 'N학점'."""
+    if "min_grade" in params:
+        text = gettext("{grade} 이상", grade=params["min_grade"])
+        return text + (gettext(" (P/PASS/S 인정)") if params.get("accept_pass") else "")
+    return gettext("{n}학점", n=params.get("credits", "–"))
+
+
 def _label(table: Mapping[Any, str], value: str | None, default: str | None = None) -> str:
     """코드값의 화면 이름을 현재 언어로 (모르는 값은 그대로)."""
     text = table.get(value or "", default if default is not None else (value or ""))
@@ -154,6 +163,8 @@ TEMPLATES.env.filters.update(
     action=lambda v: _label(ACTION_LABEL, v),
     credit_unit=lambda v: _label(CREDIT_UNIT_LABEL, v, N_("단위 모름")),
     credit_basis=lambda v: _label(BASIS_LABEL, v),
+    policy_type=lambda v: _label(POLICY_TYPE_LABEL, v),
+    policy_value=policy_value,
     pct=pct,
     iso=iso,
     utc=utc,

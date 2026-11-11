@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import Institution, TranscriptEntry, TransferRequest, User
+from backend.models import PolicyRule, TranscriptEntry, TransferRequest, User
 from tests.conftest import login, send_transcript
 from tests.integration.test_pipeline import latest, upload
 
@@ -84,11 +84,12 @@ def test_new_transcript_updates_drafts_without_duplicates(client: TestClient, se
 
 def test_transfer_cap_lets_student_choose_courses(client: TestClient, seeded: Session) -> None:
     token = login(client, "admin@msu.example")
-    r = client.post("/admin/data/transfer-cap", data={"cap": "4", "csrf_token": token})
-    assert "편입 학점 상한을 4학점으로 정했어요" in r.text
-    msu = seeded.scalars(select(Institution).where(Institution.name == "Midwest State University")).one()
-    seeded.refresh(msu)
-    assert msu.max_transfer_credits == 4
+    # 학칙 정책으로 편입 학점 상한을 4학점으로 (초안 → 승인, 이전 대학 전체 상한은 전날로 끝남)
+    r = client.post("/admin/data/policies", data={"rule_type": "transfer_cap", "value": "4", "csrf_token": token})
+    assert "정책 초안을 추가했어요" in r.text
+    rule = seeded.scalars(select(PolicyRule).where(PolicyRule.status == "draft")).one()
+    r = client.post(f"/admin/data/policies/{rule.id}/approve", data={"csrf_token": token})
+    assert "정책을 승인했어요" in r.text
 
     token = login(client, "jiwon@student.example")
     send_transcript(client, token, TRANSCRIPT)

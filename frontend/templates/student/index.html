@@ -48,12 +48,12 @@
 <section class="mt-10 grid gap-3" aria-labelledby="total-title">
   <div class="grid gap-1">
     <h2 id="total-title" class="section-title">{{ _("전체 합계") }}</h2>
-    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 세고, 문서 삭제로 종료된 요청은 넣지 않았어요.", requests=(tot.requests)) }} {{ _("편입 학점 상한 {cap}학점까지만 졸업 학점에 넣어요.", cap=(tot.cap)) }}</p>
+    <p class="text-sm text-muted">{{ _("편입 요청 {requests}건을 합친 예상치예요. 같은 과목을 여러 요청에 올렸으면 한 번만 세고, 문서 삭제로 종료된 요청은 넣지 않았어요.", requests=(tot.requests)) }} {% if tot.cap is not none %}{{ _("편입 학점 상한 {cap}학점까지만 졸업 학점에 넣어요.", cap=(tot.cap)) }}{% else %}{{ _("편입 학점 상한 정책이 아직 정해지지 않았어요.") }}{% endif %}</p>
   </div>
   <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("예상 인정 학점") }}</dt><dd class="font-semibold tabular-nums">{% if ts.unknown and not ts.source_credits %}{{ _("계산 보류") }}{% else %}{{ ts.credits_low | round(1) }}{% if ts.credits_high != ts.credits_low %}~{{ ts.credits_high | round(1) }}{% endif %} <span class="text-sm font-normal text-muted">{{ _("/ {source_credits}학점", source_credits=(ts.source_credits | round(1))) }}</span>{% endif %}</dd></div>
     <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ _("판정 확정") }}</dt><dd class="font-semibold tabular-nums">{{ tot.decided }} <span class="text-sm font-normal text-muted">{{ _("/ {courses}과목", courses=(tot.courses)) }}</span></dd></div>
-    <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">{{ _("남은 학기(예상)") }}</dt><dd class="font-semibold tabular-nums">{% if ts.unknown and not ts.source_credits %}–{% else %}{{ ts.semesters_low }}{% if ts.semesters_high != ts.semesters_low %}~{{ ts.semesters_high }}{% endif %}{{ _("학기") }}{% endif %}</dd></div>
+    <div class="col-span-2 grid gap-0.5 rounded-md bg-parchment px-4 py-3 sm:col-span-1"><dt class="text-xs text-muted">{{ _("남은 학기(예상)") }}</dt><dd class="font-semibold tabular-nums">{% if (ts.unknown and not ts.source_credits) or ts.semesters_low is none %}–{% else %}{{ ts.semesters_low }}{% if ts.semesters_high != ts.semesters_low %}~{{ ts.semesters_high }}{% endif %}{{ _("학기") }}{% endif %}</dd></div>
   </dl>
   {% if ts.unknown %}<p class="text-sm text-elective">{{ _("{n}과목은 학점 단위나 환산 규칙이 정해지지 않아 예상치에서 뺐어요({reason}). 학사처가 정하면 다시 계산돼요.", n=(ts.unknown), reason=(ts.unknown_reason | t)) }}</p>{% endif %}
   {% if tot.over_cap or tot.left_out %}

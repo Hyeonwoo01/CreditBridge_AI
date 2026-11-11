@@ -5,9 +5,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import Decision, TransferRequest
+from backend.models import Decision, Institution, TransferRequest
 from backend.repositories import evaluations as evaluation_repo
-from backend.services.student import grade_failed
+from backend.services import policy as policy_service
 from tests.conftest import login, send_transcript
 from tests.integration.test_pipeline import latest, new_request, upload
 from tests.integration.test_review_extras import notes_for
@@ -26,7 +26,12 @@ def set_grade(client: TestClient, token: str, calculus_grade: str) -> None:
     send_transcript(client, token, transcript(calculus_grade))
 
 
-def test_grade_rule_passes_c_and_above() -> None:
+def test_grade_rule_passes_c_and_above(seeded: Session) -> None:
+    msu = seeded.scalars(select(Institution).where(Institution.is_target.is_(True))).first()
+    assert msu is not None
+    grade_failed = policy_service.for_context(
+        policy_service.policy_repo.of_institution(seeded, msu.id), policy_service.Context(msu.id)
+    ).grade_failed
     assert not grade_failed(None) and not grade_failed("C") and not grade_failed(" c0 ") and not grade_failed("P")
     assert not grade_failed("C+") and not grade_failed("B-")
     assert grade_failed("C-") and grade_failed("D+") and grade_failed("F")

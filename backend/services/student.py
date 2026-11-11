@@ -17,7 +17,6 @@ from backend.models import (
     Appeal,
     CourseEvaluation,
     Decision,
-    Institution,
     MaterialRequest,
     StudentTranscript,
     SupplementFile,
@@ -26,7 +25,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import PASSING_GRADES, DecisionResult, RequestStatus, Role, SyllabusStatus, TranscriptStatus
+from backend.models.enums import DecisionResult, PolicyRuleType, RequestStatus, Role, SyllabusStatus, TranscriptStatus
 from backend.repositories import allocations as allocation_repo
 from backend.repositories import appeals as appeal_repo
 from backend.repositories import audit as audit_repo
@@ -41,6 +40,7 @@ from backend.repositories import users as user_repo
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import analysis, audit, materials, notifications
 from backend.services import credits as credit_service
+from backend.services import policy as policy_service
 
 
 @dataclass(frozen=True)
@@ -144,9 +144,10 @@ def sync_course_requests(session: Session, student: User, transcript: StudentTra
     }
     seen: set[str] = set()
     created = 0
+    policy = policy_service.for_student(session, student, target.id)
     for line in transcript.lines or []:
         key = course_key(line.get("code"), line.get("title"))
-        if not key or key in seen or grade_failed(line.get("grade")):
+        if not key or key in seen or policy.grade_failed(line.get("grade")):
             continue
         seen.add(key)
         request = existing.get(key)
@@ -185,11 +186,16 @@ def reopen_course(session: Session, closed: TransferRequest) -> TransferRequest 
     transcript = transcript_repo.for_student(session, closed.student_id)
     if transcript is None or transcript.status != TranscriptStatus.READY:
         return None
+    student = user_repo.get_by_id(session, closed.student_id)
+    if student is None:
+        return None
+    policy = policy_service.for_student(session, student, closed.target_institution_id)
     line = next(
         (
             ln
             for ln in transcript.lines or []
-            if course_key(ln.get("code"), ln.get("title")) == closed.course_key and not grade_failed(ln.get("grade"))
+            if course_key(ln.get("code"), ln.get("title")) == closed.course_key
+            and not policy.grade_failed(ln.get("grade"))
         ),
         None,
     )
@@ -512,11 +518,6 @@ def submit_request(session: Session, student: User, request: TransferRequest) ->
 STAGES = [N_("접수"), N_("AI 분석"), N_("교수 검토"), N_("확정")]
 
 
-def grade_failed(grade: str | None) -> bool:
-    """성적표 성적이 인정 최저 성적(C 이상·P/PASS/S) 미달인지. 성적이 없으면 미달이 아니다."""
-    return grade is not None and grade.strip().upper() not in PASSING_GRADES
-
-
 @dataclass(frozen=True)
 class CourseRow:
     syllabus: Syllabus
@@ -532,6 +533,7 @@ class CourseRow:
     candidate_title: str | None = None
     candidate_department: str | None = None
     reviewer: User | None = None  # 판정했으면 판정 교수, 아니면 배정된 교수
+    failed_grade: bool = False  # 학생의 학칙 정책(인정 최저 성적)으로 본 성적 기준 미달
     conversion: credit_service.Conversion | None = None  # 출신 학점을 대상 대학 단위로 환산한 결과
     # 승인된 배분 원장에서 이 과목에 배정된 학점 (없으면 None). 다른 과목과 합쳐 인정됐으면 그 대상 과목 코드
     allocated: float | None = None
@@ -539,8 +541,8 @@ class CourseRow:
 
     @property
     def grade_failed(self) -> bool:
-        """성적이 인정 최저 성적 미달이라 심사 대상에서 빠진 과목 (판정 전일 때 화면에 '성적 기준 미달')."""
-        return grade_failed(self.transcript_grade)
+        """성적이 학칙 정책의 인정 최저 성적 미달이라 심사 대상에서 빠진 과목 (판정 전일 때 화면에 '성적 기준 미달')."""
+        return self.failed_grade
 
     @property
     def group(self) -> str:
@@ -571,6 +573,9 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
         if m.status == "open":
             open_materials.setdefault(m.syllabus_id, []).append(m)
     converter = credit_service.for_request(session, request)
+    owner = user_repo.get_by_id(session, request.student_id)
+    policy = policy_service.for_student(session, owner, request.target_institution_id) if owner else None
+    failed = {sid for sid, grade in grades.items() if policy is not None and policy.grade_failed(grade)}
     allocated: dict[int, float] = {}
     combined_into: dict[int, str] = {}
     # 과목마다 자기 심사 건의 판정 id (원장 줄이 다른 판정에서 왔으면 '다른 과목과 합쳐 인정')
@@ -595,7 +600,7 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
             stage, expected = 2, (assigned or appeal.created_at) + sla  # 이의 신청 재판정 대기
         elif decision:
             stage, expected = 3, decision.decided_at
-        elif grade_failed(grades.get(s.id)):
+        elif s.id in failed:
             stage, expected = 3, None  # 성적 기준 미달: 심사 없이 제외로 끝남
         elif assigned:
             stage, expected = 2, assigned + sla
@@ -623,6 +628,7 @@ def course_rows(session: Session, request: TransferRequest) -> list[CourseRow]:
                 candidate_department=course.department_name if course else None,
                 reviewer=user_repo.get_by_id(session, reviewer_id) if reviewer_id else None,
                 conversion=converter.convert(s),
+                failed_grade=s.id in failed,
                 allocated=allocated.get(s.id),
                 combined_into=combined_into.get(s.id) if decision is None and s.id in combined_into else None,
             )
@@ -639,19 +645,26 @@ class Simulation:
 
     credits_low: float
     credits_high: float
-    semesters_low: int
-    semesters_high: int
+    semesters_low: int | None  # 졸업 학점·학기당 이수 학점 정책이 미정이면 None (계산하지 않음)
+    semesters_high: int | None
     extra_cost_low: int
     extra_cost_high: int
     source_credits: float
-    degree_credits: int
+    degree_credits: int | None
     tuition_per_credit: int
     unknown: int = 0  # 환산하지 못해 계산에서 뺀 과목 수
     unknown_reason: str | None = None  # 그중 첫 과목의 이유 (화면에서 | t)
+    credits_per_semester: int | None = None
+
+
+def _semesters(degree_credits: int | None, gained: float, per_semester: int | None) -> int | None:
+    if degree_credits is None or not per_semester:
+        return None
+    return math.ceil(max(degree_credits - gained, 0) / per_semester)
 
 
 def simulate(
-    rows: list[CourseRow], degree_credits: int, tuition_per_credit: int, credits_per_semester: int = 15
+    rows: list[CourseRow], degree_credits: int | None, tuition_per_credit: int, credits_per_semester: int | None
 ) -> Simulation:
     """예상 인정 학점·남은 학기·미인정 학점의 추가 비용을 범위값으로 계산한다 (예상치).
 
@@ -695,13 +708,11 @@ def simulate(
             low += source if ev.confidence == "high" else 0.0
         elif ev.recommendation == "insufficient":
             high += credit
-    remaining_high = max(degree_credits - low, 0)
-    remaining_low = max(degree_credits - high, 0)
     return Simulation(
         credits_low=low,
         credits_high=high,
-        semesters_low=math.ceil(remaining_low / credits_per_semester),
-        semesters_high=math.ceil(remaining_high / credits_per_semester),
+        semesters_low=_semesters(degree_credits, high, credits_per_semester),
+        semesters_high=_semesters(degree_credits, low, credits_per_semester),
         extra_cost_low=round(max(source_total - high, 0) * tuition_per_credit),
         extra_cost_high=round(max(source_total - low, 0) * tuition_per_credit),
         source_credits=source_total,
@@ -709,6 +720,7 @@ def simulate(
         tuition_per_credit=tuition_per_credit,
         unknown=unknown,
         unknown_reason=unknown_reason,
+        credits_per_semester=credits_per_semester,
     )
 
 
@@ -729,22 +741,26 @@ def merged_rows(groups: list[list[CourseRow]]) -> list[CourseRow]:
     return list(chosen.values())
 
 
-DEFAULT_TRANSFER_CAP = 60  # 대학이 편입 학점 상한을 정하지 않았을 때
-
-
-def transfer_cap(institution: Institution) -> int:
-    return institution.max_transfer_credits or DEFAULT_TRANSFER_CAP
-
-
-def cap_simulation(sim: Simulation, cap: int, credits_per_semester: int = 15) -> Simulation:
-    """편입 학점 상한을 넘는 인정 학점은 졸업 학점에 넣지 않는다: 예상 인정 학점·남은 학기를 상한으로 자른다."""
+def cap_simulation(sim: Simulation, cap: int | None) -> Simulation:
+    """편입 학점 상한(학칙 정책)을 넘는 인정 학점은 졸업 학점에 넣지 않는다. 상한 정책이 미정이면 자르지 않는다."""
+    if cap is None:
+        return sim
     low, high = min(sim.credits_low, float(cap)), min(sim.credits_high, float(cap))
     return replace(
         sim,
         credits_low=low,
         credits_high=high,
-        semesters_low=math.ceil(max(sim.degree_credits - high, 0) / credits_per_semester),
-        semesters_high=math.ceil(max(sim.degree_credits - low, 0) / credits_per_semester),
+        semesters_low=_semesters(sim.degree_credits, high, sim.credits_per_semester),
+        semesters_high=_semesters(sim.degree_credits, low, sim.credits_per_semester),
+    )
+
+
+def plan_values(policy: policy_service.StudentPolicy) -> tuple[int | None, int | None, int | None]:
+    """학생 정책에서 (졸업 학점, 학기당 이수 학점, 편입 학점 상한). 미정·충돌이면 None."""
+    return (
+        policy.get(PolicyRuleType.DEGREE_CREDITS).credits,
+        policy.get(PolicyRuleType.SEMESTER_LOAD).credits,
+        policy.get(PolicyRuleType.TRANSFER_CAP).credits,
     )
 
 

@@ -44,3 +44,5 @@ class Decision(IdMixin, Base):
     conversion_rule_id: Mapped[int | None] = mapped_column(
         IdType, ForeignKey("credit_conversion_rules.id"), default=None
     )
+    # 판정 때 이 학생에게 적용된 학칙 정책 (규칙 종류 → 규칙 id·값, 0011부터). 정책이 바뀌어도 이 기록은 그대로다
+    policy_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

@@ -52,8 +52,8 @@
   <div class="grid gap-3 sm:grid-cols-3">
     <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
       <span class="text-sm text-on-dark-muted">{{ _("졸업까지 남은 학기") }}</span>
-      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{% if held %}–{% else %}{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}<span class="text-base font-normal text-on-dark-muted"> {{ _("학기") }}</span>{% endif %}</span>
-      <span class="text-xs text-on-dark-muted">{{ _("졸업 {degree_credits}학점 · 학기당 15학점 기준", degree_credits=(sim.degree_credits)) }}</span>
+      <span class="font-display text-[32px] leading-[1.1] font-semibold tabular-nums">{% if held or sim.semesters_low is none %}–{% else %}{{ sim.semesters_low }}{% if sim.semesters_high != sim.semesters_low %}~{{ sim.semesters_high }}{% endif %}<span class="text-base font-normal text-on-dark-muted"> {{ _("학기") }}</span>{% endif %}</span>
+      <span class="text-xs text-on-dark-muted">{% if sim.semesters_low is none %}{{ _("졸업 학점·학기당 이수 학점 정책이 아직 정해지지 않았어요") }}{% else %}{{ _("졸업 {degree_credits}학점 · 학기당 {per}학점 기준 (학칙 정책)", degree_credits=(sim.degree_credits), per=(sim.credits_per_semester)) }}{% endif %}</span>
     </div>
     <div class="grid content-start gap-1 rounded-md bg-white/[0.06] p-5">
       <span class="text-sm text-on-dark-muted">{{ _("미인정 시 추가 비용") }}</span>
@@ -184,7 +184,7 @@
       <form method="get" class="grid grid-cols-2 gap-3">
         {% if view.show != 'all' %}<input type="hidden" name="show" value="{{ view.show }}">{% endif %}
         <label class="field"><span>{{ _("학점당 등록금($)") }}</span><input class="input h-11" type="number" name="tuition" min="0" step="50" value="{{ sim.tuition_per_credit }}"></label>
-        <label class="field"><span>{{ _("졸업 학점") }}</span><input class="input h-11" type="number" name="degree" min="1" max="300" value="{{ sim.degree_credits }}"></label>
+        <label class="field"><span>{{ _("졸업 학점") }}</span><input class="input h-11" type="number" name="degree" min="1" max="300" value="{{ sim.degree_credits or '' }}"></label>
         <button class="btn-secondary btn-sm col-span-2">{{ _("다시 계산") }}</button>
       </form>
     </section>

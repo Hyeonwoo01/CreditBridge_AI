@@ -53,6 +53,9 @@
         {% for d in form.departments %}<option value="{{ d.id }}" {% if d.id == u.department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
       </select>
     </label>
+    <label class="field"><span>{{ _("입학연도") }} <span class="text-muted">{{ _("(입학연도별 학칙 정책에 씀, 비우면 모름)") }}</span></span>
+      <input class="input h-11" type="number" name="admission_year" min="1990" max="2100" value="{{ u.admission_year or '' }}">
+    </label>
     <p class="text-xs text-muted">{{ _("학생은 이 두 값으로 편입 요청을 만들고 직접 바꾸지 않아요. 둘 중 하나라도 없으면 새 요청을 만들 수 없어요. 바꿔도 이미 만든 요청은 그때 값이 남아요. 학생 이름은 여기서 보거나 고치지 않아요.") }}</p>
     <button class="btn-primary w-fit">{{ _("저장") }}</button>
   </form>
