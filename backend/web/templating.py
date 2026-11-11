@@ -13,6 +13,7 @@ from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, transl
 from backend.security.csrf import csrf_token
 from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
 from backend.services.decisions import REASON_HINTS, REASON_LABELS
+from backend.services.evidence_status import APPLICABILITY_LABELS, AUTHENTICITY_LABELS, SOURCE_LABELS
 from backend.services.policy import TYPE_LABELS as POLICY_TYPE_LABEL
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).resolve().parents[2] / "frontend" / "templates")
@@ -164,6 +165,9 @@ TEMPLATES.env.filters.update(
     credit_unit=lambda v: _label(CREDIT_UNIT_LABEL, v, N_("단위 모름")),
     credit_basis=lambda v: _label(BASIS_LABEL, v),
     policy_type=lambda v: _label(POLICY_TYPE_LABEL, v),
+    source_kind=lambda v: _label(SOURCE_LABELS, v),
+    authenticity=lambda v: _label(AUTHENTICITY_LABELS, v),
+    applicability=lambda v: _label(APPLICABILITY_LABELS, v),
     policy_value=policy_value,
     pct=pct,
     iso=iso,

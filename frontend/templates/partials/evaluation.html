@@ -18,6 +18,20 @@
   <p class="text-sm text-muted">{{ _("{credits} · 분석 {time}", credits=(_('{n}학점', n=v.syllabus.credits) if v.syllabus.credits is not none else _('학점 기재 없음')), time=(time(ev.created_at))) }}{% if ev.model %} · {{ ev.prompt_version }}{% endif %}</p>
 </section>
 
+{# 증거 출처·진위·적용 학기 (리뷰 v3 P0-5). 학생 제출 자료를 공식 문서처럼 보이지 않게 출처를 그대로 보여 준다 #}
+{% set syl = v.syllabus %}
+<p id="evidence-summary" class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+  <span class="badge">{{ syl.source_kind | source_kind }}</span>
+  <span class="{{ {'verified': 'badge-approve', 'partially_verified': 'badge-elective', 'suspicious': 'badge-reject', 'rejected': 'badge-reject'}.get(syl.authenticity, 'badge') }}">{{ syl.authenticity | authenticity }}</span>
+  <span class="{{ {'applicable': 'badge-approve', 'mismatch': 'badge-reject'}.get(syl.applicability, 'badge') }}">{{ syl.applicability | applicability }}</span>
+  <span class="text-muted">{{ _("강의계획서 학기 {term} · 수강 학기 {taken}", term=(syl.academic_term or '–'), taken=(v.taken_term or '–')) }}</span>
+</p>
+{% if syl.authenticity in ('suspicious', 'rejected') and not v.decision %}
+<div class="mt-3 rounded-md bg-elective-subtle p-4 text-sm text-elective" role="status">{% if user.role == 'student' %}{{ _("학사처가 이 자료를 확인하고 있어요. 불이익으로 바로 이어지지 않아요. 출신 대학 학사처 발급본 같은 공식 자료를 보완 자료로 올려 주시면 빨리 진행돼요.") }}{% else %}{{ _("진위 검토 중이거나 증거로 채택하지 않은 자료라 판정을 보류해요. 학생에게 공식 자료를 받아 다시 확인해 주세요.") }}{% endif %}</div>
+{% elif syl.applicability == 'mismatch' and not v.decision %}
+<div class="mt-3 rounded-md bg-elective-subtle p-4 text-sm text-elective" role="status">{{ _("이 강의계획서는 실제 수강 학기의 자료가 아니에요. 수강 당시 강의계획서로 보지 않으니 그 학기 자료가 있는지 확인해 주세요.") }}</div>
+{% endif %}
+
 {% if v.grade_failed and not v.decision %}
 <div class="mt-6 rounded-md bg-pearl p-4 text-sm text-reject" role="status">{{ _("성적이 C 미만(C- 이하)이라 인정 대상이 아니에요. 학과 교수 심사 없이 제외되고 예상 인정 학점에도 넣지 않아요.") }}</div>
 {% endif %}

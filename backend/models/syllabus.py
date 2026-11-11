@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String, Text, UniqueConstraint
@@ -5,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, CreatedAtMixin, IdMixin, IdType, one_of, ratio
 from backend.db.types import JSONB
-from backend.models.enums import SyllabusStatus
+from backend.models.enums import Applicability, Authenticity, SourceKind, SyllabusStatus
 
 
 class Syllabus(IdMixin, CreatedAtMixin, Base):
@@ -16,6 +17,9 @@ class Syllabus(IdMixin, CreatedAtMixin, Base):
         CheckConstraint(one_of("status", SyllabusStatus), name="status_valid"),
         CheckConstraint(ratio("quality_score"), name="quality_score_range"),
         CheckConstraint("credits IS NULL OR credits >= 0", name="credits_range"),
+        CheckConstraint(one_of("source_kind", SourceKind), name="source_kind_valid"),
+        CheckConstraint(one_of("authenticity", Authenticity), name="authenticity_valid"),
+        CheckConstraint(one_of("applicability", Applicability), name="applicability_valid"),
         # 같은 요청에 같은 문서를 두 번 올릴 수 없다. 요청이 다르면 같은 문서의 분석 결과를 재사용한다.
         UniqueConstraint("transfer_request_id", "content_hash", name="uq_syllabi_request_content"),
     )
@@ -42,4 +46,13 @@ class Syllabus(IdMixin, CreatedAtMixin, Base):
     # 판정 유도 문구 탐지 결과 (FR-14)
     injection_flags: Mapped[list[str] | None] = mapped_column(JSONB)
     status: Mapped[str] = mapped_column(String(20), default="uploaded")
+    # 증거 출처·진위·적용 학기 (리뷰 v3 P0-5). 파일 해시는 같은 파일인지만 알려 주고 진위를 증명하지 않는다
+    source_kind: Mapped[str] = mapped_column(String(30), default=SourceKind.STUDENT_UPLOADED)
+    authenticity: Mapped[str] = mapped_column(String(20), default=Authenticity.UNVERIFIED)
+    applicability: Mapped[str] = mapped_column(String(10), default=Applicability.UNKNOWN)
+    academic_term: Mapped[str | None] = mapped_column(String(50))  # 강의계획서가 적용되는 학기 (심사관 확인)
+    verification_method: Mapped[str] = mapped_column(String(200), default="")
+    verification_note: Mapped[str] = mapped_column(Text, default="")
+    verified_by: Mapped[int | None] = mapped_column(IdType, ForeignKey("users.id"))
+    verified_at: Mapped[datetime | None]
     error_message: Mapped[str | None] = mapped_column(String(500))

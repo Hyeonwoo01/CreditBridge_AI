@@ -26,7 +26,7 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import ConversionMethod, CreditSystem, PolicyRuleType, PolicyStatus
+from backend.models.enums import Authenticity, ConversionMethod, CreditSystem, PolicyRuleType, PolicyStatus, SourceKind
 from backend.services.analysis import content_hash
 from backend.services.auth import hash_password
 from backend.services.institution_data import department_named
@@ -93,6 +93,9 @@ def seed(session: Session) -> None:
             credits=c.credits,
             status="ready",
             original_filename=f"{c.code}.txt",
+            source_kind=SourceKind.INSTITUTION_REFERENCE,
+            authenticity=Authenticity.VERIFIED,
+            verification_method="대상 대학 기준 강의계획서",
         )
         session.add(ref)
         session.flush()

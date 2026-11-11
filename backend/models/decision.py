@@ -46,3 +46,5 @@ class Decision(IdMixin, Base):
     )
     # 판정 때 이 학생에게 적용된 학칙 정책 (규칙 종류 → 규칙 id·값, 0011부터). 정책이 바뀌어도 이 기록은 그대로다
     policy_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # 판정 때 증거 상태 (출처·진위·적용 학기·학기·파일 해시, 0012부터)
+    evidence_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

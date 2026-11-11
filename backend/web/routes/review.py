@@ -16,6 +16,7 @@ from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import appeals as appeal_service
 from backend.services import equivalencies as equivalency_service
+from backend.services import evidence_status as evidence_service
 from backend.services import materials as material_service
 from backend.services import privacy as privacy_service
 from backend.services import review as review_service
@@ -175,6 +176,41 @@ def upload_supplement(
         tr("보완 자료를 올렸어요. 다시 분석한 결과는 심사 큐와 학생 화면에 반영돼요. 이전 결과는 기록으로 남아요."),
     )
     return RedirectResponse("/review", status_code=303)
+
+
+@router.post("/evaluations/{evaluation_id}/evidence-status")
+def evidence_status(
+    request: Request,
+    evaluation_id: int,
+    source_kind: str = Form(""),
+    authenticity: str = Form(""),
+    academic_term: str = Form(""),
+    verification_method: str = Form(""),
+    verification_note: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Evaluator,
+    session: Session = Depends(get_db),
+) -> Response:
+    """증거 출처·진위·적용 학기 (리뷰 v3 P0-5)."""
+    check_csrf(request, csrf_token)
+    try:
+        evidence_service.update(
+            session,
+            user,
+            evaluation_id,
+            source_kind,
+            authenticity,
+            academic_term,
+            verification_method,
+            verification_note,
+        )
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    else:
+        send_notifications()
+        flash(request, tr("증거 상태를 저장했어요."))
+    return RedirectResponse(f"/review/evaluations/{evaluation_id}#evidence-status", status_code=303)
 
 
 @router.get("/appeals")

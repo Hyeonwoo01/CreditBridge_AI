@@ -480,8 +480,11 @@ erDiagram
 | credit_unit · source_credit_unit | VARCHAR(20) | null, CHECK | 인정 학점·출신 학점의 단위 |
 | credit_basis | VARCHAR(12) | null, CHECK | full · partial · elective · not_accepted |
 | source_credits | DECIMAL(5,2) | null | 판정 때 쓴 출신 학점 (성적표 값이 먼저, 없으면 강의계획서) |
+| evidence_snapshot | JSONB | null | 판정 때 증거 상태 (강의계획서 id·출처·진위·적용 학기·학기·수강 학기·파일 해시, 0012부터) |
 | policy_snapshot | JSONB | null | 판정 때 적용한 학칙 정책 (규칙 종류 → 상태·규칙 id·값, 0011부터). 정책이 바뀌어도 그대로 |
 | conversion_rule_id | BIGINT | FK→credit_conversion_rules, null | 적용한 환산 규칙 (같은 단위거나 교수가 직접 적었으면 비움) |
+
+**syllabi 증거 상태 (0012)** — `source_kind` VARCHAR(30)(student_uploaded·registrar_issued·instructor_confirmed·official_portal·public_web·institution_reference·other), `authenticity` VARCHAR(20)(unverified·verified·partially_verified·suspicious·rejected), `applicability` VARCHAR(10)(applicable·mismatch·unknown — `academic_term`과 성적표 수강 학기 비교), `academic_term`, `verification_method`, `verification_note`(학생 비공개), `verified_by` FK→users, `verified_at`. 파일 해시가 같아도 진위·출처는 옮기지 않는다. 의심·채택 안 함이면 판정 보류(자동 불인정 아님).
 
 **policy_rules** — `institution_id` FK(IX), `rule_type` VARCHAR(30)(min_grade·transfer_cap·degree_credits·semester_load, CHECK), `department_id` FK→departments null(모든 학과), `admission_year` INT null(1990~2100, 모든 입학연도), `parameters` JSONB({min_grade, accept_pass} 또는 {credits}), `effective_from` DATE, `effective_to` DATE null, `status` VARCHAR(10)(draft·approved·retired, IX), `source` TEXT(근거 학칙), `created_by`·`approved_by` FK→users null, `approved_at`, `created_at`. 승인된 규칙 중 학생 범위에 맞고 가장 구체적인 것(학과·입학연도를 정한 수)을 쓰고, 같은 구체성에서 값이 다르면 충돌, 없으면 미정(기본값 없음). 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만든다. 0011이 대상 대학마다 이전 설정(C 이상·P/PASS/S, 상한·졸업 학점, 학기당 15)을 대학 전체 승인 규칙으로 옮겼다. `institutions.max_transfer_credits`·`degree_credits`는 더 쓰지 않는다(기록용).
 

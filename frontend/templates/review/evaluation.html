@@ -8,6 +8,22 @@
 {% include "partials/evaluation.html" %}
 {% include "partials/history.html" %}
 {% include "partials/notes.html" %}
+
+{# 증거 상태 (리뷰 v3 P0-5): 심사관이 출처·진위·적용 학기를 확인 방법과 함께 정한다. 의심은 자동 불인정이 아니라 판정 보류 #}
+<form id="evidence-status" method="post" action="/review/evaluations/{{ v.evaluation.id }}/evidence-status" class="card mt-6 grid scroll-mt-20 gap-3 md:grid-cols-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="grid gap-1 md:col-span-2">
+    <h2 class="font-semibold">{{ _("증거 상태") }}</h2>
+    <p class="text-sm text-muted">{{ _("파일 해시는 같은 파일인지만 알려 줘요. 진위는 확인한 방법과 함께 정하고, 의심되면 판정을 보류하고 학생에게 공식 자료를 받아요(자동 불인정 아님). 학생에게는 메모가 보이지 않아요.") }}{% if v.syllabus.verified_at %} {{ _("· 마지막 확인 {time}", time=(v.syllabus.verified_at.strftime('%Y-%m-%d'))) }}{% endif %}</p>
+  </div>
+  <label class="field"><span>{{ _("출처") }}</span><select name="source_kind" class="input h-11">{% for k in ['student_uploaded', 'registrar_issued', 'instructor_confirmed', 'official_portal', 'public_web', 'other'] %}<option value="{{ k }}" {% if v.syllabus.source_kind == k %}selected{% endif %}>{{ k | source_kind }}</option>{% endfor %}</select></label>
+  <label class="field"><span>{{ _("진위") }}</span><select name="authenticity" class="input h-11">{% for k in ['unverified', 'verified', 'partially_verified', 'suspicious', 'rejected'] %}<option value="{{ k }}" {% if v.syllabus.authenticity == k %}selected{% endif %}>{{ k | authenticity }}</option>{% endfor %}</select></label>
+  <label class="field"><span>{{ _("강의계획서 학기") }} <span class="text-muted">{{ _("(예: 2024-1, 2024 Fall)") }}</span></span><input class="input h-11" name="academic_term" maxlength="50" value="{{ v.syllabus.academic_term or '' }}"></label>
+  <p class="self-end text-sm text-muted">{{ _("성적표 수강 학기: {taken}", taken=(v.taken_term or '–')) }}</p>
+  <label class="field"><span>{{ _("확인 방법") }}</span><input class="input h-11" name="verification_method" maxlength="200" value="{{ v.syllabus.verification_method }}" placeholder="{{ _('예: 출신 대학 포털 강의계획서와 대조') }}"></label>
+  <label class="field"><span>{{ _("메모 (의심·채택 안 함이면 필수)") }}</span><input class="input h-11" name="verification_note" maxlength="1000" value="{{ v.syllabus.verification_note }}"></label>
+  <button class="btn-secondary h-11 w-fit">{{ _("증거 상태 저장") }}</button>
+</form>
 {% if not v.decision and v.evaluation.is_latest and v.request.status != 'draft' %}
 <form id="assign" method="post" action="/review/evaluations/{{ v.evaluation.id }}/assign" class="card mt-6 grid scroll-mt-20 gap-3">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

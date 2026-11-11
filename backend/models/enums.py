@@ -106,6 +106,32 @@ class PolicyStatus(StrEnum):
     RETIRED = "retired"
 
 
+class SourceKind(StrEnum):
+    """증거 자료를 누가 어디서 냈는지 (리뷰 v3 P0-5). 학생 제출 자료를 공식 문서처럼 표시하지 않는다."""
+
+    STUDENT_UPLOADED = "student_uploaded"
+    REGISTRAR_ISSUED = "registrar_issued"  # 출신 대학 학사처 발급
+    INSTRUCTOR_CONFIRMED = "instructor_confirmed"  # 담당 교원 확인
+    OFFICIAL_PORTAL = "official_portal"  # 출신 대학 공식 포털에서 직접 확인
+    PUBLIC_WEB = "public_web"  # 공개 웹 자료 (참고용, 수강 분반 증명으로 자동 승격하지 않음)
+    INSTITUTION_REFERENCE = "institution_reference"  # 대상 대학이 올린 기준 강의계획서
+    OTHER = "other"
+
+
+class Authenticity(StrEnum):
+    VERIFIED = "verified"
+    PARTIALLY_VERIFIED = "partially_verified"
+    UNVERIFIED = "unverified"
+    SUSPICIOUS = "suspicious"  # 자동 불인정이 아니라 판정 보류·검토
+    REJECTED = "rejected"  # 심사 증거로 채택하지 않음 (새 자료 필요)
+
+
+class Applicability(StrEnum):
+    APPLICABLE = "applicable"  # 학생이 수강한 학기 자료
+    MISMATCH = "mismatch"  # 다른 학기 자료
+    UNKNOWN = "unknown"
+
+
 class EvidenceSide(StrEnum):
     SOURCE = "source"  # 학생 강의계획서
     TARGET = "target"  # 대상 대학 기준 강의계획서

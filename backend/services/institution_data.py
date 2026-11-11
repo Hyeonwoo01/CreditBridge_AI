@@ -33,7 +33,16 @@ from backend.models import (
     Syllabus,
     User,
 )
-from backend.models.enums import ConversionMethod, CreditSystem, PolicyRuleType, PolicyStatus, Role, SyllabusStatus
+from backend.models.enums import (
+    Authenticity,
+    ConversionMethod,
+    CreditSystem,
+    PolicyRuleType,
+    PolicyStatus,
+    Role,
+    SourceKind,
+    SyllabusStatus,
+)
 from backend.repositories import catalog as catalog_repo
 from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import policies as policy_repo
@@ -521,6 +530,9 @@ def upload_reference(
             course_title=course.title,
             credits=course.credits,
             status=SyllabusStatus.UPLOADED,
+            source_kind=SourceKind.INSTITUTION_REFERENCE,
+            authenticity=Authenticity.VERIFIED,
+            verification_method="대상 대학 기준 강의계획서",
         ),
     )
     audit.record(session, admin, "course.reference_upload", "course", str(course.id), syllabus=syllabus.id)

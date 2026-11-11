@@ -821,5 +821,37 @@ INSERT INTO policy_rules (institution_id, rule_type, parameters, effective_from,
 
 UPDATE alembic_version SET version_num='0011' WHERE alembic_version.version_num = '0010';
 
+-- Running upgrade 0011 -> 0012
+
+ALTER TABLE decisions ADD COLUMN evidence_snapshot JSONB;
+
+ALTER TABLE syllabi ADD COLUMN source_kind VARCHAR(30) DEFAULT 'student_uploaded' NOT NULL;
+
+ALTER TABLE syllabi ADD COLUMN authenticity VARCHAR(20) DEFAULT 'unverified' NOT NULL;
+
+ALTER TABLE syllabi ADD COLUMN applicability VARCHAR(10) DEFAULT 'unknown' NOT NULL;
+
+ALTER TABLE syllabi ADD COLUMN academic_term VARCHAR(50);
+
+ALTER TABLE syllabi ADD COLUMN verification_method VARCHAR(200) DEFAULT '' NOT NULL;
+
+ALTER TABLE syllabi ADD COLUMN verification_note TEXT DEFAULT '' NOT NULL;
+
+ALTER TABLE syllabi ADD COLUMN verified_by BIGINT;
+
+ALTER TABLE syllabi ADD COLUMN verified_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE syllabi ADD CONSTRAINT fk_syllabi_verified_by_users FOREIGN KEY(verified_by) REFERENCES users (id);
+
+UPDATE syllabi SET source_kind = 'institution_reference', authenticity = 'verified', verification_method = '대상 대학 기준 강의계획서' WHERE transfer_request_id IS NULL;
+
+ALTER TABLE syllabi ADD CONSTRAINT ck_syllabi_source_kind_valid CHECK (source_kind IN ('student_uploaded', 'registrar_issued', 'instructor_confirmed', 'official_portal', 'public_web', 'institution_reference', 'other'));
+
+ALTER TABLE syllabi ADD CONSTRAINT ck_syllabi_authenticity_valid CHECK (authenticity IN ('verified', 'partially_verified', 'unverified', 'suspicious', 'rejected'));
+
+ALTER TABLE syllabi ADD CONSTRAINT ck_syllabi_applicability_valid CHECK (applicability IN ('applicable', 'mismatch', 'unknown'));
+
+UPDATE alembic_version SET version_num='0012' WHERE alembic_version.version_num = '0011';
+
 COMMIT;
 

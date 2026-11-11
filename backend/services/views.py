@@ -46,6 +46,7 @@ from backend.services import appeals as appeal_service
 from backend.services import credits as credit_service
 from backend.services import decisions as decision_service
 from backend.services import evidence_feedback as feedback_service
+from backend.services import evidence_status as evidence_service
 from backend.services import institution_data as institution_service
 from backend.services import materials as material_service
 from backend.services import notes as note_service
@@ -93,6 +94,7 @@ class EvaluationView:
     combinable: list[tuple[Syllabus, credit_service.Conversion]] = field(default_factory=list)
     allocations: list[tuple[CreditAllocation, Syllabus | None]] = field(default_factory=list)
     credit: credit_service.Conversion | None = None  # 교수 판정 화면: 출신 학점의 환산 결과 (인정 학점 안내)
+    taken_term: str | None = None  # 성적표에 적힌 실제 수강 학기 (증거 적용 학기 비교)
     span_ids: dict[tuple[str, int, int, str], int] = field(default_factory=dict)
     feedback: dict[int, str] = field(default_factory=dict)
 
@@ -213,6 +215,7 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
     if not (user.role == Role.STUDENT and request.status == RequestStatus.CLOSED):
         view.appeals = appeal_service.for_evaluation(session, evaluation.id)
     view.appeal_files = appeal_service.files_for(session, [a.id for a in view.appeals])
+    view.taken_term = evidence_service.taken_term(session, syllabus)
     if user.role == Role.PROFESSOR and (decision is None or view.awaiting_redecision):
         view.combinable = decision_service.combinable_sources(session, evaluation)
     if decision is not None:

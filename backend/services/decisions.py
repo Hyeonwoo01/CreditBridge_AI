@@ -35,6 +35,7 @@ from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
 from backend.services import audit, notifications
 from backend.services import credits as credit_service
+from backend.services import evidence_status as evidence_service
 from backend.services import policy as policy_service
 
 # 강의계획서 내용이 이 비율 이상 같으면 '같은 강의계획서'로 본다. 첫 측정 후 확정한다 (기능명세서 FR-11).
@@ -323,6 +324,9 @@ def decide(
         raise DecisionValidationError(tr("이미 판정된 건이에요. 이의 신청으로 재심사를 진행해 주세요."))
     if action not in DecisionAction.__members__.values():
         raise DecisionValidationError(tr("승인·수정·반려 중 하나를 선택해 주세요."))
+    hold = evidence_service.hold_reason(syllabus_repo.get(session, evaluation.syllabus_id))
+    if hold:  # 진위 검토 중·채택 안 한 자료는 자동 불인정이 아니라 판정 보류
+        raise DecisionValidationError(tr(hold))
 
     ai = ai_result(evaluation)
     ai_course = (
@@ -409,6 +413,7 @@ def decide(
             source_credit_unit=conversion.source_unit,
             conversion_rule_id=conversion.rule.id if conversion.rule else None,
             policy_snapshot=_policy_snapshot(session, request),
+            evidence_snapshot=evidence_service.snapshot(session, primary),
         ),
     )
     allocation_repo.supersede_for_evaluation(session, evaluation.id, decision.id)

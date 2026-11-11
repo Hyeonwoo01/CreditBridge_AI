@@ -1,6 +1,6 @@
 # CreditBridge AI API 명세서
 
-코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 88개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
+코드(`backend/web/routes/`, `backend/web/api/`)에서 뽑은 전체 엔드포인트 89개와, 화면 버튼·화면 데이터가 어느 API에 연결되는지 정리했다. 마지막 절에 검토 결과가 있다.
 
 - 기준: 2026-10-19 main. 화면 번호(P00~P25)는 [화면 명세서](screens/README.md), 기능 번호(FR)는 [기획 통합본](spec.md) 4장 기능 명세.
 - 데이터 구조는 [ERD.md](ERD.md).
@@ -97,6 +97,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | R14 | POST | `/review/evaluations/{id}/assign` | 심사관(소속 기관, 판정 전) | `reviewer_id`, `csrf_token` | 303→R4 + 플래시 (같은 교수면 거절, 바꾸면 이전 교수에게 알림) | P06 | FR-18 |
 | R5 | POST | `/review/evaluations/{id}/materials` | 심사관 | `items[]`, `note`, `csrf_token` | 303→R4 | P06 | FR-22 |
 | R13 | POST | `/review/evaluations/{id}/supplement` | 심사관(소속 기관, 판정 전·최신 분석) | `file`(PDF·JPG·PNG), `csrf_token` | 303→R1 (재분석은 작업 큐) / 오류는 303→R4`#supplement` | P06 | FR-22, 권한 매트릭스 문서 업로드 |
+| R15 | POST | `/review/evaluations/{id}/evidence-status` | 심사관(소속 기관) | `source_kind`, `authenticity`(unverified·verified·partially_verified·suspicious·rejected), `academic_term`, `verification_method`(확인됨·일부 확인이면 필수), `verification_note`(의심·채택 안 함이면 필수, 학생 비공개), `csrf_token` | 303→R4`#evidence-status` (적용 학기는 성적표 수강 학기와 비교해 자동, 의심·채택 안 함으로 바꾸면 학생에게 공식 자료 안내 알림) | P06 | 리뷰 v3 P0-5 |
 | R6 | GET | `/review/appeals` | 심사관 | – | HTML | P07 | FR-23 |
 | R7 | POST | `/review/appeals/{id}` | 심사관 | `action`(accept·dismiss), `reviewer_id`(accept), `note`(dismiss 필수), `csrf_token` | 303→R6 | P07 | FR-23 |
 | R8 | GET | `/review/privacy` | 심사관 | – | HTML | P08 | FR-13 |
@@ -279,6 +280,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P05 | SIS CSV 내보내기 | R3 |
 | P05 | 원문 대조 확인 → · 충돌 내역 확인 · 보완 요청 발송 · 과거 판례 N건 보기 | R4 (각각 `#history`·`#materials` 위치) |
 | P05 | 이 페이지 전체 선택 | 화면 안 |
+| P06 | 증거 상태 저장 | R15 |
 | P06 | 담당 교수 배정 [배정 / 바꾸기] | R14 |
 | P06 | 학생에게 보완 자료 요청 [요청 보내기] | R5 |
 | P06 | 학생 대신 보완 자료 올리기 [올리고 다시 분석] (확인창) | R13 |
