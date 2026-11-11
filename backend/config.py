@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     celery_task_always_eager: bool = False
 
     max_upload_mb: int = 20
+    # 업로드 악성코드 검사 (ClamAV clamd, 리뷰 v3 P0-7). 비우면 검사하지 않는다 (개발·테스트).
+    # 켜면 검사를 마친 파일만 저장한다. clamav_required=true면 검사 서버가 응답하지 않을 때 업로드를 받지 않는다
+    clamav_host: str = ""
+    clamav_port: int = 3310
+    clamav_timeout_seconds: float = 30.0
+    clamav_required: bool = True
     max_syllabi_per_request: int = 30
     # 교수 배정 후 판정까지 예상 소요일 (학생 포털의 예상 완료일 계산용)
     review_sla_days: int = 5

@@ -1,6 +1,7 @@
 """파일 업로드 방어와 숨은 글자 (리뷰 v3 P0-7, 13.6)."""
 
 import pymupdf
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -85,7 +86,42 @@ def test_dangerous_or_disguised_files_are_rejected(client: TestClient, seeded: S
         ("fake.pdf", png, "확장자(.pdf)와 달라요"),  # 이미지에 .pdf를 붙임
         ("fake.png", good, "확장자(.png)와 달라요"),  # PDF에 .png를 붙임
         ("cut.pdf", good[: len(good) // 2], "손상"),  # 중간에서 잘린 PDF는 일부만 읽어 분석하지 않는다
+        ("form.pdf", form_pdf(), "일반 PDF로 다시 저장"),  # 입력 양식 PDF는 일반 PDF로 달라고 한다
     ]
     for name, data, message in cases:
         assert message in post(client, rid, token, name, data), name
     assert seeded.scalars(select(Syllabus).where(Syllabus.transfer_request_id == rid)).first() is None
+
+
+def form_pdf() -> bytes:
+    doc = pymupdf.open("pdf", demo_pdf("calculus.txt"))
+    field = pymupdf.Widget()
+    field.field_type = pymupdf.PDF_WIDGET_TYPE_TEXT
+    field.field_name = "week1"
+    field.field_value = "Limits and continuity"
+    field.rect = pymupdf.Rect(50, 700, 300, 720)
+    doc[0].add_widget(field)
+    return doc.tobytes()
+
+
+def test_malware_is_rejected_before_storage(
+    client: TestClient, seeded: Session, fake_storage: FakeStorage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend.config import get_settings
+    from tests.unit.test_malware_scan import EICAR, FakeClamd
+
+    clamd = FakeClamd()
+    monkeypatch.setattr(get_settings(), "clamav_host", "127.0.0.1")
+    monkeypatch.setattr(get_settings(), "clamav_port", clamd.port)
+    try:
+        token = login(client, "jiwon@student.example")
+        rid = new_request(client, seeded, token)
+        stored = len(fake_storage.objects)
+        infected = demo_pdf("calculus.txt") + b"\n%" + EICAR + b"\n"
+        assert "악성코드가 발견돼" in post(client, rid, token, "plan.pdf", infected)
+        assert len(fake_storage.objects) == stored  # 저장소에 올리지 않았다
+        assert seeded.scalars(select(Syllabus).where(Syllabus.transfer_request_id == rid)).first() is None
+        post(client, rid, token, "calculus.pdf", demo_pdf("calculus.txt"))  # 깨끗한 파일은 검사 뒤 저장
+        assert len(clamd.received) == 2 and len(fake_storage.objects) == stored + 1
+    finally:
+        clamd.close()

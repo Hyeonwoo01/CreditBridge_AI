@@ -9,6 +9,7 @@ import pymupdf
 
 from backend.errors import DocumentParseError, UploadRejectedError
 from backend.i18n import gettext as tr
+from backend.security import malware
 
 ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
 CONTENT_TYPES = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
@@ -112,11 +113,13 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
                 raise UploadRejectedError(
                     tr("PDF 구조가 지나치게 복잡해요. 인쇄 → PDF로 저장해 다시 만들어 올려 주세요.")
                 )
-            if risky_pdf_parts(doc):
+            # 입력 양식(폼) PDF는 칸에 적은 글이 본문 글자로 읽히지 않을 수 있고 계산용 스크립트가 붙기도 한다.
+            # 양식 그대로 받지 않고 내용이 보이는 일반 PDF로 다시 저장해 달라고 한다
+            if risky_pdf_parts(doc) or doc.is_form_pdf:
                 raise UploadRejectedError(
                     tr(
-                        "실행 코드(JavaScript)나 첨부 파일이 들어 있는 PDF는 받지 않아요. "
-                        "인쇄 → PDF로 저장해 다시 만들어 올려 주세요."
+                        "입력 양식(폼) PDF나 실행 코드(JavaScript)·첨부 파일이 들어 있는 PDF는 받지 않아요. "
+                        "내용이 그대로 보이는 일반 PDF로 다시 저장해서 올려 주세요 (인쇄 → PDF로 저장)."
                     )
                 )
     else:
@@ -130,6 +133,7 @@ def validate_upload(filename: str, data: bytes, max_mb: int) -> str:
             pymupdf.Pixmap(data)
         except Exception as exc:
             raise UploadRejectedError(tr("이미지를 열 수 없어요. JPG 또는 PNG 파일인지 확인해 주세요.")) from exc
+    malware.check_upload(data)  # 형식 검사를 통과한 파일만 악성코드 검사 서버로 보낸다 (저장 전)
     return ext
 
 

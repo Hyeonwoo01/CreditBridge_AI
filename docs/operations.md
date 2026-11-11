@@ -29,6 +29,7 @@ CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니�
 ## 운영 시 확인할 것
 
 - 보안: 앱은 보안 헤더·운영 비밀값 검사·로그인 실패 제한(같은 IP 10분 30번)·학생별 하루 업로드 횟수(성적표 10, 강의계획서 60, 보완 자료 30)·PDF 60쪽·이미지 해상도·CSV 수식 주입 방지를 기본으로 갖고, 컨테이너는 root가 아닌 사용자로 돌아요. AWS 콘솔에서 할 일(루트 MFA, SSH 제한, IMDSv2, S3·RDS 공개 차단, AI 키 한도)은 [docs/deploy-aws.md](deploy-aws.md)의 "보안 점검"을 따르세요. `SESSION_SECRET`가 32자보다 짧으면 운영 서버가 시작하지 않아요.
+- 업로드 악성코드 검사(ClamAV)는 기본으로 꺼져 있어요. 켜지 않아도 형식 시그니처 확인, JavaScript·첨부 파일·입력 양식 PDF 거부, 크기·쪽수 상한은 그대로 동작해요. ClamAV는 바이러스 패턴을 올리는 데 메모리를 1GB 넘게 써서 t3.micro(1GB)에서는 다른 서비스가 느려지거나 멈출 수 있어요. 켜려면 메모리 2GB 이상(예: t3.small)을 권하고, `.env`에 `COMPOSE_PROFILES=clamav`와 `CLAMAV_HOST=clamav`를 적은 뒤 `docker compose -f docker-compose.prod.yml up -d --build` 하세요. 첫 실행은 패턴을 내려받느라 몇 분 걸리고, 그동안 `CLAMAV_REQUIRED=true`(기본)면 업로드가 "지금은 파일 안전 검사를 할 수 없어…"로 막혀요. 검사에 걸린 파일은 저장하지 않고 로그에 탐지 이름과 크기만 남겨요(파일 이름은 남기지 않음).
 - 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 실제 AI 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
 - 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](db-grants.sql)을 따르세요.

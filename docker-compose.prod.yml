@@ -48,6 +48,16 @@ services:
     command: ["redis-server", "--maxmemory", "64mb", "--save", "60", "1"]
     volumes: ["redis-data:/data"]
 
+  # 업로드 악성코드 검사 (ClamAV, 리뷰 v3 P0-7). 기본은 꺼져 있다: 메모리를 1GB 넘게 써서 t3.micro(1GB)에는 무겁다.
+  # 켜기(메모리 2GB 이상 권장): .env에 COMPOSE_PROFILES=clamav 와 CLAMAV_HOST=clamav 를 적고 다시 up (docs/operations.md)
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["clamav"]
+    restart: unless-stopped
+    logging: *logging
+    expose: ["3310"]
+    volumes: ["clamav-data:/var/lib/clamav"]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -62,6 +72,7 @@ services:
     depends_on: [web]
 
 volumes:
+  clamav-data:
   redis-data:
   caddy-data:
   caddy-config:

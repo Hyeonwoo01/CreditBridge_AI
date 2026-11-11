@@ -37,6 +37,13 @@ services:
     ports: ["127.0.0.1:9000:8333"]
     volumes: ["s3-data:/data"]
 
+  # 업로드 악성코드 검사 (ClamAV). 기본은 꺼짐: docker compose --profile clamav up -d 후 .env에 CLAMAV_HOST=clamav
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["clamav"]
+    restart: unless-stopped
+    volumes: ["clamav-data:/var/lib/clamav"]
+
   web:
     build: .
     # .env가 없어도 뜬다 (API 키 등은 .env에 넣으면 적용)
@@ -96,5 +103,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  clamav-data:
   db-data:
   s3-data:
