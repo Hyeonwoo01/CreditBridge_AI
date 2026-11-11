@@ -43,7 +43,7 @@ from backend.schemas.results import CandidateResult, EvaluationResult
 from backend.schemas.transcript import TranscriptExtraction
 from backend.schemas.transcription import PageTranscription
 from backend.security.masking import mask_pii
-from backend.services import scoring
+from backend.services import jobs, scoring
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +251,7 @@ def process_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient, stor
         syllabus.error_message = None
         session.commit()
     except LLMError as exc:
+        jobs.note_error(exc)  # 작업 기록에 오류 종류를 남긴다 (리뷰 v3 P1-3)
         session.rollback()
         syllabus.status = SyllabusStatus.FAILED
         syllabus.error_message = (
@@ -278,6 +279,7 @@ def add_supplement(
     try:
         text = document_to_text(llm, storage.get(file_key), filename).text
     except LLMError as exc:  # 스캔본 보완 자료는 AI로 전사한다
+        jobs.note_error(exc)  # 작업 기록에 오류 종류를 남긴다 (리뷰 v3 P1-3)
         syllabus.status = SyllabusStatus.FAILED
         syllabus.error_message = (
             NOT_CONFIGURED if _not_configured(exc) else N_("보완 자료에서 글자를 읽지 못했어요. 다시 올려 주세요.")
@@ -371,6 +373,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
     try:
         result = matching.compare(llm, prompt)
     except LLMError as exc:
+        jobs.note_error(exc)  # 작업 기록에 오류 종류를 남긴다 (리뷰 v3 P1-3)
         evaluation.status = EvaluationStatus.FAILED
         evaluation.error_message = (
             NOT_CONFIGURED if _not_configured(exc) else N_("AI 분석에 실패했어요. 잠시 후 다시 분석을 요청해 주세요.")
@@ -627,6 +630,7 @@ def process_student_transcript(session: Session, student_id: int, *, llm: LLMCli
             effort="low",
         )
     except LLMError as exc:
+        jobs.note_error(exc)  # 작업 기록에 오류 종류를 남긴다 (리뷰 v3 P1-3)
         session.rollback()
         transcript.status = TranscriptStatus.FAILED
         transcript.error_message = NOT_CONFIGURED if _not_configured(exc) else TRANSCRIPT_FAILED

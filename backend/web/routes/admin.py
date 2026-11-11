@@ -21,6 +21,7 @@ from backend.security.session import require
 from backend.services import accounts as account_service
 from backend.services import auth as auth_service
 from backend.services import institution_data, notifications, views
+from backend.services import jobs as job_service
 from backend.services import privacy as privacy_service
 from backend.services import review as review_service
 from backend.services import sis as sis_service
@@ -193,7 +194,24 @@ def stats(request: Request, user: User = Admin, session: Session = Depends(get_d
         retention_days=get_settings().privacy_deletion_days,
         reminders=views.reminder_preview(session, user),
         reminder_hour=get_settings().reminder_hour_utc,
+        jobs=views.job_health(session, user),
     )
+
+
+@router.post("/jobs/{job_id}/retry")
+def retry_job(
+    request: Request, job_id: int, csrf_token: str = Form(""), user: User = Admin, session: Session = Depends(get_db)
+) -> Response:
+    """격리·실패한 분석 작업을 다시 처리한다 (리뷰 v3 P1-3). 이전 분석·판정은 덮어쓰지 않는다."""
+    check_csrf(request, csrf_token)
+    job = job_service.requeue(session, user, job_id)
+    task = tasks.REQUEUEABLE.get(job.job_type)
+    if task is None:
+        flash(request, tr("다시 처리할 수 없는 작업이에요."), "error")
+    else:
+        task.apply_async(args=job.task_args, kwargs={"job_id": job.id})
+        flash(request, tr("작업을 다시 처리하도록 넣었어요. 결과는 이 화면의 작업 처리 현황에 나와요."))
+    return RedirectResponse("/admin/stats#jobs", status_code=303)
 
 
 @router.get("/privacy")

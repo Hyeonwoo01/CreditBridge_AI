@@ -4,6 +4,7 @@ from backend.models.appeal import Appeal
 from backend.models.appeal_file import AppealFile
 from backend.models.assignment import Assignment
 from backend.models.audit_log import AuditLog
+from backend.models.background_job import BackgroundJob
 from backend.models.course import Course
 from backend.models.course_evaluation import CourseEvaluation
 from backend.models.credit_allocation import CreditAllocation
@@ -35,6 +36,7 @@ __all__ = [
     "AppealFile",
     "Assignment",
     "AuditLog",
+    "BackgroundJob",
     "Course",
     "CourseEvaluation",
     "CreditAllocation",

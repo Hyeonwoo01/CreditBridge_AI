@@ -47,7 +47,7 @@ from backend.repositories import evaluations as evaluation_repo
 from backend.repositories import policies as policy_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
-from backend.services import analysis, audit, csv_import, notifications, review
+from backend.services import analysis, audit, csv_import, jobs, notifications, review
 from backend.services import policy as policy_service
 from backend.services.auth import RESET_AFTER, ensure_not_demo, hash_password, temporary_password, unusable_password
 
@@ -568,6 +568,7 @@ def process_reference(
     try:
         doc = analysis.document_to_text(llm, storage.get(syllabus.source_file_key), syllabus.original_filename)
     except (CreditBridgeError, LLMError) as exc:
+        jobs.note_error(exc)  # 작업 기록에 오류 종류를 남긴다 (리뷰 v3 P1-3)
         logger.warning("reference syllabus failed", extra={"syllabus_id": syllabus_id, "error": type(exc).__name__})
         doc = analysis.DocumentText("", 0.0, [])
         if isinstance(exc, LLMNotConfiguredError):  # 스캔본은 AI로 전사하는데 설정이 없다

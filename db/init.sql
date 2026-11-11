@@ -913,5 +913,32 @@ ALTER TABLE decisions ADD COLUMN review_checklist JSONB;
 
 UPDATE alembic_version SET version_num='0016' WHERE alembic_version.version_num = '0015';
 
+-- Running upgrade 0016 -> 0017
+
+CREATE TABLE background_jobs (
+    institution_id BIGINT, 
+    job_type VARCHAR(40) NOT NULL, 
+    subject_type VARCHAR(20) NOT NULL, 
+    subject_id BIGINT NOT NULL, 
+    status VARCHAR(12) NOT NULL, 
+    attempt_count INTEGER NOT NULL, 
+    error_code VARCHAR(60) NOT NULL, 
+    started_at TIMESTAMP WITHOUT TIME ZONE, 
+    completed_at TIMESTAMP WITHOUT TIME ZONE, 
+    duration_ms INTEGER, 
+    task_args JSONB NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_background_jobs PRIMARY KEY (id), 
+    CONSTRAINT ck_background_jobs_status_valid CHECK (status IN ('queued', 'running', 'succeeded', 'retry_wait', 'failed', 'dead_letter')), 
+    CONSTRAINT fk_background_jobs_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id)
+);
+
+CREATE INDEX ix_background_jobs_institution_created ON background_jobs (institution_id, created_at);
+
+CREATE INDEX ix_background_jobs_status ON background_jobs (status);
+
+UPDATE alembic_version SET version_num='0017' WHERE alembic_version.version_num = '0016';
+
 COMMIT;
 

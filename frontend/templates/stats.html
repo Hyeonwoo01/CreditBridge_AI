@@ -79,6 +79,37 @@
 </section>
 {% endif %}
 
+{% if jobs %}
+{# 작업 처리 현황 (리뷰 v3 P1-3): 최근 7일 분석 작업. 일시 오류는 자동으로 다시 하고, 다 써도 안 되면 격리 #}
+<section id="jobs" class="mt-10 card grid scroll-mt-20 gap-4 p-5" aria-labelledby="jobs-title">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="jobs-title" class="font-semibold">{{ _("작업 처리 현황") }}</h2>
+    <span class="text-sm text-muted">{{ _("최근 7일 AI 분석 작업 · 일시 오류는 최대 3번 자동 재시도") }}</span>
+  </div>
+  <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    {% set rate = jobs.success_rate %}
+    {% for label, value in [(_('작업'), jobs.total), (_('성공률'), ('%d%%' | format(rate * 100)) if rate is not none else '–'), (_('처리 시간 중앙값'), ('%.1f' | format(jobs.p50_ms / 1000)) ~ 's' if jobs.p50_ms is not none else '–'), (_('처리 시간 상위 5%'), ('%.1f' | format(jobs.p95_ms / 1000)) ~ 's' if jobs.p95_ms is not none else '–'), (_('재시도한 작업'), jobs.retried)] %}
+    <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ label }}</dt><dd class="text-[22px] leading-tight font-semibold tabular-nums" data-job-metric="{{ loop.index }}">{{ value }}</dd></div>
+    {% endfor %}
+  </dl>
+  {% if jobs.attention %}
+  <ul class="grid divide-y divide-hairline rounded-lg border border-hairline bg-white text-sm">
+    {% for j in jobs.attention %}
+    <li class="flex flex-wrap items-center gap-3 px-4 py-3" data-job="{{ j.id }}">
+      <span class="badge {{ 'text-reject' if j.status == 'dead_letter' else '' }}">{{ j.status | job_status }}</span>
+      <span class="font-semibold">{{ j.job_type }}</span>
+      <span class="text-muted">{{ _("#{id} · 시도 {n}회", id=j.subject_id, n=j.attempt_count) }}</span>
+      <span class="min-w-0 flex-1 text-muted">{{ j.error_code | job_error }}</span>
+      <form method="post" action="/admin/jobs/{{ j.id }}/retry"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-secondary btn-sm">{{ _("다시 처리") }}</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-muted">{{ _("격리되거나 실패한 작업이 없어요.") }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="mt-10 grid gap-4" aria-label="{{ _('학과별 심사 처리 지표') }}">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 class="section-title">{{ _("학과별 심사 처리 지표") }}</h2>

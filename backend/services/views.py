@@ -49,6 +49,7 @@ from backend.services import decisions as decision_service
 from backend.services import evidence_feedback as feedback_service
 from backend.services import evidence_status as evidence_service
 from backend.services import institution_data as institution_service
+from backend.services import jobs as job_service
 from backend.services import materials as material_service
 from backend.services import notes as note_service
 from backend.services import notifications as notification_service
@@ -614,6 +615,13 @@ def reminder_preview(session: Session, user: User) -> reminder_service.Plan:
     if user.role not in (Role.EVALUATOR, Role.ADMIN) or user.institution_id is None:
         raise PermissionDeniedError(tr("심사관과 기관 관리자만 볼 수 있어요."))
     return reminder_service.plan(session, user.institution_id)
+
+
+def job_health(session: Session, user: User) -> job_service.Health:
+    """관리자 콘솔 '작업 처리 현황' (리뷰 v3 P1-3): 최근 7일 분석 작업 성공률·처리 시간·재시도, 격리·실패 작업."""
+    if user.role != Role.ADMIN or user.institution_id is None:
+        raise PermissionDeniedError(tr("기관 관리자만 볼 수 있어요."))
+    return job_service.health(session, user.institution_id)
 
 
 def export_rows(session: Session, evaluator: User) -> list[dict[str, Any]]:

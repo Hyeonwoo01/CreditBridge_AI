@@ -178,3 +178,14 @@ class SisSyncStatus(StrEnum):
     PENDING = "pending"  # 관리자가 '다시 보내기'로 되돌림
     APPLIED = "applied"
     FAILED = "failed"
+
+
+class JobStatus(StrEnum):
+    """백그라운드 작업 상태 (리뷰 v3 P1-3)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    RETRY_WAIT = "retry_wait"  # 일시 오류, 잠시 뒤 다시
+    FAILED = "failed"  # 다시 해도 안 되는 오류 (파일·설정을 고쳐야 함)
+    DEAD_LETTER = "dead_letter"  # 재시도를 다 써서 격리, 운영자가 원인을 보고 다시 처리

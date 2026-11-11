@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (31개)
+## 1. 엔티티 한눈에 보기 (32개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -39,6 +39,7 @@
 | | `push_subscriptions` | 웹 푸시를 받는 기기(브라우저) 구독 | FR-20 |
 | | `sis_syncs` | 판정의 학사정보시스템 반영 결과 (반영됨·실패·다시 보내기 대기) | FR-24, 리뷰 v3 P1-4 |
 | | `sis_ack_requests` | 반영 결과 요청의 Idempotency-Key와 처음 응답 | FR-24, 리뷰 v3 P1-4 |
+| | `background_jobs` | 백그라운드 분석 작업의 상태·시도·오류 코드·처리 시간 (재시도·격리·다시 처리) | 리뷰 v3 P1-3 |
 | | `audit_logs` | 주요 행위 기록 (추가 전용) | FR-10 |
 
 ## 2. ER 다이어그램
@@ -538,6 +539,8 @@ erDiagram
 **sis_syncs** — 판정 하나가 학사정보시스템에 반영됐는지 (Alembic 0015, 리뷰 v3 P1-4). `decision_id` FK→decisions UQ(`uq_sis_syncs_decision`, 판정당 한 행), `institution_id` FK(IX), `status` VARCHAR(10)(pending·applied·failed, CHECK, IX — 행이 없으면 대기), `external_reference_id` VARCHAR(100) null(SIS 쪽 기록 번호), `attempts` INT(실패로 보고된 횟수), `last_error` TEXT, `acknowledged_at`(마지막 결과를 받은 시각), `created_at`, `updated_at`. 판정은 추가 전용이라 반영 상태는 이 표에 둔다. 이미 반영된 판정에 다른 번호가 오면 고치지 않고 대사 불일치로 알린다.
 
 **sis_ack_requests** — 반영 결과 요청의 Idempotency-Key (Alembic 0015). `institution_id` FK, `idempotency_key` VARCHAR(100), (`institution_id`, `idempotency_key`) UQ, `request_hash` VARCHAR(64)(같은 키에 다른 내용이면 409), `response` JSONB(처음 응답 — 같은 키로 다시 오면 그대로 돌려줌), `created_at`.
+
+**background_jobs** — 백그라운드 분석 작업 하나 (Alembic 0017, 리뷰 v3 P1-3). `institution_id` FK null(`institution_id, created_at` 복합 IX), `job_type` VARCHAR(40)(syllabus.process·syllabus.supplement·syllabus.evaluate·transcript.process_student·reference.process), `subject_type` VARCHAR(20)(syllabus·student)·`subject_id`(대상 id, 외래키 없음), `status` VARCHAR(12)(queued·running·succeeded·retry_wait·failed·dead_letter, CHECK, IX), `attempt_count`, `error_code` VARCHAR(60)(llm_rate_limit·llm_timeout·llm_connection·llm_server·llm_invalid_output·llm_refusal·llm_error·not_configured·document_unreadable·task_timeout·unexpected:예외 이름), `started_at`·`completed_at`, `duration_ms`(마지막 시도), `task_args` JSONB(다시 처리할 인자: id·파일 키만), `created_at`. 일시 오류는 최대 3번 지수 간격으로 다시 하고 넘기면 격리, 다시 해도 안 되는 오류는 곧바로 실패. 문서 내용·이름은 넣지 않는다.
 
 **audit_logs** — 추가 전용(INSERT만). `actor_id` FK→users null(시스템 행위는 null, `actor_id, action` 복합 IX), `action` VARCHAR(50)(IX), `target_type` VARCHAR(50)·`target_id` VARCHAR(36)(대상, 외래키 없음, `target_type, target_id` 복합 IX), `payload_json` JSONB(id·판정값만, 이름·학번·성적 없음).
 

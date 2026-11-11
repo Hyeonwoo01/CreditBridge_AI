@@ -11,6 +11,7 @@ from markupsafe import Markup, escape
 from backend.config import get_settings
 from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
+from backend.services import jobs as job_service
 from backend.services import review_frameworks
 from backend.services.case_state import LABELS as CASE_STATE_LABELS
 from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
@@ -153,6 +154,16 @@ def policy_value(params: Mapping[str, Any]) -> str:
     return gettext("{n}학점", n=params.get("credits", "–"))
 
 
+JOB_STATUS_LABELS = {
+    "queued": N_("대기"),
+    "running": N_("실행 중"),
+    "succeeded": N_("성공"),
+    "retry_wait": N_("재시도 대기"),
+    "failed": N_("실패"),
+    "dead_letter": N_("격리"),
+}
+
+
 def _label(table: Mapping[Any, str], value: str | None, default: str | None = None) -> str:
     """코드값의 화면 이름을 현재 언어로 (모르는 값은 그대로)."""
     text = table.get(value or "", default if default is not None else (value or ""))
@@ -172,6 +183,8 @@ TEMPLATES.env.filters.update(
     source_kind=lambda v: _label(SOURCE_LABELS, v),
     authenticity=lambda v: _label(AUTHENTICITY_LABELS, v),
     case_state=lambda v: _label(CASE_STATE_LABELS, v),
+    job_status=lambda v: _label(JOB_STATUS_LABELS, v),
+    job_error=lambda v: _label(job_service.ERROR_LABELS, v),
     checklist_item=lambda item, framework: gettext(review_frameworks.label(framework, item)),
     applicability=lambda v: _label(APPLICABILITY_LABELS, v),
     policy_value=policy_value,

@@ -151,6 +151,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M10 | POST | `/admin/privacy/{id}` | 관리자 | `csrf_token` | 303→M9 | P08 | FR-13 |
 | M11 | GET | `/admin/sis` | 관리자 | – | HTML | P15 | FR-24 |
 | M12 | POST | `/admin/sis` | 관리자 | `action`(issue·revoke), `csrf_token` | HTML(새 토큰 한 번만) / 303 | P15 | FR-24 |
+| M28 | POST | `/admin/jobs/{id}/retry` | 관리자(소속 기관 작업) | `csrf_token` | 303→M1`#jobs` (격리·실패한 분석 작업을 같은 작업 기록으로 다시 넣음, 이전 분석·판정은 덮어쓰지 않음) / 403(다른 기관·성공한 작업) | P10 | 리뷰 v3 P1-3 |
 | M27 | POST | `/admin/sis/retry` | 관리자 | `decision_ids[]`(반영 실패한 판정), `csrf_token` | 303→M11`#reconciliation` (실패 → 다시 보내기 대기, SIS가 `status=unsent`로 다시 가져감) | P15 | 리뷰 v3 P1-4 |
 | M13 | GET | `/admin/audit` | 관리자 | `action`, `target_type`, `target_id`, `since`·`until`(UTC 날짜 YYYY-MM-DD), `page` | HTML (소속 기관 기록, 50건씩) | P16 | FR-10 |
 | M14 | GET | `/admin/accounts` | 관리자 | `q`(이메일 일부), `role`, `status`(active·inactive·all), `page` | HTML (50건씩, 학생 이름 없음) | P24 | FR-12 |
@@ -259,7 +260,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | P07 | R6 | `appeals.rows` | 접수된 이의 신청(과목·출신 대학·신청 시각·사유·근거 자료·원 판정, 학생 이름은 없음), 재판정 교수 후보 |
 | P08 | R8 · M9 | `privacy.rows` | 삭제 요청(요청 #·학생 이메일·기한·상태·기한 초과) |
 | P09 | R10 | `equivalencies.search` | 가져온 동등 과목표 검색 (출신 대학·출신 과목·대상 과목·판정, 50건씩) |
-| P10 | M1 · R12 | `stats.institution_stats`, `stats.recent_audit`(관리자), `views.reminder_preview` | 수용률·불일치율, 개인정보, SIS 상태, 처리 현황, 기한 알림, 학과별 지표, AI 근거 품질(프롬프트 버전별 인용 수·원문에 없어 버림·가르친 근거 아님·교수 확인 맞음 비율, `evidence_feedback.quality_by_prompt`), 월별 판정, 판정 구성, 최근 감사 로그 8건(관리자), 보존 정책 |
+| P10 | M1 · R12 | `stats.institution_stats`, `stats.recent_audit`(관리자), `views.reminder_preview`, `views.job_health`(관리자) | 수용률·불일치율, 개인정보, SIS 상태, 처리 현황, 기한 알림, 학과별 지표, AI 근거 품질(프롬프트 버전별 인용 수·원문에 없어 버림·가르친 근거 아님·교수 확인 맞음 비율, `evidence_feedback.quality_by_prompt`), 월별 판정, 판정 구성, 최근 감사 로그 8건(관리자), 보존 정책 |
 | P11 | F1 | `views.professor_items`, `views.professor_recent`, `views.colleagues` | 배정된 심사(재판정·대리 표시), 최근 판정한 심사 20건(판정 결과·재판정 결과·문서 삭제 종료), 부재 설정·대리 교수 후보 |
 | P13 | C1 · C2 | `views.evaluation_view(with_audit=True)` | 사람 판정·당시 AI 추천, 경과, AI 추천, 개념별 근거, 과거 판정, 감사 로그 |
 | P14 | A12 | `notifications.inbox`, `push.device_count` | 알림 50건씩 페이지 (저장된 한국어 원문을 화면 언어로), 푸시 받는 기기 수 |
