@@ -43,7 +43,7 @@ from backend.schemas.extraction import SyllabusExtraction
 from backend.schemas.results import CandidateResult, EvaluationResult, EvidenceView
 from backend.security.permissions import ensure_can_view_evaluation
 from backend.services import accounts as account_service
-from backend.services import ai_monitoring, case_state, review_frameworks
+from backend.services import ai_monitoring, case_state, degree_audit, review_frameworks
 from backend.services import appeals as appeal_service
 from backend.services import credits as credit_service
 from backend.services import decisions as decision_service
@@ -393,6 +393,7 @@ class StudentHome:
     unread_results: int = 0  # 아직 열어 보지 않은 판정 결과 알림
     total: StudentTotal | None = None  # 과목이 하나도 없으면 None
     transcript: StudentTranscript | None = None  # 계정 성적표 (과목 요청을 만드는 근거)
+    degree: degree_audit.Audit | None = None  # 졸업 요건 진행 (리뷰 v3 P1-6, 소속 대학이 있을 때)
 
     @property
     def todos(self) -> list[tuple[TransferRequest, student_service.Todo]]:
@@ -505,6 +506,7 @@ def student_home(session: Session, student: User) -> StudentHome:
         unread_results=notification_service.unread_of_kinds(session, student, notification_service.RESULT_KINDS),
         total=total,
         transcript=student_service.account_transcript(session, student),
+        degree=degree_audit.audit_for(session, student, total_inst.id, merged) if total_inst is not None else None,
     )
 
 

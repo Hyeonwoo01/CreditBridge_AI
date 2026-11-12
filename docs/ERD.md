@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (33개)
+## 1. 엔티티 한눈에 보기 (35개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -16,6 +16,8 @@
 | | `users` | 학생·심사관·교수·관리자 계정 | FR-12·19 |
 | | `courses` | 대상 대학 카탈로그 과목과 필수 개념 | FR-05 |
 | | `catalog_imports` | 과목 카탈로그 가져오기 (검증 → 바뀌는 점 확인 → 게시, 출처·적용 학년도·게시자) | 리뷰 v3 P1-2 |
+| | `degree_programs` | 졸업 프로그램 (학과·적용 입학연도별) | 리뷰 v3 P1-6 |
+| | `graduation_requirements` | 졸업 요건 (영역·필요 학점·해당 과목 코드) | 리뷰 v3 P1-6 |
 | 편입 요청·문서 | `student_transcripts` | 학생 계정의 성적표 (학생당 하나, 처음 들어오면 먼저 올림) | FR-02·13 |
 | | `transfer_requests` | 편입 학점 심사 요청 (성적표의 C 이상 과목마다 하나, 예전 방식은 여러 과목 묶음) | FR-15·21 |
 | | `syllabi` | 강의계획서(학생 업로드·대상 과목 기준)와 추출 결과 | FR-01·03·04·14·25 |
@@ -379,6 +381,10 @@ erDiagram
 ### 3.2 편입 요청·문서
 
 **catalog_imports** — 대상 대학 과목 카탈로그 가져오기 한 번 (Alembic 0018, 리뷰 v3 P1-2). `institution_id` FK(IX), `filename` VARCHAR(255), `file_hash` VARCHAR(64)(원본 SHA-256, 파일은 저장하지 않음), `source` TEXT(출처: 학사 편람·포털 주소), `catalog_year` INT null(적용 학년도 — 올린 날짜와 다름), `status` VARCHAR(10)(draft·published·discarded, CHECK, IX), `rows` JSONB(검증을 통과한 행), `changes` JSONB(added: 새 과목 코드, changed: 과목 코드 → 필드별 [이전, 새 값], unchanged: 그대로인 수 — 게시 직전에 다시 계산해 남김, 과목 버전 이력), `created_by` FK→users, `reviewed_by` FK→users null·`reviewed_at`(게시·버린 관리자와 시각), `created_at`. 게시 대기본은 기관마다 하나(새로 올리면 이전 대기본은 discarded). 게시 전 행은 AI 후보에 쓰이지 않는다.
+
+**degree_programs** — 졸업 프로그램 (Alembic 0019, 리뷰 v3 P1-6). `institution_id` FK(IX), `name` VARCHAR(200), `department_id` FK→departments null(모든 학과), `catalog_year` INT null(적용 입학연도, 1990~2100 CHECK, 모든 입학연도), `created_at`. 학생에게는 편입 전공(학과)·입학연도가 맞는 것 중 가장 구체적인 프로그램을 쓰고, 없거나 같은 구체성에서 둘 이상이면 미정.
+
+**graduation_requirements** — 졸업 요건 (Alembic 0019). `program_id` FK→degree_programs(IX), `area` VARCHAR(20)(major_required·major_elective·general_education·free_elective, CHECK), `name` VARCHAR(200), `required_credits` DECIMAL(5,1)(>0, 대상 대학 단위), `course_codes` JSONB(요건을 채우는 대상 과목 코드), `sort` INT, `created_at`. 학생 홈에서 승인된 배분 원장(credit_allocations)의 줄마다 대상 과목이 목록에 있으면 그 요건, 아니면 일반 선택에 배정하고 필요 학점을 넘는 학점은 일반 선택으로 넘긴다(같은 학점을 두 요건에 세지 않음, 계산 결과는 저장하지 않음).
 
 **student_transcripts** — 학생 계정의 성적표 (학생당 하나, Alembic 0007). 처음 들어오면 먼저 올리고, 과목 줄을 뽑으면 성적이 C 이상인 과목마다 편입 요청을 만든다. 요청 문서를 삭제해도 계정 성적표는 남는다.
 

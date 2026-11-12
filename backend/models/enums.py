@@ -197,3 +197,12 @@ class CatalogImportStatus(StrEnum):
     DRAFT = "draft"  # 검증 통과, 게시 대기 (AI 후보에 쓰이지 않음)
     PUBLISHED = "published"
     DISCARDED = "discarded"
+
+
+class RequirementArea(StrEnum):
+    """졸업 요건 영역 (리뷰 v3 P1-6)."""
+
+    MAJOR_REQUIRED = "major_required"
+    MAJOR_ELECTIVE = "major_elective"
+    GENERAL_EDUCATION = "general_education"
+    FREE_ELECTIVE = "free_elective"

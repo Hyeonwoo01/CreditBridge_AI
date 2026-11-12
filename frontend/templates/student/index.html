@@ -85,6 +85,37 @@
 </section>
 {% endif %}
 
+{% if home.degree %}
+{% set dg = home.degree %}
+{# 졸업 요건 (리뷰 v3 P1-6): 확정 인정 학점과 심사 중 예상 학점을 요건별로. 공식 졸업 판정이 아니다 #}
+<section class="mt-10 grid gap-3" aria-labelledby="degree-title" data-degree>
+  <h2 id="degree-title" class="section-title">{{ _("졸업 요건") }}</h2>
+  {% if dg.program %}
+  <p class="text-sm text-muted">{{ _("{program} 기준 · 확정 인정 학점만 충족으로 세고, 심사 중 과목은 예상으로 따로 보여 줘요. 공식 졸업 판정은 학사 담당자의 확인이 필요해요.", program=dg.program.name) }}</p>
+  <div class="overflow-x-auto rounded-lg border border-hairline">
+    <table class="w-full text-sm">
+      <thead class="bg-parchment text-left text-xs text-muted"><tr><th class="px-3 py-2">{{ _("요건") }}</th><th class="px-3 py-2">{{ _("필요") }}</th><th class="px-3 py-2">{{ _("확정") }}</th><th class="px-3 py-2">{{ _("심사 중(예상)") }}</th><th class="px-3 py-2">{{ _("남음") }}</th><th class="px-3 py-2">{{ _("상태") }}</th></tr></thead>
+      <tbody class="divide-y divide-hairline">
+      {% for row in dg.rows %}
+      <tr data-requirement="{{ row.requirement.area }}">
+        <td class="px-3 py-2"><span class="font-semibold">{{ row.requirement.name }}</span> <span class="text-xs text-muted">{{ row.requirement.area | req_area }}</span>{% if row.courses %}<div class="text-xs text-muted">{{ row.courses | join(' · ') }}</div>{% endif %}</td>
+        <td class="px-3 py-2 tabular-nums">{{ '%g' | format(row.requirement.required_credits) }}</td>
+        <td class="px-3 py-2 tabular-nums font-semibold">{{ '%g' | format(row.confirmed) }}</td>
+        <td class="px-3 py-2 tabular-nums text-muted">{{ '%g' | format(row.pending) if row.pending else '–' }}</td>
+        <td class="px-3 py-2 tabular-nums">{{ '%g' | format(row.remaining) }}</td>
+        <td class="px-3 py-2"><span class="badge {{ 'text-approve' if row.status == 'satisfied' else '' }}" data-status="{{ row.status }}">{{ row.status | req_status }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if dg.unassigned %}<p class="text-sm text-elective">{{ _("어느 요건에도 넣지 못한 확정 학점 {n}학점이 있어요. 학사처에 문의해 주세요.", n=('%g' | format(dg.unassigned))) }}</p>{% endif %}
+  {% else %}
+  <p class="rounded-md bg-parchment p-4 text-sm">{{ _("졸업 요건: 미정") }} — {{ dg.unresolved_reason | t }} {{ _("졸업 가능 여부는 학사처에 확인해 주세요.") }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if home.todos or home.unread_results %}
 <section class="mt-10 grid gap-3" aria-labelledby="todo-title">
   <h2 id="todo-title" class="section-title">{{ _("할 일") }}</h2>

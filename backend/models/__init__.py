@@ -11,6 +11,7 @@ from backend.models.course_evaluation import CourseEvaluation
 from backend.models.credit_allocation import CreditAllocation
 from backend.models.credit_conversion_rule import CreditConversionRule
 from backend.models.decision import Decision
+from backend.models.degree_program import DegreeProgram, GraduationRequirement
 from backend.models.department import Department
 from backend.models.equivalency import Equivalency
 from backend.models.evaluation_note import EvaluationNote
@@ -44,11 +45,13 @@ __all__ = [
     "CreditAllocation",
     "CreditConversionRule",
     "Decision",
+    "DegreeProgram",
     "Department",
     "Equivalency",
     "EvaluationNote",
     "EvidenceFeedback",
     "EvidenceSpan",
+    "GraduationRequirement",
     "Institution",
     "InstitutionSource",
     "MaterialRequest",

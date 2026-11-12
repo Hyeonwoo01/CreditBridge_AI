@@ -136,6 +136,10 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | M2 | GET | `/admin/data` | 관리자 | – | HTML | P18 | – |
 | M3 | POST | `/admin/data/courses` | 관리자 | `file`(CSV), `source`(출처), `catalog_year`(적용 학년도), `csrf_token` | 303→M2`#catalog-review` (검증을 통과하면 게시 대기본을 만들고 카탈로그는 아직 바꾸지 않음, 이전 대기본은 버림) / 422(행 오류) | P18 | 리뷰 v3 P1-2 |
 | M29 | POST | `/admin/data/imports/{id}/{action}` | 관리자(소속 기관) | `action`(publish·discard), `csrf_token` | 303→M2`#courses` (게시하면 과목 반영·과목마다 출처 기록, 버리면 그대로) / 플래시(이미 게시·버림) / 403·404 | P18 | 리뷰 v3 P1-2 |
+| M30 | POST | `/admin/data/programs` | 관리자 | `name`, `department`(빈 값=모든 학과), `catalog_year`(적용 입학연도, 빈 값=모두), `csrf_token` | 303→M2`#degree` | P18 | 리뷰 v3 P1-6 |
+| M31 | POST | `/admin/data/programs/{id}/requirements` | 관리자(소속 기관) | `area`(major_required·major_elective·general_education·free_elective), `name`, `credits`(0~300), `course_codes`(쉼표, 카탈로그에 있는 코드만), `csrf_token` | 303→M2`#degree` / 플래시(없는 과목 코드) | P18 | 리뷰 v3 P1-6 |
+| M32 | POST | `/admin/data/programs/{id}/remove` | 관리자(소속 기관) | `csrf_token` | 303→M2`#degree` (요건과 함께 지움) | P18 | 리뷰 v3 P1-6 |
+| M33 | POST | `/admin/data/requirements/{id}/remove` | 관리자(소속 기관) | `csrf_token` | 303→M2`#degree` | P18 | 리뷰 v3 P1-6 |
 | M4 | POST | `/admin/data/courses/{id}/reference` | 관리자 | `file`, `csrf_token` | 303→M2`#courses` | P18 | FR-05 |
 | M5 | POST | `/admin/data/accounts` | 관리자 | `file`(CSV), `csrf_token` | HTML(결과 카드, 임시 비밀번호는 한 번만) / 422 | P18 | FR-12 |
 | M6 | POST | `/admin/data/password-reset` | 관리자 | `email`, `csrf_token` | 303 또는 HTML(임시 비밀번호 한 번만) | P18 | – |
@@ -253,7 +257,7 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- |
 | P00 | A13 · A14 · 각 화면 | `notifications.unread_count`, `stats.workspace_counts`, `views.nav_badges` | 안 읽은 알림 수, 기관 집계 칩, 메뉴 숫자 배지 |
 | P01·P19·P20 | A2 · A6 · A8 · A10 | – | 폼만 (P20 재설정은 토큰 유효성) |
-| P02 | S1 | `views.student_home` | 할 일, 전체 합계(요청을 합친 예상 인정 학점·판정 확정 수·남은 학기, 편입 학점 상한으로 자름, 졸업 학점에 넣을 과목 선택), 성적표 과목 요청 목록(과목·성적·학점), 요청별 예상 인정 학점·판정 확정 수·서류 준비율, 계정 성적표 상태, 소속 대학·출신 대학·전공 |
+| P02 | S1 | `views.student_home`, `degree_audit.audit_for` | 할 일, 전체 합계(요청을 합친 예상 인정 학점·판정 확정 수·남은 학기, 편입 학점 상한으로 자름, 졸업 학점에 넣을 과목 선택), 성적표 과목 요청 목록(과목·성적·학점), 요청별 예상 인정 학점·판정 확정 수·서류 준비율, 계정 성적표 상태, 소속 대학·출신 대학·전공 |
 | P26 | S2 | `student.account_transcript` | 계정 성적표 상태·올린 날·마스킹 이름·과목 줄(성적 기준 미달 표시) |
 | P03 | S3 | `views.request_view` (+ `student.simulate`) | 예상 학점·학기·비용, 과목 카드(추천·커버리지·대응 과목·판정 교수·담당 교수·심사 단계·보완 요청), 성적표 과목 연결, 진행 단계, 삭제 요청 상태 |
 | P04·P06·P12 | S10 · R4 · F3 | `views.evaluation_view` | 추천·신뢰도·커버리지·후보 과목, 판정·이의 신청·보완 요청 경과, 이전 분석과 비교, 경고, 정보 부족 진단, 개념별 근거(원본 쪽), 원문, 추출 정보, 과거 판정 이력, 내부 메모(교직원), 처리 기록(심사관), 대상 과목 목록·근거 구절 id와 내가 누른 맞음·틀림(교수) |

@@ -18,6 +18,8 @@ from backend.models import (
     CourseEvaluation,
     CreditConversionRule,
     Decision,
+    DegreeProgram,
+    GraduationRequirement,
     Institution,
     InstitutionSource,
     PolicyRule,
@@ -26,7 +28,15 @@ from backend.models import (
     TransferRequest,
     User,
 )
-from backend.models.enums import Authenticity, ConversionMethod, CreditSystem, PolicyRuleType, PolicyStatus, SourceKind
+from backend.models.enums import (
+    Authenticity,
+    ConversionMethod,
+    CreditSystem,
+    PolicyRuleType,
+    PolicyStatus,
+    RequirementArea,
+    SourceKind,
+)
 from backend.services.analysis import content_hash
 from backend.services.auth import hash_password
 from backend.services.institution_data import department_named
@@ -162,6 +172,28 @@ def seed(session: Session) -> None:
                 created_by=admin.id,
                 approved_by=admin.id,
                 approved_at=utcnow(),
+            )
+        )
+    # 졸업 요건 예시 (리뷰 v3 P1-6): 컴퓨터공학 학사. 학생 홈 '졸업 요건'에 확정 인정 학점이 요건별로 보인다
+    program = DegreeProgram(
+        institution_id=msu.id,
+        name="B.S. Computer Science and Engineering",
+        department_id=department_named(session, msu.id, cse).id,
+    )
+    session.add(program)
+    session.flush()
+    for sort, (area, name, credits, codes) in enumerate(
+        (
+            (RequirementArea.MAJOR_REQUIRED, "Math core", 8, ["MATH 1151", "MATH 1172", "MATH 2568"]),
+            (RequirementArea.MAJOR_REQUIRED, "CSE core", 8, ["CSE 1222", "CSE 2231", "CSE 2321"]),
+            (RequirementArea.GENERAL_EDUCATION, "Natural science", 4, ["PHYSICS 1250", "CHEM 1210"]),
+            (RequirementArea.GENERAL_EDUCATION, "Humanities", 6, ["ENGLISH 1110", "HISTORY 1151"]),
+            (RequirementArea.FREE_ELECTIVE, "Free electives", 12, []),
+        )
+    ):
+        session.add(
+            GraduationRequirement(
+                program_id=program.id, area=area, name=name, required_credits=credits, course_codes=codes, sort=sort
             )
         )
     professors = {

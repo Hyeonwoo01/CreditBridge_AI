@@ -224,6 +224,45 @@
 </section>
 
 {# 학칙 정책 (리뷰 v3 P0-4): 승인된 규칙만 적용, 범위가 구체적인 규칙이 우선, 맞는 규칙이 없으면 미정(기본값 없음) #}
+{# 졸업 요건 (리뷰 v3 P1-6): 학과·적용 입학연도별 프로그램과 요건. 학생 홈에서 확정 인정 학점을 요건에 배정해 보여 준다 #}
+<section id="degree" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="degree-title">
+  <h2 id="degree-title" class="section-title">{{ _("졸업 요건") }}</h2>
+  <p class="text-sm text-muted">{{ _("학과·적용 입학연도별 졸업 프로그램과 요건(영역·필요 학점·해당 과목)을 정해요. 학생 홈에서 확정 인정 학점을 요건 하나에만 배정해 보여 주고(목록에 있는 과목은 그 요건, 나머지와 넘친 학점은 일반 선택), 맞는 프로그램이 없으면 '미정'으로 둬요. 공식 졸업 판정을 대신하지 않아요.") }}</p>
+  {% for pv in programs %}
+  <div class="card grid gap-3" data-program="{{ pv.program.id }}">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="font-semibold">{{ pv.program.name }} <span class="text-sm font-normal text-muted">{{ _("· {dept} · {year}", dept=(pv.department or _('모든 학과')), year=(pv.program.catalog_year or _('모든 입학연도'))) }}</span></h3>
+      <form method="post" action="/admin/data/programs/{{ pv.program.id }}/remove" data-confirm="{{ _('이 졸업 프로그램과 요건을 지울까요? 학생 화면의 졸업 요건이 미정이 될 수 있어요.') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-text text-sm">{{ _("지우기") }}</button></form>
+    </div>
+    {% if pv.requirements %}
+    <ul class="grid divide-y divide-hairline rounded-md border border-hairline text-sm">
+      {% for rq in pv.requirements %}
+      <li class="flex flex-wrap items-center gap-3 px-4 py-2"><span class="badge">{{ rq.area | req_area }}</span><span class="font-semibold">{{ rq.name }}</span><span class="tabular-nums">{{ _("{n}학점", n=('%g' | format(rq.required_credits))) }}</span><span class="min-w-0 flex-1 font-mono text-[13px] text-muted">{{ rq.course_codes | join(', ') }}</span>
+        <form method="post" action="/admin/data/requirements/{{ rq.id }}/remove"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-text text-sm">{{ _("빼기") }}</button></form></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <form method="post" action="/admin/data/programs/{{ pv.program.id }}/requirements" class="grid gap-2 md:grid-cols-2 md:items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="field"><span>{{ _("영역") }}</span><select name="area" class="input h-11">{% for a in requirement_areas %}<option value="{{ a }}">{{ a | req_area }}</option>{% endfor %}</select></label>
+      <label class="field"><span>{{ _("요건 이름") }}</span><input class="input h-11" name="name" maxlength="200"></label>
+      <label class="field"><span>{{ _("필요 학점") }}</span><input class="input h-11" name="credits" inputmode="decimal" maxlength="5" required></label>
+      <label class="field"><span>{{ _("해당 과목 코드") }} <span class="text-muted">{{ _("(쉼표로, 선택)") }}</span></span><input class="input h-11" name="course_codes" placeholder="MATH 1151, MATH 1172"></label>
+      <button class="btn-secondary h-11">{{ _("요건 추가") }}</button>
+    </form>
+  </div>
+  {% else %}
+  <p class="text-sm text-muted">{{ _("등록된 졸업 프로그램이 없어요. 학생 화면의 졸업 요건은 '미정'으로 보여요.") }}</p>
+  {% endfor %}
+  <form method="post" action="/admin/data/programs" class="card grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="field"><span>{{ _("프로그램 이름") }}</span><input class="input h-11" name="name" maxlength="200" required placeholder="{{ _('예: 컴퓨터공학 학사') }}"></label>
+    <label class="field"><span>{{ _("학과 (비우면 모든 학과)") }}</span><select name="department" class="input h-11"><option value="">{{ _("모든 학과") }}</option>{% for d in policies.departments.values() | sort %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
+    <label class="field"><span>{{ _("적용 입학연도") }}</span><input class="input h-11" name="catalog_year" inputmode="numeric" maxlength="4" placeholder="{{ _('비우면 모두') }}"></label>
+    <button class="btn-primary h-11">{{ _("프로그램 추가") }}</button>
+  </form>
+</section>
+
 <section id="policies" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="policy-title">
   <h2 id="policy-title" class="section-title">{{ _("학칙 정책") }}</h2>
   <p class="text-sm text-muted">{{ _("인정 최저 성적·편입 학점 상한·졸업 학점·학기당 이수 학점을 학칙대로 정해요. 초안을 만든 뒤 승인해야 적용되고, 학과·입학연도를 정한 규칙이 대학 전체 규칙보다 우선해요. 맞는 규칙이 없으면 기본값 없이 '미정'으로 두고 그 값은 계산하지 않아요. 승인한 규칙은 고치지 않고 끝낸 뒤 새로 만들어요(지난 판정에 남은 정책 기록은 그대로).") }}</p>

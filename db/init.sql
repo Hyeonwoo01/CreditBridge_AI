@@ -973,5 +973,41 @@ ALTER TABLE courses ADD CONSTRAINT fk_courses_catalog_import_id_catalog_imports 
 
 UPDATE alembic_version SET version_num='0018' WHERE alembic_version.version_num = '0017';
 
+-- Running upgrade 0018 -> 0019
+
+CREATE TABLE degree_programs (
+    institution_id BIGINT NOT NULL, 
+    name VARCHAR(200) NOT NULL, 
+    department_id BIGINT, 
+    catalog_year INTEGER, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_degree_programs PRIMARY KEY (id), 
+    CONSTRAINT ck_degree_programs_catalog_year_range CHECK (catalog_year IS NULL OR catalog_year BETWEEN 1990 AND 2100), 
+    CONSTRAINT fk_degree_programs_department_id_departments FOREIGN KEY(department_id) REFERENCES departments (id), 
+    CONSTRAINT fk_degree_programs_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id)
+);
+
+CREATE INDEX ix_degree_programs_institution_id ON degree_programs (institution_id);
+
+CREATE TABLE graduation_requirements (
+    program_id BIGINT NOT NULL, 
+    area VARCHAR(20) NOT NULL, 
+    name VARCHAR(200) NOT NULL, 
+    required_credits NUMERIC(5, 1) NOT NULL, 
+    course_codes JSONB NOT NULL, 
+    sort INTEGER NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_graduation_requirements PRIMARY KEY (id), 
+    CONSTRAINT ck_graduation_requirements_area_valid CHECK (area IN ('major_required', 'major_elective', 'general_education', 'free_elective')), 
+    CONSTRAINT ck_graduation_requirements_required_credits_positive CHECK (required_credits > 0), 
+    CONSTRAINT fk_graduation_requirements_program_id_degree_programs FOREIGN KEY(program_id) REFERENCES degree_programs (id)
+);
+
+CREATE INDEX ix_graduation_requirements_program_id ON graduation_requirements (program_id);
+
+UPDATE alembic_version SET version_num='0019' WHERE alembic_version.version_num = '0018';
+
 COMMIT;
 

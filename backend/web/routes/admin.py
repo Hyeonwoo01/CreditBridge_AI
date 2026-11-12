@@ -15,11 +15,11 @@ from backend.documents.storage import get_storage
 from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
 from backend.i18n import gettext as tr
 from backend.models import User
-from backend.models.enums import ConversionMethod, CreditSystem, Role
+from backend.models.enums import ConversionMethod, CreditSystem, RequirementArea, Role
 from backend.security.csrf import check_csrf
 from backend.security.session import require
 from backend.services import accounts as account_service
-from backend.services import ai_monitoring, institution_data, notifications, views
+from backend.services import ai_monitoring, degree_audit, institution_data, notifications, views
 from backend.services import auth as auth_service
 from backend.services import jobs as job_service
 from backend.services import privacy as privacy_service
@@ -305,6 +305,8 @@ def _data_page(request: Request, user: User, session: Session, status_code: int 
         email_enabled=notifications.email_enabled(),
         credit_rules=institution_data.conversion_rules(session, user),
         policies=institution_data.policy_overview(session, user),
+        programs=degree_audit.programs_view(session, user),
+        requirement_areas=list(RequirementArea),
         credit_systems=list(CreditSystem),
         conversion_methods=list(ConversionMethod),
         today=utcnow().date(),
@@ -422,6 +424,79 @@ def catalog_import_action(
         session.rollback()
         flash(request, str(exc), "error")
     return RedirectResponse("/admin/data#courses", status_code=303)
+
+
+@router.post("/data/programs")
+def add_program(
+    request: Request,
+    name: str = Form(""),
+    department: str = Form(""),
+    catalog_year: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """졸업 프로그램 추가 (리뷰 v3 P1-6)."""
+    check_csrf(request, csrf_token)
+    try:
+        degree_audit.add_program(session, user, name, department, catalog_year)
+        flash(request, tr("졸업 프로그램을 추가했어요. 요건을 넣어 주세요."))
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    return RedirectResponse("/admin/data#degree", status_code=303)
+
+
+@router.post("/data/programs/{program_id}/requirements")
+def add_requirement(
+    request: Request,
+    program_id: int,
+    area: str = Form(""),
+    name: str = Form(""),
+    credits: str = Form(""),
+    course_codes: str = Form(""),
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    try:
+        degree_audit.add_requirement(session, user, program_id, area, name, credits, course_codes)
+        flash(request, tr("졸업 요건을 추가했어요."))
+    except (NotFoundError, PermissionDeniedError):
+        raise
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
+    return RedirectResponse("/admin/data#degree", status_code=303)
+
+
+@router.post("/data/programs/{program_id}/remove")
+def remove_program(
+    request: Request,
+    program_id: int,
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    degree_audit.remove_program(session, user, program_id)
+    flash(request, tr("졸업 프로그램을 지웠어요."))
+    return RedirectResponse("/admin/data#degree", status_code=303)
+
+
+@router.post("/data/requirements/{requirement_id}/remove")
+def remove_requirement(
+    request: Request,
+    requirement_id: int,
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    check_csrf(request, csrf_token)
+    degree_audit.remove_requirement(session, user, requirement_id)
+    flash(request, tr("졸업 요건을 지웠어요."))
+    return RedirectResponse("/admin/data#degree", status_code=303)
 
 
 @router.post("/data/policies")

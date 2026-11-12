@@ -11,7 +11,7 @@ from markupsafe import Markup, escape
 from backend.config import get_settings
 from backend.i18n import LABELS, N_, get_locale, gettext, gettext_markup, translate_stored
 from backend.security.csrf import csrf_token
-from backend.services import ai_monitoring, review_frameworks
+from backend.services import ai_monitoring, degree_audit, review_frameworks
 from backend.services import jobs as job_service
 from backend.services.case_state import LABELS as CASE_STATE_LABELS
 from backend.services.credits import SYSTEM_LABELS as CREDIT_UNIT_LABEL
@@ -191,6 +191,8 @@ TEMPLATES.env.filters.update(
     authenticity=lambda v: _label(AUTHENTICITY_LABELS, v),
     case_state=lambda v: _label(CASE_STATE_LABELS, v),
     job_status=lambda v: _label(JOB_STATUS_LABELS, v),
+    req_area=lambda v: _label(degree_audit.AREA_LABELS, v),
+    req_status=lambda v: _label(degree_audit.STATUS_LABELS, v),
     catalog_field=lambda v: _label(CATALOG_FIELD_LABELS, v),
     ai_gate=lambda v: _label(ai_monitoring.GATE_LABELS, v),
     job_error=lambda v: _label(job_service.ERROR_LABELS, v),

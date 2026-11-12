@@ -29,8 +29,8 @@ SET SESSION AUTHORIZATION DEFAULT;
 
 ALTER TABLE public.institutions DISABLE TRIGGER ALL;
 
-INSERT INTO public.institutions (name, country, is_target, tuition_per_credit, degree_credits, sis_token_hash, id, created_at, max_transfer_credits, credit_system) VALUES ('Midwest State University', 'US', true, 1350, 120, NULL, 1, '2026-11-11 06:48:52.990865', NULL, 'us_semester');
-INSERT INTO public.institutions (name, country, is_target, tuition_per_credit, degree_credits, sis_token_hash, id, created_at, max_transfer_credits, credit_system) VALUES ('Hankuk University (한국대학교)', 'KR', false, NULL, NULL, NULL, 2, '2026-11-11 06:48:52.990875', NULL, 'kr_credit');
+INSERT INTO public.institutions (name, country, is_target, tuition_per_credit, degree_credits, sis_token_hash, id, created_at, max_transfer_credits, credit_system) VALUES ('Midwest State University', 'US', true, 1350, 120, NULL, 1, '2026-11-12 05:54:04.188557', NULL, 'us_semester');
+INSERT INTO public.institutions (name, country, is_target, tuition_per_credit, degree_credits, sis_token_hash, id, created_at, max_transfer_credits, credit_system) VALUES ('Hankuk University (한국대학교)', 'KR', false, NULL, NULL, NULL, 2, '2026-11-12 05:54:04.188566', NULL, 'kr_credit');
 
 
 ALTER TABLE public.institutions ENABLE TRIGGER ALL;
@@ -41,13 +41,13 @@ ALTER TABLE public.institutions ENABLE TRIGGER ALL;
 
 ALTER TABLE public.departments DISABLE TRIGGER ALL;
 
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Mathematics', 1, '2026-11-11 06:48:53.007162');
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Physics', 2, '2026-11-11 06:48:53.032925');
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Chemistry', 3, '2026-11-11 06:48:53.042117');
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Computer Science and Engineering', 4, '2026-11-11 06:48:53.047976');
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'English', 5, '2026-11-11 06:48:53.066589');
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'History', 6, '2026-11-11 06:48:53.071577');
-INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Retired', 7, '2026-11-11 06:48:54.0954');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Mathematics', 1, '2026-11-12 05:54:04.200445');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Physics', 2, '2026-11-12 05:54:04.219238');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Chemistry', 3, '2026-11-12 05:54:04.224395');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Computer Science and Engineering', 4, '2026-11-12 05:54:04.229023');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'English', 5, '2026-11-12 05:54:04.242674');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'History', 6, '2026-11-12 05:54:04.247377');
+INSERT INTO public.departments (institution_id, name, id, created_at) VALUES (1, 'Retired', 7, '2026-11-12 05:54:05.115476');
 
 
 ALTER TABLE public.departments ENABLE TRIGGER ALL;
@@ -58,23 +58,33 @@ ALTER TABLE public.departments ENABLE TRIGGER ALL;
 
 ALTER TABLE public.users DISABLE TRIGGER ALL;
 
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('jiwon@student.example', '$argon2id$v=19$m=65536,t=3,p=4$0CsZ/dHmVI76obbd/1vTnA$fMAZlRwgew8NHbHn83Bze3PHr8HH7X1ABiC5e0VDtKI', '이지원', 'student', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 1, '2026-11-11 06:48:53.165804', 2, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('rachel@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$DDZXF840x+kAeQ+4tXh0fw$P6YPvQkcNh3zmeDpepB/KpeKTWVVdTiyol6ch8A9wyk', 'Rachel Morgan', 'evaluator', 1, NULL, NULL, NULL, false, 0, NULL, true, NULL, NULL, 2, '2026-11-11 06:48:53.244803', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('admin@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$/ChsqsSRSj9DSYPTcjJjmw$cG9EHbd6xqZvFOibzIxz148HEmtnzEIw1dyyqfYoNYo', 'MSU Admin', 'admin', 1, NULL, NULL, NULL, false, 0, NULL, true, NULL, NULL, 3, '2026-11-11 06:48:53.308508', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('dkim@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$6K7ssqNRKSflXSapkz3uWw$QZ5YWZyAzR5VgKZ76vj/rfBuRDN513vnVwdhqYF8UHs', 'Daniel Kim', 'professor', 1, 1, NULL, NULL, false, 0, NULL, true, NULL, NULL, 4, '2026-11-11 06:48:53.380619', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('lchen@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$NcaHrOHquwbsU9C+vNcn3Q$1vBIIA8AZ0Z5HFuoFt+7eTtwd/r/nsT9bG9ib81rADY', 'Laura Chen', 'professor', 1, 1, NULL, NULL, false, 0, NULL, true, NULL, NULL, 5, '2026-11-11 06:48:53.444453', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('oali@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$T/QMMMZ5wcMjXD25AOhiMQ$Co6YGtyYlFJWsW2yCmStsbUD/H+Xc3NUJVPyW4g16hA', 'Omar Ali', 'professor', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 6, '2026-11-11 06:48:53.516669', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('spark@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$iow/1yxeOYwHkFkKIGA/4A$Bov04+mMZHB55w3TBtrIhfjzgH1v87FQ2kgWifA2PrI', 'Sarah Park', 'professor', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 7, '2026-11-11 06:48:53.580807', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('mbrown@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$uudvjc9V0WKQ/meA+TONgw$eu3ySHYdMU3a5ygp7tmZbzqL1LOKb3c8sc1zP9wKKfU', 'Mike Brown', 'professor', 1, 2, NULL, NULL, false, 0, NULL, true, NULL, NULL, 8, '2026-11-11 06:48:53.676499', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('ewong@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$rnVri3cwV6sNhV9vcwNc/A$t9WHcrciNH7leg8cbNKmF8nu2wNca15iTUS7CP1iY9c', 'Emily Wong', 'professor', 1, 2, NULL, NULL, false, 0, NULL, true, NULL, NULL, 9, '2026-11-11 06:48:53.744698', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('alopez@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$2bLxUkRuaeHQjEbZ1qNQoQ$fx5WroJVc6z1kl7iiqpofyG2niDv4JO8m3/7DJqbXnA', 'Ana Lopez', 'professor', 1, 3, NULL, NULL, false, 0, NULL, true, NULL, NULL, 10, '2026-11-11 06:48:53.813406', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('jreed@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$VdSd47qGT25vkeaz6cPegQ$9JeCG5THqTYDl5HFYiTc76KmQ1SBT8LztRCe7LS+dU0', 'Jane Reed', 'professor', 1, 5, NULL, NULL, false, 0, NULL, true, NULL, NULL, 11, '2026-11-11 06:48:53.881348', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('twhite@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$4h3SdDfG0hgVbjaj/lGgoA$wwmR/H9hZRbVYkPksS/dV8UyNydlpKrNuXAQO3xFafs', 'Tom White', 'professor', 1, 6, NULL, NULL, false, 0, NULL, true, NULL, NULL, 12, '2026-11-11 06:48:53.946609', NULL, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('senior@student.example', '$argon2id$v=19$m=65536,t=3,p=4$O4r8JTdF+IdAvfOGJoYTuQ$V9ygLgqJdRfsgrhKjuVS0y4yLECw307mIyPSwOOjAVI', '선배 학생', 'student', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 13, '2026-11-11 06:48:54.022482', 2, NULL);
-INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('retired@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$JlNO7cct5SQFIxMJIV2XMg$JIO5ZtQ65sB32vKE2b8ZLuLbwvvubZXZVqsb4/ZEN/M', 'Prof. Emeritus Hall', 'professor', 1, 7, NULL, NULL, false, 0, NULL, true, NULL, NULL, 14, '2026-11-11 06:48:54.096386', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('jiwon@student.example', '$argon2id$v=19$m=65536,t=3,p=4$JuSw0PCZ7pZDXsIqniaH8Q$SmqmGj2ei6wrpVpA+c7gKZ8SHhT3wUokigfKN/DPzMQ', '이지원', 'student', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 1, '2026-11-12 05:54:04.309985', 2, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('rachel@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$39pzzimgDL9wTHr34iohGA$Pal/jCqHuT+k/b6TeigbI3Jwmx4HkujVp4LKzFhqDj8', 'Rachel Morgan', 'evaluator', 1, NULL, NULL, NULL, false, 0, NULL, true, NULL, NULL, 2, '2026-11-12 05:54:04.364267', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('admin@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$wckKhCRksz8zVi7wqTQL8Q$rhN0D/hymHdi68mSudiLdFLEc2vLI46DYbq648Cq67M', 'MSU Admin', 'admin', 1, NULL, NULL, NULL, false, 0, NULL, true, NULL, NULL, 3, '2026-11-12 05:54:04.419128', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('dkim@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$jR9O4TQ5CV9yoO/mNXooDQ$ed4zu3a0YxiaE0lUFdD7NTcF+QwT28FpbSd8cig8YKQ', 'Daniel Kim', 'professor', 1, 1, NULL, NULL, false, 0, NULL, true, NULL, NULL, 4, '2026-11-12 05:54:04.487111', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('lchen@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$+I2gXBSF8X/1okh7ftKyYQ$jTFIawScs7NAXIHIBmwVRS3xri/j/CG4cxUhJYecRxg', 'Laura Chen', 'professor', 1, 1, NULL, NULL, false, 0, NULL, true, NULL, NULL, 5, '2026-11-12 05:54:04.555343', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('oali@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$iikkB2fGz51+hc2jDuVv3w$CjU3rxpA7bwI03ZEptN3LPfWiQMlZZZ4QNFHGcMp71k', 'Omar Ali', 'professor', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 6, '2026-11-12 05:54:04.610936', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('spark@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$FFG0o/Y7HmZ+i6QRWOuFHQ$sQfjcOVE0USZa0NY7fyqoCUphpOR1A7YMtJkgNybJqQ', 'Sarah Park', 'professor', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 7, '2026-11-12 05:54:04.675003', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('mbrown@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$B1tyUs2LY8ret14lTg+cOg$yPdu/fXXTr4A4RZ1hSMvZEgBLZOmpzwviRZlylpHwU8', 'Mike Brown', 'professor', 1, 2, NULL, NULL, false, 0, NULL, true, NULL, NULL, 8, '2026-11-12 05:54:04.731241', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('ewong@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$rFpk+yWoQxBcgoTUPpWg6Q$KbPJpr/HcBCrwaDd7W01xIQSLmVTPV9PTydDyWV13no', 'Emily Wong', 'professor', 1, 2, NULL, NULL, false, 0, NULL, true, NULL, NULL, 9, '2026-11-12 05:54:04.788243', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('alopez@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$PGTzJbXMG3/8RGJmr5JZHA$5fXotcmhHBi7WMVC+a3a/+D71B5vTtIMQIaAUhvLY5w', 'Ana Lopez', 'professor', 1, 3, NULL, NULL, false, 0, NULL, true, NULL, NULL, 10, '2026-11-12 05:54:04.858727', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('jreed@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$tvZaIPXreYO5EN7whcWzkA$RuPVy44ziBTYL8tKEll29AW+xEqDsC3ZTs981rEKY4s', 'Jane Reed', 'professor', 1, 5, NULL, NULL, false, 0, NULL, true, NULL, NULL, 11, '2026-11-12 05:54:04.920577', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('twhite@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$kAR3Bwf4zbZm5JUQo4LyNQ$2th87SeIaFGbryQQnEJNzS+SkCQA24CF6UIwzycwY+o', 'Tom White', 'professor', 1, 6, NULL, NULL, false, 0, NULL, true, NULL, NULL, 12, '2026-11-12 05:54:05.003171', NULL, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('senior@student.example', '$argon2id$v=19$m=65536,t=3,p=4$g+evUDfi4RbczxAdD6H3mw$CrPNDtLlfkB2/e58GiE/jkMddPQ+KE6uUAYfsT4XWyE', '선배 학생', 'student', 1, 4, NULL, NULL, false, 0, NULL, true, NULL, NULL, 13, '2026-11-12 05:54:05.052958', 2, NULL);
+INSERT INTO public.users (email, password_hash, name, role, institution_id, department_id, delegate_user_id, away_until, must_change_password, failed_logins, locked_until, is_active, deactivated_at, locale, id, created_at, source_institution_id, admission_year) VALUES ('retired@msu.example', '$argon2id$v=19$m=65536,t=3,p=4$xwzyA69nI22s33er1Nw56A$v0y21SMIIgnsgoE+1XBOBFzuyZ/Tl+NPNGrJLg7TzNA', 'Prof. Emeritus Hall', 'professor', 1, 7, NULL, NULL, false, 0, NULL, true, NULL, NULL, 14, '2026-11-12 05:54:05.116486', NULL, NULL);
 
 
 ALTER TABLE public.users ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: catalog_imports; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+ALTER TABLE public.catalog_imports DISABLE TRIGGER ALL;
+
+
+
+ALTER TABLE public.catalog_imports ENABLE TRIGGER ALL;
 
 --
 -- Data for Name: transfer_requests; Type: TABLE DATA; Schema: public; Owner: -
@@ -82,7 +92,7 @@ ALTER TABLE public.users ENABLE TRIGGER ALL;
 
 ALTER TABLE public.transfer_requests DISABLE TRIGGER ALL;
 
-INSERT INTO public.transfer_requests (student_id, source_institution_id, target_institution_id, major, status, submitted_at, transcript_file_key, transcript_masked_name, id, created_at, transcript_copied_at, course_key, counted) VALUES (13, 2, 1, 'Computer Science and Engineering', 'decided', '2025-11-11 06:48:54.09712', NULL, NULL, 1, '2026-11-11 06:48:54.098201', NULL, NULL, true);
+INSERT INTO public.transfer_requests (student_id, source_institution_id, target_institution_id, major, status, submitted_at, transcript_file_key, transcript_masked_name, id, created_at, transcript_copied_at, course_key, counted) VALUES (13, 2, 1, 'Computer Science and Engineering', 'decided', '2025-11-12 05:54:05.117151', NULL, NULL, 1, '2026-11-12 05:54:05.118194', NULL, NULL, true);
 
 
 ALTER TABLE public.transfer_requests ENABLE TRIGGER ALL;
@@ -108,7 +118,7 @@ Week 4: Implicit differentiation, related rates and linear approximation.
 Week 5: Extreme values, the Mean Value Theorem, curve sketching and L''Hopital''s rule.
 Week 6: Applied optimization problems.
 Week 7: Antiderivatives, Riemann sums and the definite integral.
-Week 8: The Fundamental Theorem of Calculus and integration by substitution.', NULL, 'MATH 1151', 'Calculus I', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 1, '2026-11-11 06:48:52.997464', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 8: The Fundamental Theorem of Calculus and integration by substitution.', NULL, 'MATH 1151', 'Calculus I', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 1, '2026-11-12 05:54:04.192682', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, '18841059c1ced70c079733ba222a370cf789594cc394cb48d88325ba3c47d0a4', 'MATH 1172.txt', 'en', 'Midwest State University
 MATH 1172 Calculus II
 Credits: 4
@@ -122,7 +132,7 @@ Week 2: Improper integrals and numerical integration.
 Week 3: Volumes of revolution, arc length and work.
 Week 4: Sequences, infinite series and convergence tests.
 Week 5: Power series, Taylor and Maclaurin series.
-Week 6: Parametric equations and polar coordinates.', NULL, 'MATH 1172', 'Calculus II', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 2, '2026-11-11 06:48:53.010177', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 6: Parametric equations and polar coordinates.', NULL, 'MATH 1172', 'Calculus II', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 2, '2026-11-12 05:54:04.203229', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, '9fdc7427db8b44682c934f7cb13930d1ab357da24f06df6d7d4eeb4949d1aadd', 'MATH 2568.txt', 'en', 'Midwest State University
 MATH 2568 Linear Algebra
 Credits: 3
@@ -139,7 +149,7 @@ Week 5: Linear independence, basis, dimension and rank.
 Week 6: Linear transformations and their matrices.
 Week 7: Eigenvalues, eigenvectors and the characteristic equation.
 Week 8: Diagonalization of matrices.
-Week 9: Inner products, orthogonal projections, the Gram-Schmidt process and least squares.', NULL, 'MATH 2568', 'Linear Algebra', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 3, '2026-11-11 06:48:53.015162', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 9: Inner products, orthogonal projections, the Gram-Schmidt process and least squares.', NULL, 'MATH 2568', 'Linear Algebra', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 3, '2026-11-12 05:54:04.207684', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, 'dbacad3b13cf2c6c5dc0dd7f0c3a5aa927e0dccc2ce2eae5f9c895f829d9806f', 'MATH 1050.txt', 'en', 'Midwest State University
 MATH 1050 College Algebra
 Credits: 3
@@ -151,7 +161,7 @@ Weekly Schedule
 Week 1: Functions, domain and range, graphs and transformations.
 Week 2: Polynomial and rational functions and their zeros.
 Week 3: Exponential and logarithmic functions and equations.
-Week 4: Systems of linear equations and inequalities.', NULL, 'MATH 1050', 'College Algebra', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 4, '2026-11-11 06:48:53.021963', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 4: Systems of linear equations and inequalities.', NULL, 'MATH 1050', 'College Algebra', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 4, '2026-11-12 05:54:04.212624', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, 'a9b02b8ca02b267bdac04c9b11641ce2231f54cbcb910d1f2722d3fbb9c8074b', 'PHYSICS 1250.txt', 'en', 'Midwest State University
 PHYSICS 1250 Mechanics, Work and Energy
 Credits: 4
@@ -165,7 +175,7 @@ Week 2: Newton''s laws of motion, free-body diagrams, friction and circular moti
 Week 3: Work, kinetic energy, potential energy and conservation of energy.
 Week 4: Linear momentum, impulse and collisions.
 Week 5: Rotation, torque, moment of inertia and angular momentum.
-Week 6: Simple harmonic motion and universal gravitation.', NULL, 'PHYSICS 1250', 'Mechanics, Work and Energy', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 5, '2026-11-11 06:48:53.028582', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 6: Simple harmonic motion and universal gravitation.', NULL, 'PHYSICS 1250', 'Mechanics, Work and Energy', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 5, '2026-11-12 05:54:04.216101', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, 'a02ef47e6ec3facfe569197edaf6bb3c8d9534f435827719c83189a3e9f8d8e7', 'CHEM 1210.txt', 'en', 'Midwest State University
 CHEM 1210 General Chemistry I
 Credits: 4
@@ -180,7 +190,7 @@ Week 3: Thermochemistry: enthalpy, calorimetry and Hess''s law.
 Week 4: Electronic structure of atoms and periodic trends.
 Week 5: Ionic and covalent bonding, Lewis structures, VSEPR and molecular geometry.
 Week 6: Gas laws and the ideal gas equation.
-Week 7: Weekly laboratory experiments in measurement, synthesis and titration.', NULL, 'CHEM 1210', 'General Chemistry I', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 6, '2026-11-11 06:48:53.035722', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 7: Weekly laboratory experiments in measurement, synthesis and titration.', NULL, 'CHEM 1210', 'General Chemistry I', 4.0, NULL, NULL, NULL, NULL, 'ready', NULL, 6, '2026-11-12 05:54:04.220491', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, '3dd1a86aa215c4d4157f8bfb2cbbf809985ac7a52a2ca8ce080fda48618084f8', 'CSE 1222.txt', 'en', 'Midwest State University
 CSE 1222 Introduction to Programming in C
 Credits: 3
@@ -194,7 +204,7 @@ Week 2: Conditional statements and loops.
 Week 3: Functions, parameters and scope.
 Week 4: Arrays and strings.
 Week 5: Pointers, pointer arithmetic and dynamic memory allocation.
-Week 6: Structures and file input and output.', NULL, 'CSE 1222', 'Introduction to Programming in C', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 7, '2026-11-11 06:48:53.043961', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 6: Structures and file input and output.', NULL, 'CSE 1222', 'Introduction to Programming in C', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 7, '2026-11-12 05:54:04.225685', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, '8d0e3a49d3221c8afeb28eca383c8dbd9a9254904191846591965387c2a444d8', 'CSE 2231.txt', 'en', 'Midwest State University
 CSE 2231 Software II: Data Structures
 Credits: 3
@@ -209,7 +219,7 @@ Week 3: Binary trees, binary search trees and balanced trees.
 Week 4: Heaps and priority queues.
 Week 5: Hash tables and hashing.
 Week 6: Sorting algorithms including merge sort and quick sort.
-Week 7: Graph representation and traversal.', NULL, 'CSE 2231', 'Software II: Data Structures', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 8, '2026-11-11 06:48:53.049925', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 7: Graph representation and traversal.', NULL, 'CSE 2231', 'Software II: Data Structures', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 8, '2026-11-12 05:54:04.230671', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, 'b6833dafcec7e976e61878f6138879f3359ada386d02186cb0addce1ece79629', 'CSE 2321.txt', 'en', 'Midwest State University
 CSE 2321 Foundations I: Discrete Structures
 Credits: 3
@@ -222,7 +232,7 @@ Week 1: Propositional and predicate logic and proof techniques.
 Week 2: Mathematical induction and recursion.
 Week 3: Sets, functions and relations.
 Week 4: Permutations, combinations and the pigeonhole principle.
-Week 5: Graph theory and trees.', NULL, 'CSE 2321', 'Foundations I: Discrete Structures', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 9, '2026-11-11 06:48:53.057624', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 5: Graph theory and trees.', NULL, 'CSE 2321', 'Foundations I: Discrete Structures', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 9, '2026-11-12 05:54:04.234974', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, '832ec74b0554aef6188f9e9e8ac0fac980a5f6350d21f330167860361e2b1b6f', 'ENGLISH 1110.txt', 'en', 'Midwest State University
 ENGLISH 1110 First-Year English Composition
 Credits: 3
@@ -234,7 +244,7 @@ Weekly Schedule
 Week 1: Rhetorical analysis of texts for audience and purpose.
 Week 2: Composing thesis-driven arguments.
 Week 3: Research writing with sources and citation.
-Week 4: Drafting, peer review and revision.', NULL, 'ENGLISH 1110', 'First-Year English Composition', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 10, '2026-11-11 06:48:53.062517', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 4: Drafting, peer review and revision.', NULL, 'ENGLISH 1110', 'First-Year English Composition', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 10, '2026-11-12 05:54:04.239301', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (1, NULL, NULL, NULL, '19c181410dd664bbfbdb498d96c1ab053c27f0f245b27941580e0dd9b3a9a3b9', 'HISTORY 1151.txt', 'en', 'Midwest State University
 HISTORY 1151 American Civilization to 1877
 Credits: 3
@@ -246,7 +256,7 @@ Weekly Schedule
 Week 1: Colonial societies in North America.
 Week 2: The American Revolution and the Constitution.
 Week 3: Expansion, slavery and the antebellum era.
-Week 4: The Civil War and Reconstruction.', NULL, 'HISTORY 1151', 'American Civilization to 1877', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 11, '2026-11-11 06:48:53.068438', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
+Week 4: The Civil War and Reconstruction.', NULL, 'HISTORY 1151', 'American Civilization to 1877', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 11, '2026-11-12 05:54:04.244187', 'institution_reference', 'verified', 'unknown', NULL, '대상 대학 기준 강의계획서', '', NULL, NULL);
 INSERT INTO public.syllabi (institution_id, transfer_request_id, owner_id, source_file_key, content_hash, original_filename, language, raw_text, page_offsets, course_code, course_title, credits, extracted_json, extraction_model, quality_score, injection_flags, status, error_message, id, created_at, source_kind, authenticity, applicability, academic_term, verification_method, verification_note, verified_by, verified_at) VALUES (2, 1, 13, NULL, '4b50b3c6aa26a1836afa35d3e40e456438d0b0e39c2e61fd606f95984b9a06f3', 'MATH201.pdf', 'en', 'Hankuk University
 MATH 201 Linear Algebra
 Credits: 3
@@ -283,7 +293,7 @@ Week 15: Final exam
 
 Assessment
 Homework 25%, Midterm 35%, Final exam 40%
-', NULL, 'MATH 201', 'Linear Algebra', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 12, '2025-11-11 06:48:54.09712', 'student_uploaded', 'unverified', 'unknown', NULL, '', '', NULL, NULL);
+', NULL, 'MATH 201', 'Linear Algebra', 3.0, NULL, NULL, NULL, NULL, 'ready', NULL, 12, '2025-11-12 05:54:05.117151', 'student_uploaded', 'unverified', 'unknown', NULL, '', '', NULL, NULL);
 
 
 ALTER TABLE public.syllabi ENABLE TRIGGER ALL;
@@ -294,17 +304,17 @@ ALTER TABLE public.syllabi ENABLE TRIGGER ALL;
 
 ALTER TABLE public.courses DISABLE TRIGGER ALL;
 
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'MATH 1151', 'Calculus I', 4.0, 1, 'First-semester calculus for science and engineering majors (not business or applied calculus).', 1, NULL, 1, '2026-11-11 06:48:53.008973');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'MATH 1172', 'Calculus II', 4.0, 1, 'Second-semester calculus for science and engineering majors.', 2, NULL, 2, '2026-11-11 06:48:53.014569');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'MATH 2568', 'Linear Algebra', 3.0, 1, 'Sophomore-level linear algebra for majors.', 3, NULL, 3, '2026-11-11 06:48:53.021263');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'MATH 1050', 'College Algebra', 3.0, 1, 'Pre-calculus level course; not equivalent to calculus.', 4, NULL, 4, '2026-11-11 06:48:53.027139');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'PHYSICS 1250', 'Mechanics, Work and Energy', 4.0, 2, 'Calculus-based mechanics for science and engineering majors.', 5, NULL, 5, '2026-11-11 06:48:53.034588');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'CHEM 1210', 'General Chemistry I', 4.0, 3, 'First semester of general chemistry for science majors, with laboratory.', 6, NULL, 6, '2026-11-11 06:48:53.042998');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'CSE 1222', 'Introduction to Programming in C', 3.0, 4, 'First programming course for engineering majors.', 7, NULL, 7, '2026-11-11 06:48:53.048758');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'CSE 2231', 'Software II: Data Structures', 3.0, 4, 'Second programming course on data structures; requires CS1.', 8, NULL, 8, '2026-11-11 06:48:53.057024');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'CSE 2321', 'Foundations I: Discrete Structures', 3.0, 4, 'Discrete mathematics for CSE majors, proof-based.', 9, NULL, 9, '2026-11-11 06:48:53.062005');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'ENGLISH 1110', 'First-Year English Composition', 3.0, 5, 'First-year college writing.', 10, NULL, 10, '2026-11-11 06:48:53.067854');
-INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at) VALUES (1, 'HISTORY 1151', 'American Civilization to 1877', 3.0, 6, 'Introductory survey of United States history.', 11, NULL, 11, '2026-11-11 06:48:53.072451');
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'MATH 1151', 'Calculus I', 4.0, 1, 'First-semester calculus for science and engineering majors (not business or applied calculus).', 1, NULL, 1, '2026-11-12 05:54:04.202102', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'MATH 1172', 'Calculus II', 4.0, 1, 'Second-semester calculus for science and engineering majors.', 2, NULL, 2, '2026-11-12 05:54:04.207072', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'MATH 2568', 'Linear Algebra', 3.0, 1, 'Sophomore-level linear algebra for majors.', 3, NULL, 3, '2026-11-12 05:54:04.212036', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'MATH 1050', 'College Algebra', 3.0, 1, 'Pre-calculus level course; not equivalent to calculus.', 4, NULL, 4, '2026-11-12 05:54:04.215483', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'PHYSICS 1250', 'Mechanics, Work and Energy', 4.0, 2, 'Calculus-based mechanics for science and engineering majors.', 5, NULL, 5, '2026-11-12 05:54:04.219942', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'CHEM 1210', 'General Chemistry I', 4.0, 3, 'First semester of general chemistry for science majors, with laboratory.', 6, NULL, 6, '2026-11-12 05:54:04.225063', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'CSE 1222', 'Introduction to Programming in C', 3.0, 4, 'First programming course for engineering majors.', 7, NULL, 7, '2026-11-12 05:54:04.230048', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'CSE 2231', 'Software II: Data Structures', 3.0, 4, 'Second programming course on data structures; requires CS1.', 8, NULL, 8, '2026-11-12 05:54:04.234358', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'CSE 2321', 'Foundations I: Discrete Structures', 3.0, 4, 'Discrete mathematics for CSE majors, proof-based.', 9, NULL, 9, '2026-11-12 05:54:04.238666', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'ENGLISH 1110', 'First-Year English Composition', 3.0, 5, 'First-year college writing.', 10, NULL, 10, '2026-11-12 05:54:04.243468', NULL);
+INSERT INTO public.courses (institution_id, code, title, credits, department_id, level, reference_syllabus_id, concepts, id, created_at, catalog_import_id) VALUES (1, 'HISTORY 1151', 'American Civilization to 1877', 3.0, 6, 'Introductory survey of United States history.', 11, NULL, 11, '2026-11-12 05:54:04.24834', NULL);
 
 
 ALTER TABLE public.courses ENABLE TRIGGER ALL;
@@ -315,7 +325,7 @@ ALTER TABLE public.courses ENABLE TRIGGER ALL;
 
 ALTER TABLE public.course_evaluations DISABLE TRIGGER ALL;
 
-INSERT INTO public.course_evaluations (transfer_request_id, syllabus_id, candidate_course_id, status, recommendation, coverage, confidence, level_flag, coverage_json, summary, input_hash, prompt_version, model, error_message, is_latest, id, created_at, quotes_total, quotes_unmatched, quotes_non_teaching) VALUES (1, 12, 3, 'done', 'direct', 0.900, 'high', NULL, NULL, '', NULL, NULL, NULL, NULL, true, 1, '2025-11-11 06:48:54.09712', NULL, NULL, NULL);
+INSERT INTO public.course_evaluations (transfer_request_id, syllabus_id, candidate_course_id, status, recommendation, coverage, confidence, level_flag, coverage_json, summary, input_hash, prompt_version, model, error_message, is_latest, id, created_at, quotes_total, quotes_unmatched, quotes_non_teaching) VALUES (1, 12, 3, 'done', 'direct', 0.900, 'high', NULL, NULL, '', NULL, NULL, NULL, NULL, true, 1, '2025-11-12 05:54:05.117151', NULL, NULL, NULL);
 
 
 ALTER TABLE public.course_evaluations ENABLE TRIGGER ALL;
@@ -326,7 +336,7 @@ ALTER TABLE public.course_evaluations ENABLE TRIGGER ALL;
 
 ALTER TABLE public.credit_conversion_rules DISABLE TRIGGER ALL;
 
-INSERT INTO public.credit_conversion_rules (target_institution_id, source_system, target_system, factor, method, effective_from, effective_to, approved_by, note, id, created_at) VALUES (1, 'kr_credit', 'us_semester', 1.000, 'approved_table', '2020-01-01', NULL, 3, '데모용 예시 규칙', 1, '2026-11-11 06:48:53.311295');
+INSERT INTO public.credit_conversion_rules (target_institution_id, source_system, target_system, factor, method, effective_from, effective_to, approved_by, note, id, created_at) VALUES (1, 'kr_credit', 'us_semester', 1.000, 'approved_table', '2020-01-01', NULL, 3, '데모용 예시 규칙', 1, '2026-11-12 05:54:04.421834');
 
 
 ALTER TABLE public.credit_conversion_rules ENABLE TRIGGER ALL;
@@ -337,7 +347,7 @@ ALTER TABLE public.credit_conversion_rules ENABLE TRIGGER ALL;
 
 ALTER TABLE public.decisions DISABLE TRIGGER ALL;
 
-INSERT INTO public.decisions (course_evaluation_id, decided_by, action, result, target_course_id, reason_codes, reason_memo, ai_recommendation_snapshot, conflict_acknowledged, appeal_id, decided_at, id, accepted_credits, credit_unit, credit_basis, source_credits, source_credit_unit, conversion_rule_id, policy_snapshot, evidence_snapshot, course_snapshot) VALUES (1, 14, 'approve', 'direct', 3, '[]', '', '{"recommendation": "direct"}', false, NULL, '2025-11-11 06:48:54.09712', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO public.decisions (course_evaluation_id, decided_by, action, result, target_course_id, reason_codes, reason_memo, ai_recommendation_snapshot, conflict_acknowledged, appeal_id, decided_at, id, accepted_credits, credit_unit, credit_basis, source_credits, source_credit_unit, conversion_rule_id, policy_snapshot, evidence_snapshot, course_snapshot, review_checklist) VALUES (1, 14, 'approve', 'direct', 3, '[]', '', '{"recommendation": "direct"}', false, NULL, '2025-11-12 05:54:05.117151', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 
 ALTER TABLE public.decisions ENABLE TRIGGER ALL;
@@ -383,6 +393,16 @@ ALTER TABLE public.audit_logs DISABLE TRIGGER ALL;
 ALTER TABLE public.audit_logs ENABLE TRIGGER ALL;
 
 --
+-- Data for Name: background_jobs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+ALTER TABLE public.background_jobs DISABLE TRIGGER ALL;
+
+
+
+ALTER TABLE public.background_jobs ENABLE TRIGGER ALL;
+
+--
 -- Data for Name: credit_allocations; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -391,6 +411,17 @@ ALTER TABLE public.credit_allocations DISABLE TRIGGER ALL;
 
 
 ALTER TABLE public.credit_allocations ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: degree_programs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+ALTER TABLE public.degree_programs DISABLE TRIGGER ALL;
+
+INSERT INTO public.degree_programs (institution_id, name, department_id, catalog_year, id, created_at) VALUES (1, 'B.S. Computer Science and Engineering', 4, NULL, 1, '2026-11-12 05:54:04.429447');
+
+
+ALTER TABLE public.degree_programs ENABLE TRIGGER ALL;
 
 --
 -- Data for Name: equivalencies; Type: TABLE DATA; Schema: public; Owner: -
@@ -433,12 +464,27 @@ ALTER TABLE public.evidence_feedback DISABLE TRIGGER ALL;
 ALTER TABLE public.evidence_feedback ENABLE TRIGGER ALL;
 
 --
+-- Data for Name: graduation_requirements; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+ALTER TABLE public.graduation_requirements DISABLE TRIGGER ALL;
+
+INSERT INTO public.graduation_requirements (program_id, area, name, required_credits, course_codes, sort, id, created_at) VALUES (1, 'major_required', 'Math core', 8.0, '["MATH 1151", "MATH 1172", "MATH 2568"]', 0, 1, '2026-11-12 05:54:04.431501');
+INSERT INTO public.graduation_requirements (program_id, area, name, required_credits, course_codes, sort, id, created_at) VALUES (1, 'major_required', 'CSE core', 8.0, '["CSE 1222", "CSE 2231", "CSE 2321"]', 1, 2, '2026-11-12 05:54:04.431508');
+INSERT INTO public.graduation_requirements (program_id, area, name, required_credits, course_codes, sort, id, created_at) VALUES (1, 'general_education', 'Natural science', 4.0, '["PHYSICS 1250", "CHEM 1210"]', 2, 3, '2026-11-12 05:54:04.431509');
+INSERT INTO public.graduation_requirements (program_id, area, name, required_credits, course_codes, sort, id, created_at) VALUES (1, 'general_education', 'Humanities', 6.0, '["ENGLISH 1110", "HISTORY 1151"]', 3, 4, '2026-11-12 05:54:04.43151');
+INSERT INTO public.graduation_requirements (program_id, area, name, required_credits, course_codes, sort, id, created_at) VALUES (1, 'free_elective', 'Free electives', 12.0, '[]', 4, 5, '2026-11-12 05:54:04.431511');
+
+
+ALTER TABLE public.graduation_requirements ENABLE TRIGGER ALL;
+
+--
 -- Data for Name: institution_sources; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 ALTER TABLE public.institution_sources DISABLE TRIGGER ALL;
 
-INSERT INTO public.institution_sources (institution_id, source_institution_id, id, created_at) VALUES (1, 2, 1, '2026-11-11 06:48:52.993671');
+INSERT INTO public.institution_sources (institution_id, source_institution_id, id, created_at) VALUES (1, 2, 1, '2026-11-12 05:54:04.190672');
 
 
 ALTER TABLE public.institution_sources ENABLE TRIGGER ALL;
@@ -469,12 +515,12 @@ ALTER TABLE public.notifications ENABLE TRIGGER ALL;
 
 ALTER TABLE public.policy_rules DISABLE TRIGGER ALL;
 
-INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'min_grade', NULL, NULL, '{"min_grade": "C", "accept_pass": true}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-11 06:48:53.310119', 1, '2026-11-11 06:48:53.313991');
-INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'transfer_cap', NULL, NULL, '{"credits": 60}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-11 06:48:53.310164', 2, '2026-11-11 06:48:53.313997');
-INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'degree_credits', NULL, NULL, '{"credits": 120}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-11 06:48:53.310186', 3, '2026-11-11 06:48:53.313999');
-INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'semester_load', NULL, NULL, '{"credits": 15}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-11 06:48:53.310205', 4, '2026-11-11 06:48:53.314');
-INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'appeal_window', NULL, NULL, '{"days": 30}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-11 06:48:53.310222', 5, '2026-11-11 06:48:53.314001');
-INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'appeal_review', NULL, NULL, '{"days": 14}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-11 06:48:53.31024', 6, '2026-11-11 06:48:53.314002');
+INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'min_grade', NULL, NULL, '{"min_grade": "C", "accept_pass": true}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-12 05:54:04.42061', 1, '2026-11-12 05:54:04.424453');
+INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'transfer_cap', NULL, NULL, '{"credits": 60}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-12 05:54:04.420659', 2, '2026-11-12 05:54:04.424458');
+INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'degree_credits', NULL, NULL, '{"credits": 120}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-12 05:54:04.420678', 3, '2026-11-12 05:54:04.42446');
+INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'semester_load', NULL, NULL, '{"credits": 15}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-12 05:54:04.420693', 4, '2026-11-12 05:54:04.424461');
+INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'appeal_window', NULL, NULL, '{"days": 30}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-12 05:54:04.420707', 5, '2026-11-12 05:54:04.424462');
+INSERT INTO public.policy_rules (institution_id, rule_type, department_id, admission_year, parameters, effective_from, effective_to, status, source, created_by, approved_by, approved_at, id, created_at) VALUES (1, 'appeal_review', NULL, NULL, '{"days": 14}', '2020-01-01', NULL, 'approved', '데모용 예시 학칙', 3, 3, '2026-11-12 05:54:04.420722', 6, '2026-11-12 05:54:04.424462');
 
 
 ALTER TABLE public.policy_rules ENABLE TRIGGER ALL;
@@ -498,6 +544,26 @@ ALTER TABLE public.push_subscriptions DISABLE TRIGGER ALL;
 
 
 ALTER TABLE public.push_subscriptions ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: sis_ack_requests; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sis_ack_requests DISABLE TRIGGER ALL;
+
+
+
+ALTER TABLE public.sis_ack_requests ENABLE TRIGGER ALL;
+
+--
+-- Data for Name: sis_syncs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sis_syncs DISABLE TRIGGER ALL;
+
+
+
+ALTER TABLE public.sis_syncs ENABLE TRIGGER ALL;
 
 --
 -- Data for Name: student_transcripts; Type: TABLE DATA; Schema: public; Owner: -
@@ -634,6 +700,20 @@ SELECT pg_catalog.setval('public.audit_logs_id_seq', 1, false);
 
 
 --
+-- Name: background_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.background_jobs_id_seq', 1, false);
+
+
+--
+-- Name: catalog_imports_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.catalog_imports_id_seq', 1, false);
+
+
+--
 -- Name: course_evaluations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
@@ -669,6 +749,13 @@ SELECT pg_catalog.setval('public.decisions_id_seq', 1, true);
 
 
 --
+-- Name: degree_programs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.degree_programs_id_seq', 1, true);
+
+
+--
 -- Name: departments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
@@ -701,6 +788,13 @@ SELECT pg_catalog.setval('public.evidence_feedback_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.evidence_spans_id_seq', 1, false);
+
+
+--
+-- Name: graduation_requirements_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.graduation_requirements_id_seq', 5, true);
 
 
 --
@@ -750,6 +844,20 @@ SELECT pg_catalog.setval('public.privacy_requests_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('public.push_subscriptions_id_seq', 1, false);
+
+
+--
+-- Name: sis_ack_requests_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.sis_ack_requests_id_seq', 1, false);
+
+
+--
+-- Name: sis_syncs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.sis_syncs_id_seq', 1, false);
 
 
 --
