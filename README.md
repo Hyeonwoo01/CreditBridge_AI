@@ -221,3 +221,5 @@ tests/           unit · integration(PostgreSQL) · eval(골든셋) · fixtures/
 ## 운영
 
 실제 기관 데이터로 시작하는 순서(첫 관리자·과목·기준 강의계획서·계정 CSV)와 운영할 때 확인할 것(보안·환경 변수·알림·임시 기준값)은 [docs/operations.md](docs/operations.md)에 있어요. AWS에 올리는 순서는 [docs/deploy-aws.md](docs/deploy-aws.md)에 있어요.
+
+브랜치는 두 개입니다. 작업은 `develop`에 올리고 CI가 통과하면, 배포할 때 `main`을 그 커밋까지 앞으로 옮깁니다(fast-forward). 서버는 `main`만 받아 가므로 `main`은 늘 배포된 상태와 같습니다.

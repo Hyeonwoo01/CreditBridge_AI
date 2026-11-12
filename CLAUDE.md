@@ -52,6 +52,9 @@ docs/API_Spec.md(API 명세: 엔드포인트 목록·JSON API·화면별 조회 
 - 상태를 바꾸는 POST는 CSRF 토큰 검증 (backend/security/csrf.py)
 - 판정을 새로 내리면 기존 행을 고치지 않고 새 행을 추가 (이의 신청 재판정도 decisions INSERT)
 
+## 브랜치
+- 작업은 develop에 커밋·푸시한다. main은 배포용(EC2가 main을 pull)이라, 사람이 반영을 요청할 때만 develop의 CI 통과 커밋으로 main을 앞으로 옮긴다(fast-forward, 강제 푸시 금지)
+
 ## 작업 완료 전 확인
 - uv run ruff check . && uv run ruff format --check .
 - uv run mypy backend

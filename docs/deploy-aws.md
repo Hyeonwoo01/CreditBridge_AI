@@ -145,7 +145,7 @@ docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python 
 
 | 할 일 | 명령 (EC2, `~/CreditBridge_AI`) |
 | --- | --- |
-| 새 코드 반영 | `git pull && docker compose -f docker-compose.prod.yml up -d --build` (마이그레이션은 web 시작 때 자동) |
+| 새 코드 반영 | `git pull && docker compose -f docker-compose.prod.yml up -d --build` (마이그레이션은 web 시작 때 자동). 서버는 `main`을 받으며, 작업은 `develop`에서 CI를 통과한 뒤 `main`으로 옮긴다 |
 | 보안 업데이트 (한 달에 한 번) | `git pull && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml build --pull && docker compose -f docker-compose.prod.yml up -d && docker image prune -f` (기반 이미지·Redis·Caddy를 새로 받음). 서버 OS는 `sudo apt update && sudo apt upgrade -y`, `/var/run/reboot-required`가 있으면 `sudo reboot` |
 | 상태 | `docker compose -f docker-compose.prod.yml ps` / `docker stats --no-stream` (메모리) |
 | 로그 | `docker compose -f docker-compose.prod.yml logs --tail 100 web` (`worker`, `caddy`) |
