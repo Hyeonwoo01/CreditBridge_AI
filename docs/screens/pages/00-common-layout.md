@@ -40,7 +40,7 @@
 | 로그아웃 | 텍스트 버튼 | POST `/logout` (CSRF) | 12px |
 | 보조 바 | `workspace-sub-bar` | 학생에게는 숨김. 왼쪽: 건물 아이콘 + 기관명(14px/600) + `/ 업무 위치`(화면별 `{% block crumb %}`, 기본값 역할별 "학사처 심사 워크스페이스"·"학과 심사 워크스페이스"·"관리자 콘솔"). 오른쪽: 집계 칩. 스크롤 시 고정하지 않음 | 배경 `{colors.canvas}`, 아래 1px `{colors.hairline}`, 세로 패딩 10px |
 | 집계 칩 | `count-chip` | HTMX `GET /notifications/workspace`(페이지 로드 시 1회)로 "제출 요청 N · 심사 대기 N · 판정 완료 N"을 받아 넣음. 판정 완료만 초록 | 흰 배경·1px 헤어라인·`{rounded.pill}`·12px, 숫자 600 `tabular-nums` / 판정 완료 `{colors.surface-approve-subtle}` + `{colors.status-approve}` |
-| 플래시 | 알림 띠 | 성공: 파치먼트 배경 / 오류: 빨강 연한 배경 | `bg-parchment` / `{colors.surface-reject-subtle}` + `{colors.status-reject}` |
+| 플래시 | 알림 띠 (`data-flash`) | 성공: 파치먼트 배경(`role="status"`) / 오류: 빨강 연한 배경(`role="alert"`). 저장 뒤 화면이 `#위치`(예: `/admin/data#degree`)로 내려가면 `app.js`가 문구를 그 절·카드 맨 위(표 행이면 그 바로 앞)로 옮기고 화면 가운데로 스크롤해, 맨 위에 떠서 못 보는 일이 없게 한다. 오류는 포커스도 옮겨 화면 읽기 프로그램이 바로 읽는다. `#위치`가 없으면 본문 맨 위 그대로 | `bg-parchment` / `{colors.surface-reject-subtle}` + `{colors.status-reject}` |
 | 푸터 | `footer` | 1줄: primary 방패 아이콘 + **"Human-in-the-Loop 고지:"**(ink 600) + "본 시스템의 AI 분석 결과는 심사 참고용 근거 자료이며, 최종 학점 인정 여부는 해당 학과 교수의 승인으로 확정됩니다." / 2줄: 문서 보존·삭제 안내 · © CreditBridge AI. 링크 컬럼 없음 | 배경 `{colors.canvas-parchment}`, 위 1px `{colors.hairline}`, 세로 패딩 32px, `{typography.fine-print}` 12px, 1줄 `{colors.ink-muted-80}` / 2줄 `{colors.ink-muted-48}` |
 
 ## 역할별 메뉴

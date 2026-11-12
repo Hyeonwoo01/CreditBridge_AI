@@ -87,7 +87,8 @@
   {% endif %}
   <main class="mx-auto w-full {% block width %}max-w-[1280px]{% endblock %} flex-1 px-4 pt-8 pb-20 md:px-10 md:pt-10">
     {% for f in flashes %}
-    <div role="status" class="mb-4 rounded-md px-4 py-3 text-sm {{ 'bg-reject-subtle text-reject' if f.kind == 'error' else 'bg-parchment text-ink-80' }}">{{ f.message }}</div>
+    {# data-flash: 저장 뒤 화면이 #위치로 내려가면 app.js가 이 문구를 그 위치(카드) 맨 위로 옮겨 바로 보이게 한다 #}
+    <div role="{{ 'alert' if f.kind == 'error' else 'status' }}" data-flash tabindex="-1" class="mb-4 rounded-md px-4 py-3 text-sm {{ 'bg-reject-subtle text-reject' if f.kind == 'error' else 'bg-parchment text-ink-80' }}">{{ f.message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

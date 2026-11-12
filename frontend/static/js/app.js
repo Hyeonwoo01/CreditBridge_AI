@@ -18,6 +18,20 @@ function localizeTimes(root) {
   });
 }
 document.addEventListener("DOMContentLoaded", () => localizeTimes(document));
+
+// 저장 뒤 화면이 아래쪽 카드(#degree 등)로 내려가면, 맨 위에 뜬 안내·오류 문구가 보이지 않는다.
+// 문구를 그 카드 맨 위로 옮기고 다시 그 위치로 이동한다 (오류는 읽기 프로그램이 바로 읽도록 포커스).
+document.addEventListener("DOMContentLoaded", () => {
+  const flashes = [...document.querySelectorAll("[data-flash]")];
+  const id = decodeURIComponent(location.hash.slice(1));
+  const target = id && document.getElementById(id);
+  if (!flashes.length || !target) return;
+  const inline = ["TR", "TD", "TBODY", "THEAD", "TABLE", "UL", "OL"].includes(target.tagName);
+  flashes.reverse().forEach((f) => (inline ? target.before(f) : target.prepend(f)));
+  const first = flashes[flashes.length - 1];
+  first.scrollIntoView({ block: "center" });
+  if (first.getAttribute("role") === "alert") first.focus({ preventScroll: true });
+});
 document.addEventListener("htmx:afterSwap", (e) => localizeTimes(e.target));
 
 // 근거 구절을 누르면 접혀 있는 원문을 펼치고 해당 위치로 이동한다 (FR-25).
