@@ -112,6 +112,9 @@ def test_admin_reconciliation_and_retry(client: TestClient, seeded: Session) -> 
         'data-recon="1">3<' in page and 'data-recon="2">1<' in page and 'data-recon="4">1<' in page
     )  # 전체 3(데모 판정 포함)·반영 1·실패 1
     assert "course code not mapped" in page
+    # 대사 카드는 본문에 한 번만 (예전에 메뉴 블록에도 들어가 상단 바에 겹쳐 보였음)
+    assert page.count('id="reconciliation"') == 1
+    assert page.index('id="reconciliation"') > page.index("<main")
     r = client.post("/admin/sis/retry", data={"decision_ids": [b], "csrf_token": token}, follow_redirects=False)
     assert r.status_code == 303
     seeded.expire_all()

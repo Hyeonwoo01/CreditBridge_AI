@@ -217,40 +217,6 @@
   </form>
 </section>
 
-<section id="account-tools" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="account-tools-title">
-  <h2 id="account-tools-title" class="section-title">{{ _("계정 관리") }}</h2>
-  <div class="grid content-start gap-4 lg:grid-cols-2 lg:items-start">
-  <form id="password-reset" method="post" action="/admin/data/password-reset" class="card grid scroll-mt-20 content-start gap-3" data-confirm="{{ _('이 계정의 지금 비밀번호를 무효로 할까요?') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <h3 class="font-semibold">{{ _("비밀번호 초기화") }}</h3>
-    {% if email_enabled %}
-    <p class="text-sm text-muted">{{ _("지금 비밀번호를 무효로 하고 사용자 메일로") }} <strong class="text-ink">{{ _("비밀번호 설정 링크") }}</strong>{{ _("(72시간 유효)를 자동으로 보내요. 비밀번호를 전달할 필요가 없어요. 사용자는 로그인 화면의 \"비밀번호를 잊으셨나요?\"로 직접 재설정할 수도 있고, 로그인 실패 10회로 초기화되면 링크가 자동으로 가요.") }}</p>
-    {% else %}
-    <p class="text-sm text-muted">{{ _("메일 발송이 설정되지 않아 임시 비밀번호를 다시 발급해 화면에 한 번만 보여드려요. 비밀번호를 잊은 사용자, 로그인 실패로 비밀번호가 초기화된 사용자에게 쓰세요. 메일 발송(") }}<code>SMTP_HOST</code>{{ _(")을 설정하면 사용자 메일로 링크가 자동으로 가서 관리자가 처리할 일이 없어져요.") }}</p>
-    {% endif %}
-    <label class="field"><span>{{ _("사용자 이메일") }}</span><input class="input" type="email" name="email" required></label>
-    <button class="btn-secondary w-fit">{{ _('설정 링크 메일 보내기') if email_enabled else _('임시 비밀번호 발급') }}</button>
-    <a href="/admin/accounts" class="btn-text w-fit text-sm">{{ _("이메일을 모르면 계정 목록에서 찾기") }}</a>
-  </form>
-
-  <form id="account-active" method="post" action="/admin/data/accounts/active" class="card grid scroll-mt-20 content-start gap-3">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <h3 class="font-semibold">{{ _("계정 비활성화") }}</h3>
-    <p class="text-sm text-muted">{{ _("졸업·퇴직·휴학한 사람의 로그인을 막아요. 계정은 지우지 않아서 판정·감사 기록은 그대로 남고, 언제든 다시 활성화할 수 있어요.") }}</p>
-    <ul class="list-disc pl-5 text-sm text-muted">
-      <li>{{ _("로그인과 비밀번호 재설정이 막히고, 다른 기기에 남은 로그인도 바로 끊겨요.") }}</li>
-      <li>{{ _("교수 배정·대리 심사자·알림 메일 대상에서 빠지고, 위 계정 수에서도 빠져요.") }}</li>
-      <li>{{ _("교수라면 진행 중인 심사를 같은 학과 다른 교수에게 넘겨요. 넘길 교수가 없으면 배정을 비워 심사관이 다시 배정하게 해요.") }}</li>
-    </ul>
-    <label class="field"><span>{{ _("사용자 이메일") }}</span><input class="input" type="email" name="email" required></label>
-    <div class="flex flex-wrap gap-2">
-      <button class="btn-secondary w-fit" name="action" value="deactivate" data-confirm="{{ _('이 계정을 비활성화할까요? 로그인이 바로 막혀요.') }}">{{ _("비활성화") }}</button>
-      <button class="btn-secondary w-fit border-hairline text-ink" name="action" value="reactivate">{{ _("다시 활성화") }}</button>
-    </div>
-  </form>
-  </div>
-</section>
-
 {# 학칙 정책 (리뷰 v3 P0-4): 승인된 규칙만 적용, 범위가 구체적인 규칙이 우선, 맞는 규칙이 없으면 미정(기본값 없음) #}
 <section id="policies" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="policy-title">
   <h2 id="policy-title" class="section-title">{{ _("학칙 정책") }}</h2>
@@ -363,6 +329,40 @@
     <label class="field"><span>{{ _("적용 입학연도") }}</span><input class="input h-11" name="catalog_year" inputmode="numeric" maxlength="4" placeholder="{{ _('비우면 모두') }}"></label>
     <button class="btn-primary h-11">{{ _("프로그램 추가") }}</button>
   </form>
+</section>
+
+<section id="account-tools" class="mt-10 grid scroll-mt-20 gap-3" aria-labelledby="account-tools-title">
+  <h2 id="account-tools-title" class="section-title">{{ _("계정 관리") }}</h2>
+  <div class="grid content-start gap-4 lg:grid-cols-2 lg:items-start">
+  <form id="password-reset" method="post" action="/admin/data/password-reset" class="card grid scroll-mt-20 content-start gap-3" data-confirm="{{ _('이 계정의 지금 비밀번호를 무효로 할까요?') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h3 class="font-semibold">{{ _("비밀번호 초기화") }}</h3>
+    {% if email_enabled %}
+    <p class="text-sm text-muted">{{ _("지금 비밀번호를 무효로 하고 사용자 메일로") }} <strong class="text-ink">{{ _("비밀번호 설정 링크") }}</strong>{{ _("(72시간 유효)를 자동으로 보내요. 비밀번호를 전달할 필요가 없어요. 사용자는 로그인 화면의 \"비밀번호를 잊으셨나요?\"로 직접 재설정할 수도 있고, 로그인 실패 10회로 초기화되면 링크가 자동으로 가요.") }}</p>
+    {% else %}
+    <p class="text-sm text-muted">{{ _("메일 발송이 설정되지 않아 임시 비밀번호를 다시 발급해 화면에 한 번만 보여드려요. 비밀번호를 잊은 사용자, 로그인 실패로 비밀번호가 초기화된 사용자에게 쓰세요. 메일 발송(") }}<code>SMTP_HOST</code>{{ _(")을 설정하면 사용자 메일로 링크가 자동으로 가서 관리자가 처리할 일이 없어져요.") }}</p>
+    {% endif %}
+    <label class="field"><span>{{ _("사용자 이메일") }}</span><input class="input" type="email" name="email" required></label>
+    <button class="btn-secondary w-fit">{{ _('설정 링크 메일 보내기') if email_enabled else _('임시 비밀번호 발급') }}</button>
+    <a href="/admin/accounts" class="btn-text w-fit text-sm">{{ _("이메일을 모르면 계정 목록에서 찾기") }}</a>
+  </form>
+
+  <form id="account-active" method="post" action="/admin/data/accounts/active" class="card grid scroll-mt-20 content-start gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h3 class="font-semibold">{{ _("계정 비활성화") }}</h3>
+    <p class="text-sm text-muted">{{ _("졸업·퇴직·휴학한 사람의 로그인을 막아요. 계정은 지우지 않아서 판정·감사 기록은 그대로 남고, 언제든 다시 활성화할 수 있어요.") }}</p>
+    <ul class="list-disc pl-5 text-sm text-muted">
+      <li>{{ _("로그인과 비밀번호 재설정이 막히고, 다른 기기에 남은 로그인도 바로 끊겨요.") }}</li>
+      <li>{{ _("교수 배정·대리 심사자·알림 메일 대상에서 빠지고, 위 계정 수에서도 빠져요.") }}</li>
+      <li>{{ _("교수라면 진행 중인 심사를 같은 학과 다른 교수에게 넘겨요. 넘길 교수가 없으면 배정을 비워 심사관이 다시 배정하게 해요.") }}</li>
+    </ul>
+    <label class="field"><span>{{ _("사용자 이메일") }}</span><input class="input" type="email" name="email" required></label>
+    <div class="flex flex-wrap gap-2">
+      <button class="btn-secondary w-fit" name="action" value="deactivate" data-confirm="{{ _('이 계정을 비활성화할까요? 로그인이 바로 막혀요.') }}">{{ _("비활성화") }}</button>
+      <button class="btn-secondary w-fit border-hairline text-ink" name="action" value="reactivate">{{ _("다시 활성화") }}</button>
+    </div>
+  </form>
+  </div>
 </section>
 
 {% endblock %}
