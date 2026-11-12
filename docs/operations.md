@@ -36,7 +36,7 @@ CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니�
 - AI 품질은 관리자 콘솔의 "AI 성능 모니터링"에서 프롬프트·모델 버전별로 봐요(교수 첫 판정과의 일치율, 신뢰도 '상'으로 인정 추천했는데 교수가 다르게 판정한 비율). 가장 최근 버전이 기준(`AI_GATE_*`, 기본: 20건 이상에서 일치율 70% 이상·잘못된 강한 추천 15% 이하)에 못 미치면 맨 위에 경고가 떠요. 교수 판정을 정답으로 단정하지 않으니 사례를 살펴본 뒤, 이전 프롬프트(`backend/ai/prompts/*.md` 버전)나 모델(`CLAUDE_MODEL`·`OPENAI_MODEL`)로 되돌리거나, `.env`에 `AI_RECOMMENDATION_MODE=evidence_only`를 넣고 다시 시작해 추천 등급·신뢰도를 숨기고 근거만 보여 주세요(교수는 결과를 직접 고르고, 학생 예상치에서 AI 추정이 빠져요).
 - 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 실제 AI 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
 - 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
-- 가끔(예: 배포 뒤, 손으로 SQL을 고친 뒤) `docker compose -f docker-compose.prod.yml exec web python -m scripts.integrity_check`로 일부러 두 곳에 둔 값이 어긋나지 않았는지 확인하세요. 읽기만 하고, 어긋나면 점검 이름과 행 id만 보여 줘요(종료 코드 1).
+- 가끔(예: 배포 뒤, 손으로 SQL을 고친 뒤) `docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python -m scripts.integrity_check`로 일부러 두 곳에 둔 값이 어긋나지 않았는지 확인하세요. 읽기만 하고, 어긋나면 점검 이름과 행 id만 보여 줘요(종료 코드 1).
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.

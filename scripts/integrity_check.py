@@ -1,7 +1,7 @@
 """중복 저장 값 정합성 점검 (ERD R2): 두 곳에 둔 값이 어긋난 행의 id를 보여 준다. 읽기만 한다.
 
 실행: uv run python -m scripts.integrity_check   (어긋난 곳이 있으면 종료 코드 1)
-운영 서버: docker compose -f docker-compose.prod.yml exec web python -m scripts.integrity_check
+운영 서버: docker compose -f docker-compose.prod.yml exec web uv run --no-group dev python -m scripts.integrity_check
 출력에는 점검 이름·테이블·행 id만 있다 (이름·학번·문서 내용 없음).
 """
 
