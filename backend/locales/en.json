@@ -1912,5 +1912,10 @@
  "강의계획서 정보 추출": "Syllabus extraction",
  "개념 비교": "Concept comparison",
  "스캔 쪽 글자 옮기기": "Scanned page transcription",
- "성적표 읽기": "Transcript reading"
+ "성적표 읽기": "Transcript reading",
+ "졸업 요건 영역": "Graduation requirement",
+ "자동 (과목 목록 기준)": "Automatic (by course list)",
+ "자동이면 대상 과목이 들어 있는 요건, 없으면 일반 선택에 넣어요. 고른 요건의 필요 학점을 넘는 학점은 일반 선택으로 넘어가요. 불인정이면 쓰지 않아요.": "Automatic puts the credit in the requirement that lists the target course, otherwise in free electives. Credit beyond the chosen requirement's total moves to free electives. Ignored for a rejection.",
+ "졸업 요건: {area} · {name}": "Graduation requirement: {area} · {name}",
+ "졸업 요건을 이 학생의 졸업 프로그램 목록에서 골라 주세요.": "Choose a graduation requirement from this student's degree program."
 }

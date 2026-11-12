@@ -1032,5 +1032,13 @@ CREATE INDEX ix_llm_usage_job_id ON llm_usage (job_id);
 
 UPDATE alembic_version SET version_num='0020' WHERE alembic_version.version_num = '0019';
 
+-- Running upgrade 0020 -> 0021
+
+ALTER TABLE credit_allocations ADD COLUMN requirement_id BIGINT;
+
+ALTER TABLE credit_allocations ADD CONSTRAINT fk_credit_allocations_requirement_id_graduation_requirements FOREIGN KEY(requirement_id) REFERENCES graduation_requirements (id) ON DELETE SET NULL;
+
+UPDATE alembic_version SET version_num='0021' WHERE alembic_version.version_num = '0020';
+
 COMMIT;
 

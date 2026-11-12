@@ -28,6 +28,7 @@ class DecisionIn(BaseModel):
     case_token: str | None = None  # 조회 때 받은 상태 토큰. 그 사이 바뀌었으면 409 (낙관적 잠금)
     checklist: list[str] = []  # 분야별 심사 체크리스트에서 확인한 항목 키 (리뷰 v3 P1-1)
     missing_evidence: list[str] = []  # 자료가 없어 확인하지 못한 항목 키
+    requirement_id: int | None = None  # 넣을 졸업 요건 (학생 프로그램의 요건, 비우면 자동 배정, 리뷰 v3 P1-6)
 
 
 @router.post("/decisions", status_code=201)
@@ -52,6 +53,7 @@ def create_decision(
             case_token=body.case_token,
             checklist=body.checklist,
             missing_evidence=body.missing_evidence,
+            requirement_id=body.requirement_id,
         )
     except (decision_service.ConflictNeedsAcknowledgement, ConcurrentChangeError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

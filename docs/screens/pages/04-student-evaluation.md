@@ -49,7 +49,7 @@
 | 추천 배지 | `confidence-badge-pill` | 직접 인정·선택 인정·불인정·정보 부족 | 의미 색 3쌍 (P03 표와 같음) |
 | 신뢰도 배지 | `confidence-badge-pill` | 상·중·하 | 상 approve, 중 elective, 하 reject |
 | 수준 차이 | `confidence-badge-pill` | "낮은 수준" 등 | reject 쌍 |
-| 교수 판정 | 테두리 박스 | 결과·대상 과목 / 판정자·시각·승인/수정/반려 / 사유 칩 이름·메모. 이의 신청 후에는 재판정이 위, 원 판정은 흐리게 | 최신: 테두리 `{colors.ink}` 60%, 이전: `{colors.hairline}` + muted |
+| 교수 판정 | 테두리 박스 | 결과·대상 과목 / 교수가 고른 졸업 요건이 있으면 "졸업 요건: 영역 · 이름"(`data-decision-requirement`) / 판정자·시각·승인/수정/반려 / 사유 칩 이름·메모. 이의 신청 후에는 재판정이 위, 원 판정은 흐리게 | 최신: 테두리 `{colors.ink}` 60%, 이전: `{colors.hairline}` + muted |
 | 보완 요청 | 앰버 박스 | 요청 항목 목록, 메모, 요청자, 제출 대기/제출됨 | `{colors.surface-elective-subtle}` |
 | 정보 부족 | 앰버 카드 | 근거 부족 개념 칩, 기재 없는 항목, 함께 내면 좋은 자료 | `{colors.surface-elective-subtle}`, 칩 `decision-option-chip` |
 | 후보 과목 | `<details>` 카드 | "N순위 · 코드 과목명" / 수준 배지 / 커버리지 % | 흰 카드 `{rounded.lg}`, 패딩 24px |

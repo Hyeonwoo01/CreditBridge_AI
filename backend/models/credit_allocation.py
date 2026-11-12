@@ -28,3 +28,8 @@ class CreditAllocation(IdMixin, CreatedAtMixin, Base):
     credit_unit: Mapped[str | None] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(12), default=AllocationStatus.ACTIVE, index=True)
     superseded_by_decision_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("decisions.id"))
+    # 교수가 판정 때 고른 졸업 요건 (리뷰 v3 P1-6). 비우면 자동(과목 목록 기준) 배정.
+    # 요건을 지우면 비워져 자동으로 돌아가고, 그때 고른 요건 이름·영역은 판정의 course_snapshot에 남는다
+    requirement_id: Mapped[int | None] = mapped_column(
+        IdType, ForeignKey("graduation_requirements.id", ondelete="SET NULL"), default=None
+    )

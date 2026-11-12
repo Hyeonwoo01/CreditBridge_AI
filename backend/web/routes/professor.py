@@ -68,6 +68,7 @@ def decide(
     case_token: str = Form(""),
     checklist: list[str] = Form([]),
     missing_evidence: list[str] = Form([]),
+    requirement_id: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Professor,
     session: Session = Depends(get_db),
@@ -76,6 +77,7 @@ def decide(
     form = {
         "checklist": checklist,
         "missing_evidence": missing_evidence,
+        "requirement_id": requirement_id,
         "accepted_credits": accepted_credits,
         "combined_syllabus_ids": combined_syllabus_ids,
         "action": action,
@@ -100,6 +102,7 @@ def decide(
             case_token=case_token or None,
             checklist=checklist,
             missing_evidence=missing_evidence,
+            requirement_id=int(requirement_id) if requirement_id.isdigit() else None,
         )
     except ConcurrentChangeError as exc:
         session.rollback()

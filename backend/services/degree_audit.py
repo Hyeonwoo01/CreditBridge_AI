@@ -5,8 +5,10 @@
 
 - 학생 프로그램: 학생의 편입 전공(학과)·입학연도가 맞는 프로그램 중 가장 구체적인 것. 없거나 같은 구체성에서 둘 이상이면
   미정(unresolved)으로 두고 졸업 가능 여부를 단정하지 않는다.
-- 배정 규칙(같은 학점을 두 요건에 세지 않음): 승인된 배분 원장의 줄마다 대상 과목이 요건의 과목 목록에 있으면 그 요건
-  (정렬 순서상 처음), 아니면 일반 선택. 필요 학점을 넘는 학점은 일반 선택으로 넘기고, 일반 선택이 없으면 '배정 안 됨'.
+- 배정 규칙(같은 학점을 두 요건에 세지 않음): 승인된 배분 원장의 줄마다 교수가 판정 때 고른 요건(requirement_id)이
+  이 프로그램에 있으면 그 요건, 아니면(자동) 대상 과목이 요건의 과목 목록에 있으면 그 요건(정렬 순서상 처음),
+  아니면 일반 선택.
+  필요 학점을 넘는 학점은 일반 선택으로 넘기고, 일반 선택이 없으면 '배정 안 됨'.
 - 확정 학점(원장)과 심사 중 예상 학점(AI 추천, 판정 전)은 따로 센다. 예상치는 확정 합계에 넣지 않는다.
 """
 
@@ -96,10 +98,17 @@ def program_for(session: Session, student: User, institution_id: int) -> tuple[D
 
 
 def _place(
-    rows: list[RequirementProgress], code: str | None, credits: float, attr: str, label: str | None = None
+    rows: list[RequirementProgress],
+    code: str | None,
+    credits: float,
+    attr: str,
+    label: str | None = None,
+    requirement_id: int | None = None,
 ) -> float:
-    """학점을 요건에 배정하고 배정하지 못한 학점을 돌려준다 (필요 학점을 넘으면 일반 선택으로 넘김)."""
-    target = next((r for r in rows if code and code in (r.requirement.course_codes or [])), None)
+    """학점을 요건에 배정하고 배정하지 못한 학점을 돌려준다 (필요 학점을 넘으면 일반 선택으로 넘김).
+    requirement_id: 교수가 고른 요건. 이 프로그램에 없으면(다른 프로그램 요건·지운 요건) 자동 규칙으로 배정한다."""
+    chosen = next((r for r in rows if requirement_id and r.requirement.id == requirement_id), None)
+    target = chosen or next((r for r in rows if code and code in (r.requirement.course_codes or [])), None)
     free = next((r for r in rows if r.requirement.area == RequirementArea.FREE_ELECTIVE), None)
     left = credits
     if target is not None and target is not free:
@@ -130,7 +139,12 @@ def audit_for(session: Session, student: User, institution_id: int, rows: list[C
         course = courses.get(allocation.target_course_id) if allocation.target_course_id else None
         label = f"{source.course_code or source.course_title} → {course.code if course else tr('일반 선택')}"
         out.unassigned += _place(
-            out.rows, course.code if course else None, float(allocation.credits), "confirmed", label
+            out.rows,
+            course.code if course else None,
+            float(allocation.credits),
+            "confirmed",
+            label,
+            allocation.requirement_id,
         )
     if not get_settings().ai_limited:  # 추천 범위 제한 중에는 예상치를 만들지 않는다 (P1-7)
         for row in rows:
@@ -145,6 +159,30 @@ def audit_for(session: Session, student: User, institution_id: int, rows: list[C
             _place(out.rows, code, credit, "pending")
     out.unassigned = round(out.unassigned, 2)
     return out
+
+
+def requirement_options(
+    session: Session, student: User | None, institution_id: int
+) -> tuple[DegreeProgram | None, list[GraduationRequirement]]:
+    """교수 판정 화면에서 고를 수 있는 졸업 요건: 그 학생에게 맞는 프로그램의 요건.
+    프로그램이 미정이면 고를 것이 없다."""
+    if student is None:
+        return None, []
+    program, _ = program_for(session, student, institution_id)
+    return (program, degree_repo.requirements_of(session, [program.id])) if program else (None, [])
+
+
+def chosen_requirement(
+    session: Session, student: User | None, institution_id: int, requirement_id: int | None
+) -> GraduationRequirement | None:
+    """판정 때 고른 요건을 확인한다. 비우면 자동(None). 그 학생 프로그램의 요건이 아니면 오류."""
+    if requirement_id is None:
+        return None
+    _, options = requirement_options(session, student, institution_id)
+    found = next((r for r in options if r.id == requirement_id), None)
+    if found is None:
+        raise CreditBridgeError(tr("졸업 요건을 이 학생의 졸업 프로그램 목록에서 골라 주세요."))
+    return found
 
 
 # ---------- 관리자: 프로그램·요건 관리 ----------

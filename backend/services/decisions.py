@@ -12,10 +12,19 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
-from backend.errors import DecisionValidationError, NotFoundError, PermissionDeniedError
+from backend.errors import CreditBridgeError, DecisionValidationError, NotFoundError, PermissionDeniedError
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import Course, CourseEvaluation, CreditAllocation, Decision, Syllabus, TransferRequest, User
+from backend.models import (
+    Course,
+    CourseEvaluation,
+    CreditAllocation,
+    Decision,
+    GraduationRequirement,
+    Syllabus,
+    TransferRequest,
+    User,
+)
 from backend.models.enums import (
     AppealStatus,
     DecisionAction,
@@ -34,7 +43,7 @@ from backend.repositories import requests as request_repo
 from backend.repositories import syllabi as syllabus_repo
 from backend.repositories import users as user_repo
 from backend.services import appeals as appeal_service
-from backend.services import audit, case_state, notifications, review_frameworks, scoring
+from backend.services import audit, case_state, degree_audit, notifications, review_frameworks, scoring
 from backend.services import credits as credit_service
 from backend.services import evidence_status as evidence_service
 from backend.services import policy as policy_service
@@ -172,10 +181,20 @@ def course_snapshot(
     combined: list[Syllabus],
     conversion: credit_service.Conversion,
     source_institution: str | None,
+    requirement: GraduationRequirement | None = None,
 ) -> dict[str, Any]:
-    """판정 때의 과목·환산 규칙 값 (리뷰 v3 P0-8 결정 재현). 카탈로그·규칙이 바뀌어도 이 값으로 다시 보여 준다."""
+    """판정 때의 과목·환산 규칙 값 (리뷰 v3 P0-8 결정 재현). 카탈로그·규칙이 바뀌어도 이 값으로 다시 보여 준다.
+    requirement: 교수가 고른 졸업 요건 (없으면 자동 배정, P1-6). 요건을 나중에 고치거나 지워도 그때 값이 남는다."""
     rule = conversion.rule
     return {
+        "requirement": {
+            "id": requirement.id,
+            "program_id": requirement.program_id,
+            "area": requirement.area,
+            "name": requirement.name,
+        }
+        if requirement
+        else None,
         "target": {
             "id": target.id,
             "code": target.code,
@@ -356,13 +375,15 @@ def decide(
     case_token: str | None = None,
     checklist: list[str] | None = None,
     missing_evidence: list[str] | None = None,
+    requirement_id: int | None = None,
 ) -> Decision:
     """accepted_credits: 교수가 적은 인정 학점(대상 대학 단위). 비우면 환산 규칙으로 계산한 제안값을 쓰고,
     환산할 수 없으면 인정하는 판정은 직접 적어야 한다 (학점을 지어내지 않음).
     combined_syllabus_ids: 이 과목과 합쳐 하나로 인정할 같은 학생의 다른 출신 과목(N:1). 인정 학점은 과목별 남은
     학점에 비례해 나눠 원장(credit_allocations)에 한 줄씩 남긴다. 한 출신 과목 학점의 이중 사용과 같은 대상 과목의
     이중 인정은 막는다.
-    case_token: 화면을 열 때의 상태 토큰. 그 사이 다른 사람이 판정·배정 등을 바꿨으면 덮어쓰지 않는다 (P0-6)."""
+    case_token: 화면을 열 때의 상태 토큰. 그 사이 다른 사람이 판정·배정 등을 바꿨으면 덮어쓰지 않는다 (P0-6).
+    requirement_id: 이 인정 학점을 넣을 졸업 요건(학생 프로그램의 요건, P1-6). 비우면 과목 목록 기준 자동 배정."""
     evaluation = evaluation_repo.get(session, evaluation_id)
     if evaluation is None:
         raise NotFoundError(tr("심사 건을 찾을 수 없어요."))
@@ -438,6 +459,14 @@ def decide(
         raise DecisionValidationError(tr(message, credits=f"{value:g}") if value is not None else tr(message))
     basis = credit_service.basis_for(final, accepted, target)
     plan = _allocation_plan(session, evaluation, request, primary, combined, conversion, final, accepted, target)
+    requirement = None
+    if requirement_id is not None and final != DecisionResult.NONE and request is not None:
+        try:
+            requirement = degree_audit.chosen_requirement(
+                session, user_repo.get_by_id(session, request.student_id), request.target_institution_id, requirement_id
+            )
+        except CreditBridgeError as exc:
+            raise DecisionValidationError(str(exc)) from exc
 
     found = conflicts(history(session, evaluation), final)
     if found and not acknowledge_conflict:
@@ -476,6 +505,7 @@ def decide(
                 [c for c, _ in combined],
                 conversion,
                 request.source_institution.name if request else None,
+                requirement,
             )
             if primary is not None
             else None,
@@ -497,6 +527,7 @@ def decide(
                 target_course_id=target.id if target else None,
                 credits=share,
                 credit_unit=conversion.target_unit,
+                requirement_id=requirement.id if requirement else None,
             )
             for syllabus, share in plan
         ],
@@ -520,6 +551,7 @@ def decide(
         credit_basis=basis,
         conversion_rule=conversion.rule.id if conversion.rule else None,
         combined_sources=[s.id for s, _ in combined],
+        requirement=requirement.id if requirement else None,
     )
     _notify_student(session, evaluation, final, redecided=appeal is not None)
     if evaluation.transfer_request_id is not None:

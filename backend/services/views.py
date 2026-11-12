@@ -121,6 +121,9 @@ class EvaluationView:
     case_token: str = ""  # 화면을 열 때의 상태 토큰. 저장 폼에 실어 동시 수정을 막는다
     appeal_deadline: appeal_service.Deadline | None = None  # 이의 신청 기한 (학칙 정책, 판정이 있을 때만)
     framework: review_frameworks.Framework | None = None  # 교수 판정 화면: 분야별 심사 체크리스트 (리뷰 v3 P1-1)
+    # 교수 판정 화면: 고를 수 있는 졸업 요건 (학생 프로그램, 리뷰 v3 P1-6). 비어 있으면 선택 칸을 숨긴다
+    requirement_program: Any = None
+    requirement_options: list[Any] = field(default_factory=list)
 
     def span_id(self, side: str, evidence: EvidenceView, course_code: str, concept: str) -> int | None:
         return self.span_ids.get((side, evidence.char_start, evidence.char_end, f"{course_code}|{concept}"[:255]))
@@ -248,6 +251,9 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
     view.taken_term = evidence_service.taken_term(session, syllabus)
     if user.role == Role.PROFESSOR and (decision is None or view.awaiting_redecision):
         view.combinable = decision_service.combinable_sources(session, evaluation)
+        view.requirement_program, view.requirement_options = degree_audit.requirement_options(
+            session, user_repo.get_by_id(session, request.student_id), request.target_institution_id
+        )
     if decision is not None:
         rows = allocation_repo.for_decisions(session, [decision.id])
         sources = {s.id: s for s in syllabus_repo.by_ids(session, [a.syllabus_id for a in rows])}

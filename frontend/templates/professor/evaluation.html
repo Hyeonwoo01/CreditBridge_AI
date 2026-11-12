@@ -47,6 +47,18 @@
       {% else %}<span class="text-elective">{{ _("자동 계산할 수 없어요:") }} {{ (cr.reason if cr else '') | t }}.</span> {{ _("인정하는 판정이면 인정 학점을 직접 적어 주세요. 관리자는 계정·과목 화면에서 학점 단위와 환산 규칙을 정할 수 있어요.") }}{% endif %}
     </p>
   </div>
+  {% if v.requirement_options %}
+  {# 졸업 요건 영역 (리뷰 v3 P1-6): 비우면 자동(과목 목록에 있으면 그 요건, 아니면 일반 선택). 고르면 학생 졸업 요건 표에 그대로 #}
+  <div class="grid gap-2 md:grid-cols-2 md:items-end" data-requirement-select>
+    <label class="field"><span>{{ _("졸업 요건 영역") }} <span class="text-muted">({{ v.requirement_program.name }})</span></span>
+      <select name="requirement_id" class="input h-11">
+        <option value="">{{ _("자동 (과목 목록 기준)") }}</option>
+        {% for r in v.requirement_options %}<option value="{{ r.id }}" {% if f.get('requirement_id') == r.id|string %}selected{% endif %}>{{ r.area | req_area }} · {{ r.name }}{% if r.course_codes %} ({{ r.course_codes | join(', ') }}){% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <p class="text-sm text-muted">{{ _("자동이면 대상 과목이 들어 있는 요건, 없으면 일반 선택에 넣어요. 고른 요건의 필요 학점을 넘는 학점은 일반 선택으로 넘어가요. 불인정이면 쓰지 않아요.") }}</p>
+  </div>
+  {% endif %}
   {% if v.framework %}
   {# 분야별 심사 체크리스트 (리뷰 v3 P1-1): 판정을 대신하는 점수가 아니라 검토 누락을 줄이는 확인 항목. 판정 기록에 남는다 #}
   <fieldset class="grid gap-2" data-checklist="{{ v.framework.key }}">
