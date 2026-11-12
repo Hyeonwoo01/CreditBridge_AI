@@ -177,6 +177,8 @@ uv run pytest tests/eval -m eval             # 골든셋 평가: 실제 AI API(�
 
 같은 검사를 푸시·PR마다 [GitHub Actions](.github/workflows/ci.yml)가 PostgreSQL 17 서비스 컨테이너로 다시 돌립니다(번역 점검 `scripts.i18n_check`, 문서 점검 `scripts.docs_check` 포함 — 엔드포인트·테이블 칸·화면 버튼 표가 문서에 빠짐없는지).
 
+마이그레이션은 데이터가 있는 DB로도 시험합니다. `tests/integration/test_migrations.py`가 0002·0009 시점의 옛 데이터(`scripts/demo_data/migration/*.sql`)를 넣고 head까지 올려 백필 결과를 확인하고, head → 0002 → head 되돌리기도 지나가는지 봅니다(TEST_DATABASE_URL의 DB 이름 뒤에 `_migrations`를 붙인 별도 DB). 직접 들여다보려면 `uv run python -m scripts.migration_demo --database-url postgresql+psycopg://creditbridge:change-me@localhost:5432/cb_migration [--to 0006]` — 지정한 DB의 스키마를 지우고 다시 만들며, 앱 DB는 거절합니다. head까지 올린 DB는 `DATABASE_URL`을 그 주소로 바꿔 앱으로 열 수 있습니다(예: `admin@legacy.example`, `multi@student.example`, 비밀번호 `demo1234`).
+
 테스트에서는 AI·S3를 대역(`tests/fakes.py`)으로 바꿉니다. 대역 AI는 일부러 원문에 없는 구절을 섞어 내보내고, 테스트는 그 구절이 저장되지 않는지 확인합니다.
 
 ## 구조
@@ -208,7 +210,7 @@ frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (PostgreSQL 17, 기준점 0001에 이전 MariaDB 마이그레이션을 합침)
 db/              init.sql(스키마, alembic --sql로 생성) · data.sql(데모 초기 데이터, pg_dump로 생성) — scripts/export_db_sql.sh로 다시 만듦
-scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · docs_check(API 명세·ERD·화면 명세 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · docs_check(API 명세·ERD·화면 명세 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · migration_demo(옛 데이터로 마이그레이션 시험) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
 tests/           unit · integration(PostgreSQL) · eval(골든셋) · fixtures/(학점 계산·문서 추출 회귀 기대값, 인젝션 공격 문구 모음)
 ```
 
