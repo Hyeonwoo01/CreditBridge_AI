@@ -25,6 +25,10 @@ class Course(IdMixin, CreatedAtMixin, Base):
     reference_syllabus_id: Mapped[int | None] = mapped_column(IdType, ForeignKey("syllabi.id", use_alter=True))
     # 학과가 정한 필수 개념 (과목 CSV). 비어 있으면 기준 강의계획서 청크의 개념을 쓴다
     concepts: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
+    # 이 과목 값을 마지막으로 정한 카탈로그 게시본 (출처·학년도·게시자, 0018부터). 그 전 과목은 비어 있다
+    catalog_import_id: Mapped[int | None] = mapped_column(
+        IdType, ForeignKey("catalog_imports.id", use_alter=True), default=None
+    )
 
     dept: Mapped[Department] = relationship(lazy="joined")
 

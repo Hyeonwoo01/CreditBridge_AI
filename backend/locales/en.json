@@ -368,7 +368,6 @@
  "과거 판정과 다른 결과임을 확인하고 확정함": "Finalized after acknowledging it differs from past decisions",
  "과거 판정을 확인했고 이 판정으로 확정합니다": "I've reviewed the past decisions and confirm this decision",
  "과목": "the course",
- "과목 {created}건을 새로 만들고 {updated}건을 고쳤어요.": "Created {created} courses and updated {updated}.",
  "과목 {n}개": [
   "{n} course",
   "{n} courses"
@@ -1827,5 +1826,27 @@
  "일치율 낮은 학과": "Lowest-agreement departments",
  "기준": "Bar",
  "최근 버전에서 교수가 고른 수정·반려 사유:": "Reasons professors chose to modify or reject in the latest version:",
- "아직 교수 판정이 없어 비교할 수 없어요.": "No professor decisions yet to compare."
+ "아직 교수 판정이 없어 비교할 수 없어요.": "No professor decisions yet to compare.",
+ "적용 학년도는 네 자리 연도로 적어 주세요.": "Enter the catalog year as a four-digit year.",
+ "가져오기 기록을 찾을 수 없어요.": "Couldn't find that import.",
+ "이미 게시했거나 버린 가져오기예요.": "This import was already published or discarded.",
+ "과목 CSV를 검증했어요. 바뀌는 점을 확인한 뒤 게시해 주세요.": "The course CSV passed validation. Review the changes, then publish.",
+ "카탈로그를 게시했어요. 과목 {created}건을 새로 만들고 {updated}건을 고쳤어요.": "Published the catalog: created {created} courses and updated {updated}.",
+ "게시 대기본을 버렸어요. 카탈로그는 바뀌지 않았어요.": "Discarded the pending import. The catalog didn't change.",
+ "과목명": "Title",
+ "수준": "Level",
+ "(예: 2027 학사 편람, 포털 주소)": "(e.g., 2027 bulletin, portal URL)",
+ "적용 학년도": "Catalog year",
+ "(올린 날짜와 다를 수 있어요)": "(may differ from the upload date)",
+ "검증하기": "Validate",
+ "바로 반영하지 않아요. 검증을 통과하면 바뀌는 점을 보여 주고, 게시해야 카탈로그와 AI 비교 후보에 반영돼요.": "Nothing changes yet. After validation you'll see what would change; publishing applies it to the catalog and AI candidates.",
+ "게시 대기 중인 카탈로그": "Catalog waiting to publish",
+ "{file} · 출처 {source} · 적용 학년도 {year} · 올린 날 {date}": "{file} · source {source} · catalog year {year} · uploaded {date}",
+ "새 과목 {n}개": "{n} new courses",
+ "바뀌는 과목 {n}개": "{n} changed courses",
+ "그대로인 과목 {n}개": "{n} unchanged courses",
+ "게시": "Publish",
+ "버리기": "Discard",
+ "출처 {source} · {year}학년도 · {name} 게시 {date}": "Source {source} · {year} catalog · published by {name} on {date}",
+ "출처 기록 없음 (게시 절차 이전)": "No source record (before publishing workflow)"
 }

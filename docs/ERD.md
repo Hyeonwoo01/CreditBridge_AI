@@ -6,7 +6,7 @@
 - DB: PostgreSQL 17, 인코딩 UTF8. 시간은 모두 UTC `TIMESTAMP`(시간대 없음, 마이크로초). 기본키는 `id BIGSERIAL`(BIGINT + 시퀀스). JSON 컬럼은 `JSONB`.
 - 원본 파일(강의계획서·성적표·보완 자료·이의 근거 자료)은 DB가 아니라 객체 스토리지(S3)에 두고 DB에는 파일 키만 저장한다.
 
-## 1. 엔티티 한눈에 보기 (32개)
+## 1. 엔티티 한눈에 보기 (33개)
 
 | 영역 | 엔티티 | 한 줄 설명 | 주요 FR |
 | --- | --- | --- | --- |
@@ -15,6 +15,7 @@
 | | `departments` | 대상 대학의 학과 (과목·교수 배정 기준) | FR-05·18 |
 | | `users` | 학생·심사관·교수·관리자 계정 | FR-12·19 |
 | | `courses` | 대상 대학 카탈로그 과목과 필수 개념 | FR-05 |
+| | `catalog_imports` | 과목 카탈로그 가져오기 (검증 → 바뀌는 점 확인 → 게시, 출처·적용 학년도·게시자) | 리뷰 v3 P1-2 |
 | 편입 요청·문서 | `student_transcripts` | 학생 계정의 성적표 (학생당 하나, 처음 들어오면 먼저 올림) | FR-02·13 |
 | | `transfer_requests` | 편입 학점 심사 요청 (성적표의 C 이상 과목마다 하나, 예전 방식은 여러 과목 묶음) | FR-15·21 |
 | | `syllabi` | 강의계획서(학생 업로드·대상 과목 기준)와 추출 결과 | FR-01·03·04·14·25 |
@@ -373,8 +374,11 @@ erDiagram
 | level | TEXT | NN | 과목 수준 설명 (FR-16) |
 | concepts | JSONB | null | 학과가 정한 필수 개념 목록 (FR-05) |
 | reference_syllabus_id | BIGINT | FK→syllabi, null | 기준 강의계획서 |
+| catalog_import_id | BIGINT | FK→catalog_imports, null | 이 과목 값을 마지막으로 정한 카탈로그 게시본(출처·적용 학년도·게시자·게시 시각, Alembic 0018, 리뷰 v3 P1-2). 그 전에 만든 과목은 비어 있음 |
 
 ### 3.2 편입 요청·문서
+
+**catalog_imports** — 대상 대학 과목 카탈로그 가져오기 한 번 (Alembic 0018, 리뷰 v3 P1-2). `institution_id` FK(IX), `filename` VARCHAR(255), `file_hash` VARCHAR(64)(원본 SHA-256, 파일은 저장하지 않음), `source` TEXT(출처: 학사 편람·포털 주소), `catalog_year` INT null(적용 학년도 — 올린 날짜와 다름), `status` VARCHAR(10)(draft·published·discarded, CHECK, IX), `rows` JSONB(검증을 통과한 행), `changes` JSONB(added: 새 과목 코드, changed: 과목 코드 → 필드별 [이전, 새 값], unchanged: 그대로인 수 — 게시 직전에 다시 계산해 남김, 과목 버전 이력), `created_by` FK→users, `reviewed_by` FK→users null·`reviewed_at`(게시·버린 관리자와 시각), `created_at`. 게시 대기본은 기관마다 하나(새로 올리면 이전 대기본은 discarded). 게시 전 행은 AI 후보에 쓰이지 않는다.
 
 **student_transcripts** — 학생 계정의 성적표 (학생당 하나, Alembic 0007). 처음 들어오면 먼저 올리고, 과목 줄을 뽑으면 성적이 C 이상인 과목마다 편입 요청을 만든다. 요청 문서를 삭제해도 계정 성적표는 남는다.
 

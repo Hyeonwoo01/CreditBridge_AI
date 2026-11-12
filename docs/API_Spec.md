@@ -134,7 +134,8 @@ CreditBridge AI는 서버가 화면을 그려 보내는 앱이다 (FastAPI + Jin
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | M1 | GET | `/admin/stats` | 관리자 | – | HTML | P10 | FR-10·13·24·27 |
 | M2 | GET | `/admin/data` | 관리자 | – | HTML | P18 | – |
-| M3 | POST | `/admin/data/courses` | 관리자 | `file`(CSV), `csrf_token` | 303→M2`#courses` / 422 | P18 | – |
+| M3 | POST | `/admin/data/courses` | 관리자 | `file`(CSV), `source`(출처), `catalog_year`(적용 학년도), `csrf_token` | 303→M2`#catalog-review` (검증을 통과하면 게시 대기본을 만들고 카탈로그는 아직 바꾸지 않음, 이전 대기본은 버림) / 422(행 오류) | P18 | 리뷰 v3 P1-2 |
+| M29 | POST | `/admin/data/imports/{id}/{action}` | 관리자(소속 기관) | `action`(publish·discard), `csrf_token` | 303→M2`#courses` (게시하면 과목 반영·과목마다 출처 기록, 버리면 그대로) / 플래시(이미 게시·버림) / 403·404 | P18 | 리뷰 v3 P1-2 |
 | M4 | POST | `/admin/data/courses/{id}/reference` | 관리자 | `file`, `csrf_token` | 303→M2`#courses` | P18 | FR-05 |
 | M5 | POST | `/admin/data/accounts` | 관리자 | `file`(CSV), `csrf_token` | HTML(결과 카드, 임시 비밀번호는 한 번만) / 422 | P18 | FR-12 |
 | M6 | POST | `/admin/data/password-reset` | 관리자 | `email`, `csrf_token` | 303 또는 HTML(임시 비밀번호 한 번만) | P18 | – |

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import time %}
 {% block nav %}{% include "admin/_nav.html" %}{% endblock %}
 {% block crumb %}{{ _("관리자 콘솔 · 계정·과목") }}{% endblock %}
 {% block content %}
@@ -95,9 +96,34 @@
     </ul>
     <a href="/static/samples/courses.csv" download class="btn-text w-fit text-sm">{{ _("예시 파일 받기") }}</a>
     {{ file_field(".csv,text/csv") }}
-    <button class="btn-primary w-fit">{{ _("과목 가져오기") }}</button>
+    <div class="grid gap-3 md:grid-cols-2">
+      <label class="field"><span>{{ _("출처") }} <span class="text-muted">{{ _("(예: 2027 학사 편람, 포털 주소)") }}</span></span><input class="input h-11" name="source" maxlength="500"></label>
+      <label class="field"><span>{{ _("적용 학년도") }} <span class="text-muted">{{ _("(올린 날짜와 다를 수 있어요)") }}</span></span><input class="input h-11" name="catalog_year" inputmode="numeric" maxlength="4" placeholder="2027"></label>
+    </div>
+    <button class="btn-primary w-fit">{{ _("검증하기") }}</button>
+    <p class="text-xs text-muted">{{ _("바로 반영하지 않아요. 검증을 통과하면 바뀌는 점을 보여 주고, 게시해야 카탈로그와 AI 비교 후보에 반영돼요.") }}</p>
     {% if course_errors %}{{ errors_box(course_errors) }}{% endif %}
   </form>
+  {% set pi = o.pending_import %}
+  {% if pi %}
+  {# 게시 대기본 (리뷰 v3 P1-2): 올리기 → 검증 → 바뀌는 점 확인 → 게시 #}
+  <div id="catalog-review" class="card mt-3 grid scroll-mt-20 gap-3" data-catalog-draft="{{ pi.id }}">
+    <h3 class="font-semibold">{{ _("게시 대기 중인 카탈로그") }}</h3>
+    <p class="text-sm text-muted">{{ _("{file} · 출처 {source} · 적용 학년도 {year} · 올린 날 {date}", file=pi.filename, source=(pi.source or '–'), year=(pi.catalog_year or '–'), date=time(pi.created_at, 'date')) }}</p>
+    <ul class="grid gap-1 text-sm">
+      <li>{{ _("새 과목 {n}개", n=(pi.changes.added | length)) }}{% if pi.changes.added %}: <span class="font-mono text-[13px]">{{ pi.changes.added[:10] | join(', ') }}{% if pi.changes.added | length > 10 %} …{% endif %}</span>{% endif %}</li>
+      <li>{{ _("바뀌는 과목 {n}개", n=(pi.changes.changed | length)) }}</li>
+      {% for code, diff in (pi.changes.changed.items() | list)[:10] %}
+      <li class="pl-4 text-muted"><span class="font-mono text-[13px] text-ink">{{ code }}</span> — {% for fld, pair in diff.items() %}{{ fld | catalog_field }}: {{ pair[0] | join(', ') if pair[0] is sequence and pair[0] is not string else pair[0] }} → <span class="text-ink">{{ pair[1] | join(', ') if pair[1] is sequence and pair[1] is not string else pair[1] }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</li>
+      {% endfor %}
+      <li class="text-muted">{{ _("그대로인 과목 {n}개", n=pi.changes.unchanged) }}</li>
+    </ul>
+    <div class="flex flex-wrap gap-2">
+      <form method="post" action="/admin/data/imports/{{ pi.id }}/publish"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-primary">{{ _("게시") }}</button></form>
+      <form method="post" action="/admin/data/imports/{{ pi.id }}/discard"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-secondary">{{ _("버리기") }}</button></form>
+    </div>
+  </div>
+  {% endif %}
 </section>
 
 <section id="courses" class="mt-10 grid scroll-mt-20 gap-3" aria-label="{{ _('② 과목별 기준 강의계획서') }}">
@@ -115,7 +141,7 @@
         {% set c = r.course %}
         {% set st = r.reference_status %}
         <tr class="border-t border-divider align-middle">
-          <td class="px-5 py-3"><span class="font-mono text-[13px] font-semibold">{{ c.code }}</span><div class="text-xs text-ink-80">{{ c.title }}</div></td>
+          <td class="px-5 py-3"><span class="font-mono text-[13px] font-semibold">{{ c.code }}</span><div class="text-xs text-ink-80">{{ c.title }}</div>{% set pv = o.provenance.get(c.catalog_import_id) %}<div class="text-xs text-muted" data-provenance>{% if pv %}{{ _("출처 {source} · {year}학년도 · {name} 게시 {date}", source=(pv.source or pv.filename), year=(pv.catalog_year or '–'), name=o.reviewers.get(pv.reviewed_by, ''), date=time(pv.reviewed_at, 'date')) }}{% else %}{{ _("출처 기록 없음 (게시 절차 이전)") }}{% endif %}</div></td>
           <td class="px-3 py-3">{{ c.department_name }}</td>
           <td class="px-3 py-3 tabular-nums">{{ c.credits }}</td>
           <td class="px-3 py-3">{% if r.concepts %}<span title="{{ r.concepts | join(', ') }}">{{ _("{concepts}개", concepts=(r.concepts | length)) }}</span>{% else %}<span class="text-muted">{{ _("기준 강의계획서 기준") }}</span>{% endif %}</td>

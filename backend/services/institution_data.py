@@ -7,10 +7,12 @@
 CSV 파일 검사·인코딩은 services/csv_import.py. 한 줄이라도 틀리면 아무것도 저장하지 않는다.
 """
 
+import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,7 @@ from backend.i18n import N_
 from backend.i18n import gettext as tr
 from backend.models import (
     Assignment,
+    CatalogImport,
     Course,
     CreditConversionRule,
     Department,
@@ -34,6 +37,7 @@ from backend.models import (
 )
 from backend.models.enums import (
     Authenticity,
+    CatalogImportStatus,
     ConversionMethod,
     CreditSystem,
     PolicyRuleType,
@@ -92,6 +96,7 @@ class CourseImport:
     created: int = 0
     updated: int = 0
     errors: list[str] = field(default_factory=list)
+    draft: CatalogImport | None = None  # 검증을 통과한 게시 대기본 (리뷰 v3 P1-2)
 
 
 @dataclass(frozen=True)
@@ -126,6 +131,9 @@ class Overview:
     departments_without_professor: list[str]
     source_institutions: list[Institution]
     used_source_ids: set[int] = field(default_factory=set)  # 학생·요청·동등 과목표가 가리켜 지울 수 없는 출신 대학
+    pending_import: CatalogImport | None = None  # 게시를 기다리는 과목 카탈로그 (리뷰 v3 P1-2)
+    provenance: dict[int, CatalogImport] = field(default_factory=dict)  # 게시본 id → 게시본 (과목 출처 표시)
+    reviewers: dict[int, str] = field(default_factory=dict)  # 게시한 관리자 id → 이름
 
     @property
     def missing_reference(self) -> int:
@@ -153,6 +161,10 @@ def overview(session: Session, admin: User) -> Overview:
     uploads = syllabus_repo.latest_reference_uploads(session, institution_id)
     staffed = user_repo.professor_departments(session, institution_id)
     departments = catalog_repo.course_departments(session, institution_id)
+    provenance = catalog_repo.imports_by_ids(
+        session, sorted({c.catalog_import_id for c in courses if c.catalog_import_id})
+    )
+    reviewer_ids = sorted({p.reviewed_by for p in provenance.values() if p.reviewed_by})
     return Overview(
         institution=institution,
         role_counts=user_repo.role_counts(session, institution_id),
@@ -163,6 +175,9 @@ def overview(session: Session, admin: User) -> Overview:
         departments_without_professor=[d.name for d in departments if d.id not in staffed],
         source_institutions=catalog_repo.source_institutions(session, institution_id),
         used_source_ids=catalog_repo.used_source_institution_ids(session, institution_id),
+        pending_import=next(iter(catalog_repo.imports_of(session, institution_id, CatalogImportStatus.DRAFT)), None),
+        provenance=provenance,
+        reviewers={uid: u.name for uid, u in user_repo.by_ids(session, reviewer_ids).items()},
     )
 
 
@@ -375,9 +390,16 @@ def _concepts(value: str) -> list[str]:
     return list(dict.fromkeys(c.strip() for c in value.split(";") if c.strip()))
 
 
-def import_courses(session: Session, admin: User, filename: str, data: bytes) -> CourseImport:
+def import_courses(
+    session: Session, admin: User, filename: str, data: bytes, source: str = "", catalog_year: str = ""
+) -> CourseImport:
+    """과목 CSV를 검증해 게시 대기본을 만든다 (리뷰 v3 P1-2). 카탈로그에는 publish_import로 게시해야 반영된다.
+    이전 게시 대기본은 버린다 (대기본은 하나만)."""
     institution_id = ensure_admin(admin)
     result = CourseImport()
+    year = catalog_year.strip()
+    if year and not (year.isdigit() and 1990 <= int(year) <= 2100):
+        raise CreditBridgeError(tr("적용 학년도는 네 자리 연도로 적어 주세요."))
     parsed: list[tuple[str, str, float, str, str, list[str]]] = []
     seen: set[str] = set()
     required = ["code", "title", "credits", "department", "concepts"]
@@ -420,10 +442,80 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
         return result
     if not parsed:
         raise CreditBridgeError(tr("가져올 행이 없어요."))
-    for code, title, credits, department, level, concepts in parsed:
+    for old in catalog_repo.imports_of(session, institution_id, CatalogImportStatus.DRAFT):
+        old.status = CatalogImportStatus.DISCARDED
+    rows = [
+        {"code": c, "title": t, "credits": cr, "department": d, "level": lv, "concepts": cs}
+        for c, t, cr, d, lv, cs in parsed
+    ]
+    result.draft = catalog_repo.add_import(
+        session,
+        CatalogImport(
+            institution_id=institution_id,
+            filename=filename[:255],
+            file_hash=hashlib.sha256(data).hexdigest(),
+            source=source.strip()[:500],
+            catalog_year=int(year) if year else None,
+            status=CatalogImportStatus.DRAFT,
+            rows=rows,
+            changes=_catalog_changes(session, institution_id, rows),
+            created_by=admin.id,
+        ),
+    )
+    audit.record(session, admin, "catalog.draft", "catalog_import", str(result.draft.id), rows=len(rows))
+    session.commit()
+    return result
+
+
+def _catalog_changes(session: Session, institution_id: int, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """게시하면 무엇이 바뀌는지: 새 과목 코드, 바뀌는 과목(필드별 [이전, 새 값]), 그대로인 과목 수."""
+    added: list[str] = []
+    changed: dict[str, dict[str, list[Any]]] = {}
+    unchanged = 0
+    for row in rows:
+        course = catalog_repo.course_by_code(session, institution_id, row["code"])
+        if course is None:
+            added.append(row["code"])
+            continue
+        current = {
+            "title": course.title,
+            "credits": float(course.credits),
+            "department": course.department_name,
+            "concepts": course.concepts or [],
+        }
+        diff = {key: [old, row[key]] for key, old in current.items() if row[key] != old}
+        if row["level"] and row["level"] != course.level:
+            diff["level"] = [course.level, row["level"]]
+        if diff:
+            changed[row["code"]] = diff
+        else:
+            unchanged += 1
+    return {"added": added, "changed": changed, "unchanged": unchanged}
+
+
+def _pending_import(session: Session, admin: User, import_id: int) -> CatalogImport:
+    institution_id = ensure_admin(admin)
+    draft = catalog_repo.get_import(session, import_id)
+    if draft is None or draft.institution_id != institution_id:
+        raise NotFoundError(tr("가져오기 기록을 찾을 수 없어요."))
+    if draft.status != CatalogImportStatus.DRAFT:
+        raise CreditBridgeError(tr("이미 게시했거나 버린 가져오기예요."))
+    return draft
+
+
+def publish_import(session: Session, admin: User, import_id: int) -> CourseImport:
+    """게시 대기본을 카탈로그에 반영한다. 게시 직전 카탈로그와 다시 비교해 바뀐 점을 기록하고,
+    과목마다 이 게시본을 출처로 남긴다."""
+    draft = _pending_import(session, admin, import_id)
+    institution_id = draft.institution_id
+    result = CourseImport(draft=draft)
+    draft.changes = _catalog_changes(session, institution_id, draft.rows)
+    for row in draft.rows:
+        code, title, credits, department = row["code"], row["title"], float(row["credits"]), row["department"]
+        level, concepts = row["level"], row["concepts"]
         course = catalog_repo.course_by_code(session, institution_id, code)
         if course is None:
-            catalog_repo.add_course(
+            course = catalog_repo.add_course(
                 session,
                 Course(
                     institution_id=institution_id,
@@ -442,17 +534,22 @@ def import_courses(session: Session, admin: User, filename: str, data: bytes) ->
             if level:
                 course.level = level
             result.updated += 1
+        course.catalog_import_id = draft.id
+    draft.status = CatalogImportStatus.PUBLISHED
+    draft.reviewed_by, draft.reviewed_at = admin.id, utcnow()
     audit.record(
-        session,
-        admin,
-        "course.import",
-        "institution",
-        str(institution_id),
-        created=result.created,
-        updated=result.updated,
+        session, admin, "course.import", "catalog_import", str(draft.id), created=result.created, updated=result.updated
     )
     session.commit()
     return result
+
+
+def discard_import(session: Session, admin: User, import_id: int) -> None:
+    draft = _pending_import(session, admin, import_id)
+    draft.status = CatalogImportStatus.DISCARDED
+    draft.reviewed_by, draft.reviewed_at = admin.id, utcnow()
+    audit.record(session, admin, "catalog.discard", "catalog_import", str(draft.id))
+    session.commit()
 
 
 # ---------- 출신 대학 ----------

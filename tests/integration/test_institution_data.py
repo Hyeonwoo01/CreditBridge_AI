@@ -148,6 +148,14 @@ def test_course_import_and_reference_upload_feed_ai_comparison(
     )
     r = post_csv(client, "/admin/data/courses", token, body)
     assert r.status_code == 303
+    # 바로 반영하지 않고 게시 대기본을 만든다 (리뷰 v3 P1-2)
+    seeded.expire_all()
+    assert seeded.scalars(select(Course).where(Course.code == "MATH 2255")).first() is None
+    page = client.get("/admin/data").text
+    assert "data-catalog-draft" in page and "새 과목 1개" in page and "바뀌는 과목 1개" in page
+    draft_id = int(page.split('data-catalog-draft="', 1)[1].split('"', 1)[0])
+    r = client.post(f"/admin/data/imports/{draft_id}/publish", data={"csrf_token": token}, follow_redirects=False)
+    assert r.status_code == 303
     page = client.get("/admin/data").text
     assert "과목 1건을 새로 만들고 1건을 고쳤어요" in page and "교수 계정이 없는 학과" not in page
     seeded.expire_all()

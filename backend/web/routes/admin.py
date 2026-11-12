@@ -12,7 +12,7 @@ from backend.config import get_settings
 from backend.db.base import utcnow
 from backend.db.session import get_db
 from backend.documents.storage import get_storage
-from backend.errors import CreditBridgeError
+from backend.errors import CreditBridgeError, NotFoundError, PermissionDeniedError
 from backend.i18n import gettext as tr
 from backend.models import User
 from backend.models.enums import ConversionMethod, CreditSystem, Role
@@ -367,23 +367,60 @@ def import_accounts(
 def import_courses(
     request: Request,
     file: UploadFile = File(...),
+    source: str = Form(""),
+    catalog_year: str = Form(""),
     csrf_token: str = Form(""),
     user: User = Admin,
     session: Session = Depends(get_db),
 ) -> Response:
+    """과목 CSV를 검증해 게시 대기본을 만든다 (리뷰 v3 P1-2). 바뀌는 점을 확인하고 게시해야 카탈로그에 반영된다."""
     check_csrf(request, csrf_token)
     try:
-        result = institution_data.import_courses(session, user, file.filename or "", file.file.read())
+        result = institution_data.import_courses(
+            session, user, file.filename or "", file.file.read(), source=source, catalog_year=catalog_year
+        )
     except CreditBridgeError as exc:
         session.rollback()
         flash(request, str(exc), "error")
         return RedirectResponse("/admin/data", status_code=303)
     if result.errors:
         return _data_page(request, user, session, status_code=422, course_errors=result.errors)
-    flash(
-        request,
-        tr("과목 {created}건을 새로 만들고 {updated}건을 고쳤어요.", created=result.created, updated=result.updated),
-    )
+    flash(request, tr("과목 CSV를 검증했어요. 바뀌는 점을 확인한 뒤 게시해 주세요."))
+    return RedirectResponse("/admin/data#catalog-review", status_code=303)
+
+
+@router.post("/data/imports/{import_id}/{action}")
+def catalog_import_action(
+    request: Request,
+    import_id: int,
+    action: str,
+    csrf_token: str = Form(""),
+    user: User = Admin,
+    session: Session = Depends(get_db),
+) -> Response:
+    """카탈로그 게시 대기본 게시(publish)·버리기(discard) (리뷰 v3 P1-2)."""
+    check_csrf(request, csrf_token)
+    if action not in ("publish", "discard"):
+        raise NotFoundError(tr("가져오기 기록을 찾을 수 없어요."))
+    try:
+        if action == "publish":
+            result = institution_data.publish_import(session, user, import_id)
+            flash(
+                request,
+                tr(
+                    "카탈로그를 게시했어요. 과목 {created}건을 새로 만들고 {updated}건을 고쳤어요.",
+                    created=result.created,
+                    updated=result.updated,
+                ),
+            )
+        else:
+            institution_data.discard_import(session, user, import_id)
+            flash(request, tr("게시 대기본을 버렸어요. 카탈로그는 바뀌지 않았어요."))
+    except (NotFoundError, PermissionDeniedError):
+        raise
+    except CreditBridgeError as exc:
+        session.rollback()
+        flash(request, str(exc), "error")
     return RedirectResponse("/admin/data#courses", status_code=303)
 
 

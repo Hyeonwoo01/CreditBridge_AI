@@ -189,3 +189,11 @@ class JobStatus(StrEnum):
     RETRY_WAIT = "retry_wait"  # 일시 오류, 잠시 뒤 다시
     FAILED = "failed"  # 다시 해도 안 되는 오류 (파일·설정을 고쳐야 함)
     DEAD_LETTER = "dead_letter"  # 재시도를 다 써서 격리, 운영자가 원인을 보고 다시 처리
+
+
+class CatalogImportStatus(StrEnum):
+    """과목 카탈로그 가져오기 상태 (리뷰 v3 P1-2)."""
+
+    DRAFT = "draft"  # 검증 통과, 게시 대기 (AI 후보에 쓰이지 않음)
+    PUBLISHED = "published"
+    DISCARDED = "discarded"

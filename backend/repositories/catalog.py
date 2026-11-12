@@ -2,6 +2,7 @@ from sqlalchemy import ColumnElement, CompoundSelect, delete, func, or_, select,
 from sqlalchemy.orm import Session
 
 from backend.models import (
+    CatalogImport,
     Course,
     CreditConversionRule,
     Department,
@@ -236,3 +237,29 @@ def add_conversion_rule(session: Session, rule: CreditConversionRule) -> CreditC
 def department_rows(session: Session, institution_id: int) -> list[Department]:
     stmt = select(Department).where(Department.institution_id == institution_id).order_by(Department.name)
     return list(session.scalars(stmt))
+
+
+# ---------- 카탈로그 가져오기 (리뷰 v3 P1-2) ----------
+
+
+def add_import(session: Session, draft: CatalogImport) -> CatalogImport:
+    session.add(draft)
+    session.flush()
+    return draft
+
+
+def get_import(session: Session, import_id: int) -> CatalogImport | None:
+    return session.get(CatalogImport, import_id)
+
+
+def imports_of(session: Session, institution_id: int, status: str | None = None) -> list[CatalogImport]:
+    stmt = select(CatalogImport).where(CatalogImport.institution_id == institution_id)
+    if status is not None:
+        stmt = stmt.where(CatalogImport.status == status)
+    return list(session.execute(stmt.order_by(CatalogImport.id.desc())).scalars())
+
+
+def imports_by_ids(session: Session, ids: list[int]) -> dict[int, CatalogImport]:
+    if not ids:
+        return {}
+    return {i.id: i for i in session.execute(select(CatalogImport).where(CatalogImport.id.in_(ids))).scalars()}

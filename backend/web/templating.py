@@ -154,6 +154,13 @@ def policy_value(params: Mapping[str, Any]) -> str:
     return gettext("{n}학점", n=params.get("credits", "–"))
 
 
+CATALOG_FIELD_LABELS = {
+    "title": N_("과목명"),
+    "credits": N_("학점"),
+    "department": N_("학과"),
+    "concepts": N_("필수 개념"),
+    "level": N_("수준"),
+}
 JOB_STATUS_LABELS = {
     "queued": N_("대기"),
     "running": N_("실행 중"),
@@ -184,6 +191,7 @@ TEMPLATES.env.filters.update(
     authenticity=lambda v: _label(AUTHENTICITY_LABELS, v),
     case_state=lambda v: _label(CASE_STATE_LABELS, v),
     job_status=lambda v: _label(JOB_STATUS_LABELS, v),
+    catalog_field=lambda v: _label(CATALOG_FIELD_LABELS, v),
     ai_gate=lambda v: _label(ai_monitoring.GATE_LABELS, v),
     job_error=lambda v: _label(job_service.ERROR_LABELS, v),
     checklist_item=lambda item, framework: gettext(review_frameworks.label(framework, item)),

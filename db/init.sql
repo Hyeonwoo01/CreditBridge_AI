@@ -940,5 +940,38 @@ CREATE INDEX ix_background_jobs_status ON background_jobs (status);
 
 UPDATE alembic_version SET version_num='0017' WHERE alembic_version.version_num = '0016';
 
+-- Running upgrade 0017 -> 0018
+
+CREATE TABLE catalog_imports (
+    institution_id BIGINT NOT NULL, 
+    filename VARCHAR(255) NOT NULL, 
+    file_hash VARCHAR(64) NOT NULL, 
+    source TEXT NOT NULL, 
+    catalog_year INTEGER, 
+    status VARCHAR(10) NOT NULL, 
+    rows JSONB NOT NULL, 
+    changes JSONB NOT NULL, 
+    created_by BIGINT NOT NULL, 
+    reviewed_by BIGINT, 
+    reviewed_at TIMESTAMP WITHOUT TIME ZONE, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_catalog_imports PRIMARY KEY (id), 
+    CONSTRAINT ck_catalog_imports_status_valid CHECK (status IN ('draft', 'published', 'discarded')), 
+    CONSTRAINT fk_catalog_imports_created_by_users FOREIGN KEY(created_by) REFERENCES users (id), 
+    CONSTRAINT fk_catalog_imports_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id), 
+    CONSTRAINT fk_catalog_imports_reviewed_by_users FOREIGN KEY(reviewed_by) REFERENCES users (id)
+);
+
+CREATE INDEX ix_catalog_imports_institution_id ON catalog_imports (institution_id);
+
+CREATE INDEX ix_catalog_imports_status ON catalog_imports (status);
+
+ALTER TABLE courses ADD COLUMN catalog_import_id BIGINT;
+
+ALTER TABLE courses ADD CONSTRAINT fk_courses_catalog_import_id_catalog_imports FOREIGN KEY(catalog_import_id) REFERENCES catalog_imports (id);
+
+UPDATE alembic_version SET version_num='0018' WHERE alembic_version.version_num = '0017';
+
 COMMIT;
 
