@@ -6,7 +6,7 @@ from typing import cast
 
 from pydantic import BaseModel
 
-from backend.ai.llm_client import Effort, LLMClient, LLMResult
+from backend.ai.llm_client import Effort, LLMClient, LLMResult, record_usage
 from backend.errors import LLMError
 from backend.schemas.evaluation import CandidateJudgment, ConceptJudgment, EvaluationOutput
 from backend.schemas.extraction import SyllabusExtraction, WeeklyTopic
@@ -116,6 +116,8 @@ class DemoLLM(LLMClient):
             out = PageTranscription(text="Week 1: Limits and continuity\nWeek 2: Derivatives", legibility=0.9)
         else:
             raise LLMError(f"demo AI has no output for {output_model.__name__}")
+        # 실제 호출이 없으므로 글자 수로 어림한 토큰 수를 남긴다 (사용량 화면이 비지 않게, 모델 이름은 demo-ai)
+        record_usage(output_model.__name__, self.model, len(prompt) // 4 + 1, len(out.model_dump_json()) // 4 + 1)
         return LLMResult(output=cast(T, out), model=self.model)
 
     @classmethod

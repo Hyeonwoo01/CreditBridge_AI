@@ -109,7 +109,7 @@
   {# 게시 대기본 (리뷰 v3 P1-2): 올리기 → 검증 → 바뀌는 점 확인 → 게시 #}
   <div id="catalog-review" class="card mt-3 grid scroll-mt-20 gap-3" data-catalog-draft="{{ pi.id }}">
     <h3 class="font-semibold">{{ _("게시 대기 중인 카탈로그") }}</h3>
-    <p class="text-sm text-muted">{{ _("{file} · 출처 {source} · 적용 학년도 {year} · 올린 날 {date}", file=pi.filename, source=(pi.source or '–'), year=(pi.catalog_year or '–'), date=time(pi.created_at, 'date')) }}</p>
+    <p class="text-sm text-muted">{{ _("{file} · 출처 {source} · 적용 학년도 {year} · {name} 올림 {date}", file=pi.filename, name=o.reviewers.get(pi.created_by, ''), source=(pi.source or '–'), year=(pi.catalog_year or '–'), date=time(pi.created_at, 'date')) }}</p>
     <ul class="grid gap-1 text-sm">
       <li>{{ _("새 과목 {n}개", n=(pi.changes.added | length)) }}{% if pi.changes.added %}: <span class="font-mono text-[13px]">{{ pi.changes.added[:10] | join(', ') }}{% if pi.changes.added | length > 10 %} …{% endif %}</span>{% endif %}</li>
       <li>{{ _("바뀌는 과목 {n}개", n=(pi.changes.changed | length)) }}</li>
@@ -119,7 +119,12 @@
       <li class="text-muted">{{ _("그대로인 과목 {n}개", n=pi.changes.unchanged) }}</li>
     </ul>
     <div class="flex flex-wrap gap-2">
+      {# 2인 승인: 올린 관리자는 게시하지 못한다(활성 관리자가 혼자면 예외) #}
+      {% if pi.created_by == user.id and o.admin_ids | length > 1 %}
+      <p class="w-full text-sm text-muted" data-two-person>{{ _("올린 관리자와 다른 관리자가 확인하고 게시해요 (2인 승인). 다른 관리자에게 알림을 보냈어요.") }}</p>
+      {% else %}
       <form method="post" action="/admin/data/imports/{{ pi.id }}/publish"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-primary">{{ _("게시") }}</button></form>
+      {% endif %}
       <form method="post" action="/admin/data/imports/{{ pi.id }}/discard"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-secondary">{{ _("버리기") }}</button></form>
     </div>
   </div>
@@ -141,7 +146,7 @@
         {% set c = r.course %}
         {% set st = r.reference_status %}
         <tr class="border-t border-divider align-middle">
-          <td class="px-5 py-3"><span class="font-mono text-[13px] font-semibold">{{ c.code }}</span><div class="text-xs text-ink-80">{{ c.title }}</div>{% set pv = o.provenance.get(c.catalog_import_id) %}<div class="text-xs text-muted" data-provenance>{% if pv %}{{ _("출처 {source} · {year}학년도 · {name} 게시 {date}", source=(pv.source or pv.filename), year=(pv.catalog_year or '–'), name=o.reviewers.get(pv.reviewed_by, ''), date=time(pv.reviewed_at, 'date')) }}{% else %}{{ _("출처 기록 없음 (게시 절차 이전)") }}{% endif %}</div></td>
+          <td class="px-5 py-3"><span class="font-mono text-[13px] font-semibold">{{ c.code }}</span><div class="text-xs text-ink-80">{{ c.title }}</div>{% set pv = o.provenance.get(c.catalog_import_id) %}<div class="text-xs text-muted" data-provenance>{% if pv %}{{ _("출처 {source} · {year}학년도 · {name} 게시 {date}", source=(pv.source or pv.filename), year=(pv.catalog_year or '–'), name=o.reviewers.get(pv.reviewed_by, ''), date=time(pv.reviewed_at, 'date')) }}{% if pv.created_by == pv.reviewed_by %} {{ _("(관리자 한 명이라 올린 사람이 게시)") }}{% endif %}{% else %}{{ _("출처 기록 없음 (게시 절차 이전)") }}{% endif %}</div></td>
           <td class="px-3 py-3">{{ c.department_name }}</td>
           <td class="px-3 py-3 tabular-nums">{{ c.credits }}</td>
           <td class="px-3 py-3">{% if r.concepts %}<span title="{{ r.concepts | join(', ') }}">{{ _("{concepts}개", concepts=(r.concepts | length)) }}</span>{% else %}<span class="text-muted">{{ _("기준 강의계획서 기준") }}</span>{% endif %}</td>

@@ -32,9 +32,11 @@ CSV는 엑셀에서 "다른 이름으로 저장 → CSV UTF-8"로 저장합니�
 
 - 보안: 앱은 보안 헤더·운영 비밀값 검사·로그인 실패 제한(같은 IP 10분 30번)·학생별 하루 업로드 횟수(성적표 10, 강의계획서 60, 보완 자료 30)·PDF 60쪽·이미지 해상도·CSV 수식 주입 방지를 기본으로 갖고, 컨테이너는 root가 아닌 사용자로 돌아요. AWS 콘솔에서 할 일(루트 MFA, SSH 제한, IMDSv2, S3·RDS 공개 차단, AI 키 한도)은 [docs/deploy-aws.md](deploy-aws.md)의 "보안 점검"을 따르세요. `SESSION_SECRET`가 32자보다 짧으면 운영 서버가 시작하지 않아요.
 - 업로드 악성코드 검사(ClamAV)는 기본으로 꺼져 있어요. 켜지 않아도 형식 시그니처 확인, JavaScript·첨부 파일·입력 양식 PDF 거부, 크기·쪽수 상한은 그대로 동작해요. ClamAV는 바이러스 패턴을 올리는 데 메모리를 1GB 넘게 써서 t3.micro(1GB)에서는 다른 서비스가 느려지거나 멈출 수 있어요. 켜려면 메모리 2GB 이상(예: t3.small)을 권하고, `.env`에 `COMPOSE_PROFILES=clamav`와 `CLAMAV_HOST=clamav`를 적은 뒤 `docker compose -f docker-compose.prod.yml up -d --build` 하세요. 첫 실행은 패턴을 내려받느라 몇 분 걸리고, 그동안 `CLAMAV_REQUIRED=true`(기본)면 업로드가 "지금은 파일 안전 검사를 할 수 없어…"로 막혀요. 검사에 걸린 파일은 저장하지 않고 로그에 탐지 이름과 크기만 남겨요(파일 이름은 남기지 않음).
+- AI 비용은 관리자 콘솔 "작업 처리 현황" 아래 "AI 사용량"에서 봐요(최근 7일, 용도·모델별 호출 수와 입력·출력 토큰). `.env`에 지금 모델의 단가를 `AI_PRICE_INPUT_PER_MTOK`·`AI_PRICE_OUTPUT_PER_MTOK`(1백만 토큰당 USD, 공급자 가격표)로 넣으면 어림 비용도 보여요. 모델을 바꾸면 단가도 함께 바꾸세요.
 - AI 품질은 관리자 콘솔의 "AI 성능 모니터링"에서 프롬프트·모델 버전별로 봐요(교수 첫 판정과의 일치율, 신뢰도 '상'으로 인정 추천했는데 교수가 다르게 판정한 비율). 가장 최근 버전이 기준(`AI_GATE_*`, 기본: 20건 이상에서 일치율 70% 이상·잘못된 강한 추천 15% 이하)에 못 미치면 맨 위에 경고가 떠요. 교수 판정을 정답으로 단정하지 않으니 사례를 살펴본 뒤, 이전 프롬프트(`backend/ai/prompts/*.md` 버전)나 모델(`CLAUDE_MODEL`·`OPENAI_MODEL`)로 되돌리거나, `.env`에 `AI_RECOMMENDATION_MODE=evidence_only`를 넣고 다시 시작해 추천 등급·신뢰도를 숨기고 근거만 보여 주세요(교수는 결과를 직접 고르고, 학생 예상치에서 AI 추정이 빠져요).
 - 운영에서는 `DEMO_MODE`를 켜지 마세요(기본 false). 켜면 실제 AI 대신 예시 AI를 쓰고 파일을 로컬 폴더에 저장합니다.
 - 운영에서는 `SEED_DEMO=false`로 두세요. 데모 계정(비밀번호 `demo1234`)이 만들어지지 않게 합니다. 첫 관리자는 `scripts/create_admin.py`로 만듭니다.
+- 가끔(예: 배포 뒤, 손으로 SQL을 고친 뒤) `docker compose -f docker-compose.prod.yml exec web python -m scripts.integrity_check`로 일부러 두 곳에 둔 값이 어긋나지 않았는지 확인하세요. 읽기만 하고, 어긋나면 점검 이름과 행 id만 보여 줘요(종료 코드 1).
 - `decisions`, `audit_logs`는 추가 전용입니다. 앱 DB 계정 권한은 [docs/db-grants.sql](db-grants.sql)을 따르세요.
 - 운영 S3는 `S3_SERVER_SIDE_ENCRYPTION=AES256`(또는 `aws:kms`)으로 저장 암호화를 켜세요.
 - 예상 인정 학점·추가 비용은 AI 추천을 기준으로 한 예상치입니다. 화면에도 "예상치"로 표시합니다.

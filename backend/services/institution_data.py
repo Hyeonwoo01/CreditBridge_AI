@@ -133,7 +133,8 @@ class Overview:
     used_source_ids: set[int] = field(default_factory=set)  # 학생·요청·동등 과목표가 가리켜 지울 수 없는 출신 대학
     pending_import: CatalogImport | None = None  # 게시를 기다리는 과목 카탈로그 (리뷰 v3 P1-2)
     provenance: dict[int, CatalogImport] = field(default_factory=dict)  # 게시본 id → 게시본 (과목 출처 표시)
-    reviewers: dict[int, str] = field(default_factory=dict)  # 게시한 관리자 id → 이름
+    reviewers: dict[int, str] = field(default_factory=dict)  # 올리고 게시한 관리자 id → 이름
+    admin_ids: list[int] = field(default_factory=list)  # 활성 관리자 (카탈로그 2인 승인 판단)
 
     @property
     def missing_reference(self) -> int:
@@ -164,7 +165,12 @@ def overview(session: Session, admin: User) -> Overview:
     provenance = catalog_repo.imports_by_ids(
         session, sorted({c.catalog_import_id for c in courses if c.catalog_import_id})
     )
-    reviewer_ids = sorted({p.reviewed_by for p in provenance.values() if p.reviewed_by})
+    pending = next(iter(catalog_repo.imports_of(session, institution_id, CatalogImportStatus.DRAFT)), None)
+    reviewer_ids = sorted(
+        {p.reviewed_by for p in provenance.values() if p.reviewed_by}
+        | {p.created_by for p in provenance.values()}
+        | ({pending.created_by} if pending else set())
+    )
     return Overview(
         institution=institution,
         role_counts=user_repo.role_counts(session, institution_id),
@@ -175,9 +181,10 @@ def overview(session: Session, admin: User) -> Overview:
         departments_without_professor=[d.name for d in departments if d.id not in staffed],
         source_institutions=catalog_repo.source_institutions(session, institution_id),
         used_source_ids=catalog_repo.used_source_institution_ids(session, institution_id),
-        pending_import=next(iter(catalog_repo.imports_of(session, institution_id, CatalogImportStatus.DRAFT)), None),
+        pending_import=pending,
         provenance=provenance,
         reviewers={uid: u.name for uid, u in user_repo.by_ids(session, reviewer_ids).items()},
+        admin_ids=[u.id for u in user_repo.staff_of(session, institution_id, Role.ADMIN)],
     )
 
 
@@ -463,6 +470,18 @@ def import_courses(
         ),
     )
     audit.record(session, admin, "catalog.draft", "catalog_import", str(result.draft.id), rows=len(rows))
+    reviewers = _other_admins(session, admin)
+    if reviewers:
+        notifications.notify(
+            session,
+            reviewers,
+            "catalog.review",
+            N_(
+                "게시를 기다리는 과목 카탈로그가 있어요 (과목 {n}개). "
+                "올린 관리자와 다른 관리자가 확인하고 게시해 주세요."
+            ).format(n=len(rows)),
+            "/admin/data#catalog-review",
+        )
     session.commit()
     return result
 
@@ -493,6 +512,11 @@ def _catalog_changes(session: Session, institution_id: int, rows: list[dict[str,
     return {"added": added, "changed": changed, "unchanged": unchanged}
 
 
+def _other_admins(session: Session, admin: User) -> list[User]:
+    """같은 대학의 다른 활성 관리자 (카탈로그 2인 승인의 확인자)."""
+    return [u for u in user_repo.staff_of(session, ensure_admin(admin), Role.ADMIN) if u.id != admin.id]
+
+
 def _pending_import(session: Session, admin: User, import_id: int) -> CatalogImport:
     institution_id = ensure_admin(admin)
     draft = catalog_repo.get_import(session, import_id)
@@ -507,6 +531,12 @@ def publish_import(session: Session, admin: User, import_id: int) -> CourseImpor
     """게시 대기본을 카탈로그에 반영한다. 게시 직전 카탈로그와 다시 비교해 바뀐 점을 기록하고,
     과목마다 이 게시본을 출처로 남긴다."""
     draft = _pending_import(session, admin, import_id)
+    # 2인 승인: 올린 관리자는 직접 게시하지 못한다. 활성 관리자가 혼자뿐이면 막을 수 없어 허용하고 기록에 남긴다
+    sole_admin = not _other_admins(session, admin)
+    if draft.created_by == admin.id and not sole_admin:
+        raise CreditBridgeError(
+            tr("과목 카탈로그는 올린 관리자와 다른 관리자가 게시해요 (2인 승인). 다른 관리자에게 확인을 요청해 주세요.")
+        )
     institution_id = draft.institution_id
     result = CourseImport(draft=draft)
     draft.changes = _catalog_changes(session, institution_id, draft.rows)
@@ -538,7 +568,15 @@ def publish_import(session: Session, admin: User, import_id: int) -> CourseImpor
     draft.status = CatalogImportStatus.PUBLISHED
     draft.reviewed_by, draft.reviewed_at = admin.id, utcnow()
     audit.record(
-        session, admin, "course.import", "catalog_import", str(draft.id), created=result.created, updated=result.updated
+        session,
+        admin,
+        "course.import",
+        "catalog_import",
+        str(draft.id),
+        created=result.created,
+        updated=result.updated,
+        uploaded_by=draft.created_by,
+        self_approved=draft.created_by == admin.id,
     )
     session.commit()
     return result

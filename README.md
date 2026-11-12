@@ -210,7 +210,7 @@ frontend/        ← 프론트엔드 (서버가 그려 보내는 화면 파일)
   tailwind/      input.css (DESIGN.md 토큰, Tailwind 4 입력)
 alembic/         마이그레이션 (PostgreSQL 17, 기준점 0001에 이전 MariaDB 마이그레이션을 합침)
 db/              init.sql(스키마, alembic --sql로 생성) · data.sql(데모 초기 데이터, pg_dump로 생성) — scripts/export_db_sql.sh로 다시 만듦
-scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · docs_check(API 명세·ERD·화면 명세 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · migration_demo(옛 데이터로 마이그레이션 시험) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
+scripts/         start.sh · build_css.sh · create_admin(첫 관리자) · seed_demo · create_bucket · backfill_page_offsets(원본 쪽 번호 채우기) · i18n_check(영어 번역 점검) · docs_check(API 명세·ERD·화면 명세 점검) · export_db_sql(db/*.sql 다시 만들기) · generate_vapid_keys(웹 푸시 키) · calibrate_scoring(추천 기준값 보정 보고서) · migration_demo(옛 데이터로 마이그레이션 시험) · integrity_check(중복 저장 값 정합성 점검) · demo_data/ · demo_scenario·make_demo_pdfs(공개 데모 데이터)
 tests/           unit · integration(PostgreSQL) · eval(골든셋) · fixtures/(학점 계산·문서 추출 회귀 기대값, 인젝션 공격 문구 모음)
 ```
 

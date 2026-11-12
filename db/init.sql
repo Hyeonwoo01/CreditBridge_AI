@@ -1009,5 +1009,28 @@ CREATE INDEX ix_graduation_requirements_program_id ON graduation_requirements (p
 
 UPDATE alembic_version SET version_num='0019' WHERE alembic_version.version_num = '0018';
 
+-- Running upgrade 0019 -> 0020
+
+CREATE TABLE llm_usage (
+    institution_id BIGINT, 
+    job_id BIGINT, 
+    purpose VARCHAR(60) NOT NULL, 
+    model VARCHAR(100) NOT NULL, 
+    calls INTEGER NOT NULL, 
+    input_tokens INTEGER NOT NULL, 
+    output_tokens INTEGER NOT NULL, 
+    id BIGSERIAL NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT pk_llm_usage PRIMARY KEY (id), 
+    CONSTRAINT fk_llm_usage_institution_id_institutions FOREIGN KEY(institution_id) REFERENCES institutions (id), 
+    CONSTRAINT fk_llm_usage_job_id_background_jobs FOREIGN KEY(job_id) REFERENCES background_jobs (id)
+);
+
+CREATE INDEX ix_llm_usage_institution_created ON llm_usage (institution_id, created_at);
+
+CREATE INDEX ix_llm_usage_job_id ON llm_usage (job_id);
+
+UPDATE alembic_version SET version_num='0020' WHERE alembic_version.version_num = '0019';
+
 COMMIT;
 

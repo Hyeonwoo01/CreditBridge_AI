@@ -5,6 +5,7 @@
 import base64
 import json
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Literal
@@ -34,6 +35,42 @@ _CONSTRAINT_KEYS = {
     "minItems": "min items",
     "maxItems": "max items",
 }
+
+
+@dataclass(frozen=True)
+class LLMUsage:
+    """AI 호출 한 번의 사용량 (공급자 응답의 usage). 검증 실패로 다시 부른 호출도 따로 센다 (비용이 드니까)."""
+
+    purpose: str  # 출력 모델 이름 (SyllabusExtraction 등)
+    model: str
+    input_tokens: int
+    output_tokens: int
+
+
+# 작업 하나(services/jobs.start ~ finish) 동안의 호출 사용량을 모은다. 모으는 중이 아니면(None) 버린다
+_usage: ContextVar[list[LLMUsage] | None] = ContextVar("llm_usage", default=None)
+
+
+def start_usage() -> None:
+    _usage.set([])
+
+
+def take_usage() -> list[LLMUsage]:
+    """모은 사용량을 꺼내고 모으기를 끝낸다."""
+    rows = _usage.get() or []
+    _usage.set(None)
+    return rows
+
+
+def record_usage(purpose: str, model: str, input_tokens: int, output_tokens: int) -> None:
+    rows = _usage.get()
+    if rows is not None:
+        rows.append(LLMUsage(purpose, model, max(0, input_tokens), max(0, output_tokens)))
+
+
+def _tokens(usage: Any, *names: str) -> int:
+    """SDK usage 객체에서 토큰 수를 더한다 (없거나 None인 칸은 0)."""
+    return sum(int(getattr(usage, name, 0) or 0) for name in names)
 
 
 @dataclass(frozen=True)
@@ -79,6 +116,8 @@ class _Reply:
     text: str
     truncated: bool  # 출력 토큰 상한에 걸려 잘림
     model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class LLMClient:
@@ -136,6 +175,7 @@ class LLMClient:
         last_error: Exception | None = None
         for attempt in range(2):
             reply = call(prompt, images or [], schema, output_model.__name__, effort, max_tokens)
+            record_usage(output_model.__name__, reply.model, reply.input_tokens, reply.output_tokens)
             try:
                 if reply.truncated:
                     raise ValueError("output truncated at max_tokens")
@@ -176,7 +216,15 @@ class LLMClient:
         if response.stop_reason == "refusal":
             raise LLMRefusalError("the model declined the request")
         text = "".join(block.text for block in response.content if block.type == "text")
-        return _Reply(text, response.stop_reason == "max_tokens", response.model)
+        usage = getattr(response, "usage", None)
+        return _Reply(
+            text,
+            response.stop_reason == "max_tokens",
+            response.model,
+            # 캐시에 쓰고 읽은 입력도 입력 토큰으로 센다
+            _tokens(usage, "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"),
+            _tokens(usage, "output_tokens"),
+        )
 
     def _call_openai(
         self, prompt: str, images: list[bytes], schema: dict[str, Any], name: str, effort: Effort, max_tokens: int
@@ -204,7 +252,14 @@ class LLMClient:
         choice = response.choices[0]
         if choice.message.refusal or choice.finish_reason == "content_filter":
             raise LLMRefusalError("the model declined the request")
-        return _Reply(choice.message.content or "", choice.finish_reason == "length", response.model)
+        usage = getattr(response, "usage", None)
+        return _Reply(
+            choice.message.content or "",
+            choice.finish_reason == "length",
+            response.model,
+            _tokens(usage, "prompt_tokens"),
+            _tokens(usage, "completion_tokens"),
+        )
 
 
 @lru_cache

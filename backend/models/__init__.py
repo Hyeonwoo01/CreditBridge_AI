@@ -19,6 +19,7 @@ from backend.models.evidence_feedback import EvidenceFeedback
 from backend.models.evidence_span import EvidenceSpan
 from backend.models.institution import Institution
 from backend.models.institution_source import InstitutionSource
+from backend.models.llm_usage import LLMUsageRecord
 from backend.models.material_request import MaterialRequest
 from backend.models.notification import Notification
 from backend.models.policy_rule import PolicyRule
@@ -54,6 +55,7 @@ __all__ = [
     "GraduationRequirement",
     "Institution",
     "InstitutionSource",
+    "LLMUsageRecord",
     "MaterialRequest",
     "Notification",
     "PolicyRule",

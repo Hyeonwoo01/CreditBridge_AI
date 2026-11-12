@@ -43,6 +43,7 @@
 | | `sis_syncs` | 판정의 학사정보시스템 반영 결과 (반영됨·실패·다시 보내기 대기) | FR-24, 리뷰 v3 P1-4 |
 | | `sis_ack_requests` | 반영 결과 요청의 Idempotency-Key와 처음 응답 | FR-24, 리뷰 v3 P1-4 |
 | | `background_jobs` | 백그라운드 분석 작업의 상태·시도·오류 코드·처리 시간 (재시도·격리·다시 처리) | 리뷰 v3 P1-3 |
+| | `llm_usage` | AI 호출 사용량: 작업 시도마다 (용도, 모델)별 호출 수·입력·출력 토큰 | 리뷰 v3 13.7 (H15) |
 | | `audit_logs` | 주요 행위 기록 (추가 전용) | FR-10 |
 
 ## 2. ER 다이어그램
@@ -552,6 +553,8 @@ erDiagram
 
 **background_jobs** — 백그라운드 분석 작업 하나 (Alembic 0017, 리뷰 v3 P1-3). `institution_id` FK null(`institution_id, created_at` 복합 IX), `job_type` VARCHAR(40)(syllabus.process·syllabus.supplement·syllabus.evaluate·transcript.process_student·reference.process), `subject_type` VARCHAR(20)(syllabus·student)·`subject_id`(대상 id, 외래키 없음), `status` VARCHAR(12)(queued·running·succeeded·retry_wait·failed·dead_letter, CHECK, IX), `attempt_count`, `error_code` VARCHAR(60)(llm_rate_limit·llm_timeout·llm_connection·llm_server·llm_invalid_output·llm_refusal·llm_error·not_configured·document_unreadable·task_timeout·unexpected:예외 이름), `started_at`·`completed_at`, `duration_ms`(마지막 시도), `task_args` JSONB(다시 처리할 인자: id·파일 키만), `created_at`. 일시 오류는 최대 3번 지수 간격으로 다시 하고 넘기면 격리, 다시 해도 안 되는 오류는 곧바로 실패. 문서 내용·이름은 넣지 않는다.
 
+**llm_usage** — AI 호출 사용량 (Alembic 0020, 리뷰 v3 13.7 비용 지표). `institution_id` FK null(`institution_id, created_at` 복합 IX), `job_id` FK→background_jobs null(IX, 작업 시도마다 한 묶음), `purpose` VARCHAR(60)(출력 모델 이름: SyllabusExtraction·EvaluationOutput·PageTranscription·TranscriptExtraction), `model` VARCHAR(100)(응답이 알려 준 모델), `calls` INT, `input_tokens` INT(캐시 쓰기·읽기 포함), `output_tokens` INT, `created_at`. 검증 실패로 다시 부른 호출도 센다. 비용은 저장하지 않고 화면에서 설정 단가(`AI_PRICE_*`)로 어림한다. 문서 내용·이름은 넣지 않는다.
+
 **audit_logs** — 추가 전용(INSERT만). `actor_id` FK→users null(시스템 행위는 null, `actor_id, action` 복합 IX), `action` VARCHAR(50)(IX), `target_type` VARCHAR(50)·`target_id` VARCHAR(36)(대상, 외래키 없음, `target_type, target_id` 복합 IX), `payload_json` JSONB(id·판정값만, 이름·학번·성적 없음).
 
 ## 4. 관계
@@ -668,7 +671,7 @@ erDiagram
 | # | 항목 | 내용 | 권장 |
 | --- | --- | --- | --- |
 | R1 | "하나만" 규칙이 DB에 없다 ✅ 반영 (0010) | 심사 건당 활성 배정 1개, 처리 중 이의 신청 1개, 요청당 처리 중 삭제 요청 1개, 강의계획서당 `is_latest` 1개를 앱이 지킨다. 동시에 두 요청이 들어오면 둘 다 들어갈 수 있다 | MariaDB 때는 부분 유니크 인덱스가 없어 생성 컬럼(`IF(is_active, course_evaluation_id, NULL)`에 UNIQUE)으로 막았고, PostgreSQL로 옮기며 부분 유니크 인덱스(`... WHERE is_active`)로 바꿨다 |
-| R2 | 같은 값을 두 곳에 둔다 | `course_evaluations.transfer_request_id`(강의계획서에서 얻을 수 있음), `appeals.student_id`·`privacy_requests.student_id`(요청에서), `material_requests.syllabus_id`·`evaluation_notes.syllabus_id`(분석에서), `evidence_spans`(= `coverage_json`의 근거 위치) | 권한 검사·재분석 묶기·감사에 쓰려고 일부러 둔 것이다. 값이 어긋나지 않도록 만드는 곳을 서비스 한 곳으로 두고, 정합성 점검 쿼리를 테스트에 넣는다 |
+| R2 | 같은 값을 두 곳에 둔다 | `course_evaluations.transfer_request_id`(강의계획서에서 얻을 수 있음), `appeals.student_id`·`privacy_requests.student_id`(요청에서), `material_requests.syllabus_id`·`evaluation_notes.syllabus_id`(분석에서), `evidence_spans`(= `coverage_json`의 근거 위치) | 권한 검사·재분석 묶기·감사에 쓰려고 일부러 둔 것이다. 값이 어긋나지 않도록 만드는 곳을 서비스 한 곳으로 두고, 정합성 점검 쿼리를 테스트에 넣는다 ✅ 반영 (2026-11-12, `repositories/integrity.py`·`scripts/integrity_check.py`·`test_integrity.py`, 배분 원장 학생 점검 포함) |
 | R3 | 자주 쓰는 조회에 맞는 복합 인덱스가 없다 ✅ 반영 (0009, 앞 컬럼이 같은 단일 인덱스는 지움) | `audit_logs(target_type, target_id)` — 심사 건 처리 기록·리포트가 매번 전체를 훑는다 · `notifications(user_id, read_at)` — 60초마다 안 읽은 수 · `assignments(course_evaluation_id, is_active)`, `assignments(reviewer_id, is_active)` · `course_evaluations(syllabus_id, is_latest)` · `equivalencies(target_institution_id, source_institution_id, source_course_key)` | Alembic 마이그레이션으로 추가. 특히 `audit_logs`는 계속 쌓이는 테이블이라 먼저 |
 | R4 | 감사 로그 대상에 외래키가 없다 | `audit_logs.target_type`·`target_id`는 여러 테이블을 가리키는 다형 참조라 FK가 없다 | 대상 행이 지워져도 기록이 남아야 하므로 의도한 설계. 그대로 둔다 |
 | R5 | 지울 때 동작 | `syllabus_chunks`만 CASCADE, 나머지는 기본(RESTRICT). 앱은 행을 지우지 않고 키를 비우는 방식이라 맞다 | 그대로. 운영자가 SQL로 직접 지우지 않도록 `db-grants.sql`을 유지 |

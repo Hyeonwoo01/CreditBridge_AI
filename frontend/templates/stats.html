@@ -115,6 +115,35 @@
   {% else %}
   <p class="text-sm text-muted">{{ _("격리되거나 실패한 작업이 없어요.") }}</p>
   {% endif %}
+
+  {# AI 사용량 (리뷰 v3 13.7 비용 지표): 같은 7일, 공급자 응답의 토큰 수. 검증 실패로 다시 부른 호출도 센다 #}
+  <div id="ai-usage" class="grid gap-3 border-t border-divider pt-4" data-ai-usage>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="font-semibold">{{ _("AI 사용량") }}</h3>
+      <span class="text-sm text-muted">{% if jobs.cost is not none %}{{ _("비용은 설정한 단가(1백만 토큰당 USD)로 어림한 값") }}{% else %}{{ _("단가(AI_PRICE_*)를 정하면 어림 비용도 보여요") }}{% endif %}</span>
+    </div>
+    <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {% for label, value in [(_('입력 토큰'), '{:,}'.format(jobs.input_tokens)), (_('출력 토큰'), '{:,}'.format(jobs.output_tokens)), (_('작업당 평균 토큰'), ('{:,}'.format(jobs.tokens_per_job)) if jobs.tokens_per_job is not none else '–'), (_('어림 비용'), ('$%.2f' | format(jobs.cost)) if jobs.cost is not none else '–')] %}
+      <div class="grid gap-0.5 rounded-md bg-parchment px-4 py-3"><dt class="text-xs text-muted">{{ label }}</dt><dd class="text-[22px] leading-tight font-semibold tabular-nums" data-usage-metric="{{ loop.index }}">{{ value }}</dd></div>
+      {% endfor %}
+    </dl>
+    {% if jobs.usage %}
+    <div class="overflow-x-auto rounded-lg border border-hairline bg-white">
+      <table class="w-full min-w-[680px] text-sm">
+        <thead class="bg-pearl text-left text-xs text-muted">
+          <tr><th class="px-4 py-2 font-normal">{{ _("용도") }}</th><th class="px-4 py-2 font-normal">{{ _("모델") }}</th><th class="px-4 py-2 text-right font-normal">{{ _("호출") }}</th><th class="px-4 py-2 text-right font-normal">{{ _("입력 토큰") }}</th><th class="px-4 py-2 text-right font-normal">{{ _("출력 토큰") }}</th>{% if jobs.cost is not none %}<th class="px-4 py-2 text-right font-normal">{{ _("어림 비용") }}</th>{% endif %}</tr>
+        </thead>
+        <tbody>
+          {% for u in jobs.usage %}
+          <tr class="border-t border-divider" data-usage-row="{{ u.purpose }}"><td class="px-4 py-2">{{ u.label | t }}</td><td class="px-4 py-2 font-mono text-xs">{{ u.model }}</td><td class="px-4 py-2 text-right tabular-nums">{{ '{:,}'.format(u.calls) }}</td><td class="px-4 py-2 text-right tabular-nums">{{ '{:,}'.format(u.input_tokens) }}</td><td class="px-4 py-2 text-right tabular-nums">{{ '{:,}'.format(u.output_tokens) }}</td>{% if jobs.cost is not none %}<td class="px-4 py-2 text-right tabular-nums">{{ '$%.2f' | format(u.cost) }}</td>{% endif %}</tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-muted">{{ _("최근 7일 AI 호출 기록이 없어요.") }}</p>
+    {% endif %}
+  </div>
 </section>
 {% endif %}
 

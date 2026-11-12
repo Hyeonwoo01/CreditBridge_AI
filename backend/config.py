@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     ai_gate_min_samples: int = 20
     ai_gate_min_agreement: float = 0.70
     ai_gate_max_strong_wrong: float = 0.15
+    # AI 사용량 비용 어림 (관리자 콘솔 'AI 사용량'): 1백만 토큰당 USD. 둘 다 정해야 비용을 보여 준다 (모델마다 다름)
+    ai_price_input_per_mtok: float | None = None
+    ai_price_output_per_mtok: float | None = None
     # 업로드 악성코드 검사 (ClamAV clamd, 리뷰 v3 P0-7). 비우면 검사하지 않는다 (개발·테스트).
     # 켜면 검사를 마친 파일만 저장한다. clamav_required=true면 검사 서버가 응답하지 않을 때 업로드를 받지 않는다
     clamav_host: str = ""
@@ -80,6 +83,11 @@ class Settings(BaseSettings):
     # 비밀번호 변경·초기화와 계정 비활성화를 막는다. 운영에서는 반드시 false
     demo_mode: bool = False
     demo_storage_dir: str = "/tmp/creditbridge-files"
+
+    @field_validator("ai_price_input_per_mtok", "ai_price_output_per_mtok", mode="before")
+    @classmethod
+    def _blank_price_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @property
     def ai_limited(self) -> bool:

@@ -160,3 +160,40 @@ def test_openai_missing_settings_and_effort_switch() -> None:
     llm, completions = openai_with([("stop", '{"answer": "ok"}', None)], openai_reasoning_effort=False)
     llm.parse("hi", Out)
     assert "reasoning_effort" not in completions.calls[0]  # 추론 모델이 아닌 GPT용
+
+
+# ---------- 사용량 (리뷰 v3 13.7 비용 지표) ----------
+
+
+def test_usage_is_collected_per_call_including_retries() -> None:
+    from backend.ai import llm_client
+
+    messages = FakeMessages([("end_turn", "not json"), ("end_turn", '{"answer": "ok"}')])
+    usage = SimpleNamespace(
+        input_tokens=100, output_tokens=20, cache_creation_input_tokens=None, cache_read_input_tokens=5
+    )
+    original = messages.create
+    messages.create = lambda **kw: SimpleNamespace(**{**vars(original(**kw)), "usage": usage})  # type: ignore[method-assign]
+    fake = SimpleNamespace(beta=SimpleNamespace(messages=messages))
+    llm = LLMClient(Settings(llm_provider="anthropic", claude_model="configured-model"), client=fake)  # type: ignore[arg-type]
+    llm_client.start_usage()
+    llm.parse("hi", Out)
+    rows = llm_client.take_usage()
+    # 검증 실패로 다시 부른 호출도 센다, 캐시 입력도 입력 토큰
+    assert [(r.purpose, r.model, r.input_tokens, r.output_tokens) for r in rows] == [("Out", "m", 105, 20)] * 2
+    assert llm_client.take_usage() == []  # 꺼내면 모으기가 끝난다
+    llm_client.record_usage("Out", "m", 1, 1)  # 모으는 중이 아니면 버린다
+    assert llm_client.take_usage() == []
+
+
+def test_openai_usage_tokens() -> None:
+    from backend.ai import llm_client
+
+    llm, completions = openai_with([("stop", '{"answer": "ok"}', None)])
+    original = completions.create
+    completions.create = lambda **kw: SimpleNamespace(  # type: ignore[method-assign]
+        **{**vars(original(**kw)), "usage": SimpleNamespace(prompt_tokens=300, completion_tokens=40)}
+    )
+    llm_client.start_usage()
+    llm.parse("hi", Out)
+    assert [(r.input_tokens, r.output_tokens) for r in llm_client.take_usage()] == [(300, 40)]

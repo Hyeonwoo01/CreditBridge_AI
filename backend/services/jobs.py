@@ -20,6 +20,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.ai import llm_client
+from backend.config import get_settings
 from backend.db.base import utcnow
 from backend.errors import (
     DocumentParseError,
@@ -30,7 +32,7 @@ from backend.errors import (
 )
 from backend.i18n import N_
 from backend.i18n import gettext as tr
-from backend.models import BackgroundJob, User
+from backend.models import BackgroundJob, LLMUsageRecord, User
 from backend.models.enums import JobStatus, Role
 from backend.repositories import jobs as job_repo
 from backend.repositories import requests as request_repo
@@ -103,8 +105,9 @@ def _institution_of(session: Session, subject_type: str, subject_id: int) -> int
 def start(
     session: Session, job_type: str, subject_type: str, subject_id: int, job_id: int | None, args: list[Any]
 ) -> BackgroundJob:
-    """작업 시작 기록. job_id가 있으면 같은 작업의 다음 시도."""
+    """작업 시작 기록. job_id가 있으면 같은 작업의 다음 시도. 이 시도의 AI 사용량을 모으기 시작한다."""
     _error.set(None)
+    llm_client.start_usage()
     job = job_repo.get(session, job_id) if job_id else None
     if job is None:
         job = job_repo.add(
@@ -146,6 +149,7 @@ def finish(session: Session, job: BackgroundJob, timed_out: bool = False) -> int
         job.status, job.error_code = JobStatus.DEAD_LETTER, code
     else:
         job.status, job.error_code = JobStatus.FAILED, code
+    _save_usage(session, job)
     session.commit()
     if code is not None:
         logger.warning(
@@ -154,6 +158,32 @@ def finish(session: Session, job: BackgroundJob, timed_out: bool = False) -> int
         )
     _error.set(None)
     return delay
+
+
+def _save_usage(session: Session, job: BackgroundJob) -> None:
+    """이 시도에서 모은 AI 사용량을 (용도, 모델)별로 합쳐 남긴다 (리뷰 v3 13.7 비용 지표)."""
+    totals: dict[tuple[str, str], list[int]] = {}
+    for u in llm_client.take_usage():
+        row = totals.setdefault((u.purpose, u.model), [0, 0, 0])
+        row[0] += 1
+        row[1] += u.input_tokens
+        row[2] += u.output_tokens
+    if totals:
+        job_repo.add_usage(
+            session,
+            [
+                LLMUsageRecord(
+                    institution_id=job.institution_id,
+                    job_id=job.id,
+                    purpose=purpose,
+                    model=model[:100],
+                    calls=calls,
+                    input_tokens=tokens_in,
+                    output_tokens=tokens_out,
+                )
+                for (purpose, model), (calls, tokens_in, tokens_out) in totals.items()
+            ],
+        )
 
 
 def requeue(session: Session, admin: User, job_id: int) -> BackgroundJob:
@@ -182,11 +212,65 @@ class Health:
     p50_ms: int | None = None
     p95_ms: int | None = None
     attention: list[BackgroundJob] = field(default_factory=list)
+    usage: list["UsageRow"] = field(default_factory=list)  # AI 사용량 (용도·모델별)
+    usage_jobs: int = 0  # AI를 부른 작업 수
+
+    @property
+    def input_tokens(self) -> int:
+        return sum(u.input_tokens for u in self.usage)
+
+    @property
+    def output_tokens(self) -> int:
+        return sum(u.output_tokens for u in self.usage)
+
+    @property
+    def tokens_per_job(self) -> int | None:
+        return round((self.input_tokens + self.output_tokens) / self.usage_jobs) if self.usage_jobs else None
+
+    @property
+    def cost(self) -> float | None:
+        """설정한 단가(1백만 토큰당 USD)로 어림한 비용. 단가를 정하지 않았으면 None."""
+        return _cost(self.input_tokens, self.output_tokens)
 
     @property
     def success_rate(self) -> float | None:
         done = self.succeeded + self.failed
         return self.succeeded / done if done else None
+
+
+# 용도(출력 모델 이름) → 화면 이름
+USAGE_PURPOSES = {
+    "SyllabusExtraction": N_("강의계획서 정보 추출"),
+    "EvaluationOutput": N_("개념 비교"),
+    "PageTranscription": N_("스캔 쪽 글자 옮기기"),
+    "TranscriptExtraction": N_("성적표 읽기"),
+}
+
+
+@dataclass
+class UsageRow:
+    purpose: str
+    model: str
+    calls: int
+    input_tokens: int
+    output_tokens: int
+    jobs: int
+
+    @property
+    def label(self) -> str:
+        return USAGE_PURPOSES.get(self.purpose, self.purpose)
+
+    @property
+    def cost(self) -> float | None:
+        return _cost(self.input_tokens, self.output_tokens)
+
+
+def _cost(tokens_in: int, tokens_out: int) -> float | None:
+    settings = get_settings()
+    price_in, price_out = settings.ai_price_input_per_mtok, settings.ai_price_output_per_mtok
+    if price_in is None or price_out is None:
+        return None
+    return (tokens_in * price_in + tokens_out * price_out) / 1_000_000
 
 
 def _percentile(values: list[int], q: float) -> int | None:
@@ -213,4 +297,7 @@ def health(session: Session, institution_id: int, days: int = 7, now: datetime |
             out.retried += 1
     out.p50_ms, out.p95_ms = _percentile(durations, 0.5), _percentile(durations, 0.95)
     out.attention = job_repo.needing_attention(session, institution_id)
+    start = (now or utcnow()) - timedelta(days=days)
+    out.usage = [UsageRow(*row) for row in job_repo.usage_since(session, institution_id, start)]
+    out.usage_jobs = job_repo.usage_job_count(session, institution_id, start)
     return out

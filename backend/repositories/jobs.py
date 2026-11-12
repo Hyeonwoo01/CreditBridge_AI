@@ -2,10 +2,10 @@
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.models import BackgroundJob
+from backend.models import BackgroundJob, LLMUsageRecord
 
 
 def add(session: Session, job: BackgroundJob) -> BackgroundJob:
@@ -41,3 +41,34 @@ def needing_attention(session: Session, institution_id: int, limit: int = 50) ->
             .limit(limit)
         ).scalars()
     )
+
+
+def add_usage(session: Session, rows: list[LLMUsageRecord]) -> None:
+    session.add_all(rows)
+    session.flush()
+
+
+def usage_since(session: Session, institution_id: int, start: datetime) -> list[tuple[str, str, int, int, int, int]]:
+    """(용도, 모델)별 호출 수·입력 토큰·출력 토큰·작업 수."""
+    stmt = (
+        select(
+            LLMUsageRecord.purpose,
+            LLMUsageRecord.model,
+            func.sum(LLMUsageRecord.calls),
+            func.sum(LLMUsageRecord.input_tokens),
+            func.sum(LLMUsageRecord.output_tokens),
+            func.count(func.distinct(LLMUsageRecord.job_id)),
+        )
+        .where(LLMUsageRecord.institution_id == institution_id, LLMUsageRecord.created_at >= start)
+        .group_by(LLMUsageRecord.purpose, LLMUsageRecord.model)
+        .order_by(func.sum(LLMUsageRecord.input_tokens + LLMUsageRecord.output_tokens).desc())
+    )
+    return [(p, m, int(c), int(i), int(o), int(j)) for p, m, c, i, o, j in session.execute(stmt).all()]
+
+
+def usage_job_count(session: Session, institution_id: int, start: datetime) -> int:
+    """AI를 부른 작업 수 (문서 하나당 평균을 낼 때 분모)."""
+    stmt = select(func.count(func.distinct(LLMUsageRecord.job_id))).where(
+        LLMUsageRecord.institution_id == institution_id, LLMUsageRecord.created_at >= start
+    )
+    return int(session.execute(stmt).scalar_one())
