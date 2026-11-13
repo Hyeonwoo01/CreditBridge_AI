@@ -9,7 +9,8 @@ from backend.ai.evidence import QuoteCounts, Span, teaching_evidence, verify_quo
 from backend.ai.llm_client import LLMClient, LLMResult
 from backend.ai.prompts_loader import load_prompt
 from backend.schemas.evaluation import CandidateJudgment, EvaluationOutput
-from backend.schemas.results import ConceptResult, EvidenceView
+from backend.schemas.results import ConceptResult, EvidenceView, ReviewItemResult
+from backend.services import review_frameworks
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ class Reference:
     syllabus_id: int
     text: str
     concepts: list[str]
+    department: str = ""  # 분야별 확인 항목을 고르는 학과 이름 (review_frameworks.for_department)
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,11 @@ def build_prompt(
                 "credits": ref.credits,
                 "level": ref.level,
                 "concepts": ref.concepts,
+                # 교수 체크리스트 중 문서에 적혀 있는지로 답할 수 있는 항목 (미리 채우기, 판정이 아님)
+                "review_items": [
+                    {"key": key, "look_for": look_for}
+                    for key, look_for in review_frameworks.findable(review_frameworks.for_department(ref.department))
+                ],
             },
             ensure_ascii=False,
         )
@@ -125,3 +132,33 @@ def concept_results(
             )
         )
     return results, spans
+
+
+def review_item_results(judgment: CandidateJudgment, ref: Reference, student_text: str) -> list[ReviewItemResult]:
+    """체크리스트 항목 미리 채우기. 이 후보 분야의 항목 순서대로, 인용은 원문과 일치할 때만 남긴다.
+    적혀 있다고 했는데 인용이 원문과 다르면 unverified(근거 없음)로 둔다. 응답에 없는 항목은 빼고 모르는 키는 버린다."""
+    wanted = [k for k, _ in review_frameworks.findable(review_frameworks.for_department(ref.department))]
+    by_key = {f.key.strip(): f for f in judgment.review_items}
+    out: list[ReviewItemResult] = []
+    for key in wanted:
+        finding = by_key.get(key)
+        if finding is None:
+            continue
+        if not finding.stated:
+            out.append(ReviewItemResult(key=key, status="not_found"))
+            continue
+        spans = verify_quotes(student_text, [finding.quote] if finding.quote else [], context=f"review|{key}")
+        if not spans:
+            out.append(ReviewItemResult(key=key, status="unverified"))
+            continue
+        span = spans[0]
+        out.append(
+            ReviewItemResult(
+                key=key,
+                status="found",
+                quote=student_text[span.start : span.end],
+                char_start=span.start,
+                char_end=span.end,
+            )
+        )
+    return out

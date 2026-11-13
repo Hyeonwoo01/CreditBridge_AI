@@ -454,10 +454,10 @@ erDiagram
 | coverage | DECIMAL(4,3) | null | 1순위 개념 커버리지 0~1 |
 | confidence | VARCHAR(10) | IX, null | high · medium · low |
 | level_flag | VARCHAR(10) | null | same · lower · higher (FR-16) |
-| coverage_json | JSONB | null | 후보 3개·개념별 판단·근거·정보 부족 진단·경고, 한국어·영어 설명 |
+| coverage_json | JSONB | null | 후보 3개·개념별 판단·근거·정보 부족 진단·경고, 한국어·영어 설명, 후보마다 분야별 확인 항목 미리 채우기 `review_items`(key·status found/not_found/unverified·원문과 일치한 인용과 위치, evaluation-v4부터) |
 | summary | TEXT | NN | 요약 (한국어) |
 | input_hash | VARCHAR(64) | IX, null | 프롬프트 버전·규칙 버전·모델·입력의 해시 (같으면 결과 재사용) |
-| prompt_version · model | VARCHAR(20) · VARCHAR(100) | null | evaluation-v3 등 |
+| prompt_version · model | VARCHAR(20) · VARCHAR(100) | null | evaluation-v4 등 |
 | error_message | VARCHAR(500) | null | 실패 사유 |
 | is_latest | BOOLEAN | NN, IX | 그 강의계획서의 최신 분석 (`syllabus_id, is_latest` 복합 IX) |
 | quotes_total · quotes_unmatched · quotes_non_teaching | INT · INT · INT | null | AI가 낸 인용 구절 수, 원문에 없어 버린 수, 선수과목·교재 칸이나 부정 문장이라 버린 수 (프롬프트 버전별 환각 지표, 0008). 이전 결과를 재사용한 행은 비움 |

@@ -67,9 +67,12 @@
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
       <label class="flex items-center gap-2"><input type="checkbox" name="checklist" value="{{ key }}" class="size-4" {% if key in f.get('checklist', []) %}checked{% endif %}>{{ text | t }}</label>
       <label class="flex items-center gap-1 text-xs text-muted"><input type="checkbox" name="missing_evidence" value="{{ key }}" class="size-4" {% if key in f.get('missing_evidence', []) %}checked{% endif %}>{{ _("자료 없음") }}</label>
+      {% set hint = v.review_hints.get(key) %}
+      {% if hint %}<span class="min-w-0 text-xs {{ 'text-approve' if hint.status == 'found' else 'text-muted' }}" data-review-hint="{{ hint.status }}">{% if hint.status == 'found' %}{{ _("AI: 찾음") }} <span class="text-muted">“{{ hint.quote | truncate(90) }}”</span>{% elif hint.status == 'not_found' %}{{ _("AI: 강의계획서에서 못 찾음") }}{% else %}{{ _("AI: 근거가 원문과 맞지 않아 표시하지 않음") }}{% endif %}</span>{% endif %}
     </div>
     {% endfor %}
     <p class="text-xs text-muted">{{ _("판정을 대신하지 않아요. 자료가 없어 확인하지 못한 항목은 '자료 없음'에 표시해 두면 학사처·이의 신청 재판정 때 참고해요.") }}</p>
+    {% if v.review_hints %}<p class="text-xs text-muted">{{ _("'AI: 찾음'은 강의계획서에서 그 내용이 적힌 곳을 찾았다는 뜻이고, 인용은 원문과 일치하는 것만 보여요. 확인한 뒤 직접 체크해 주세요.") }}</p>{% endif %}
   </fieldset>
   {% endif %}
   {% if v.combinable %}

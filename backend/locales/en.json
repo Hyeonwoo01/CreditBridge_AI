@@ -1917,5 +1917,9 @@
  "자동 (과목 목록 기준)": "Automatic (by course list)",
  "자동이면 대상 과목이 들어 있는 요건, 없으면 일반 선택에 넣어요. 고른 요건의 필요 학점을 넘는 학점은 일반 선택으로 넘어가요. 불인정이면 쓰지 않아요.": "Automatic puts the credit in the requirement that lists the target course, otherwise in free electives. Credit beyond the chosen requirement's total moves to free electives. Ignored for a rejection.",
  "졸업 요건: {area} · {name}": "Graduation requirement: {area} · {name}",
- "졸업 요건을 이 학생의 졸업 프로그램 목록에서 골라 주세요.": "Choose a graduation requirement from this student's degree program."
+ "졸업 요건을 이 학생의 졸업 프로그램 목록에서 골라 주세요.": "Choose a graduation requirement from this student's degree program.",
+ "AI: 찾음": "AI: found",
+ "AI: 강의계획서에서 못 찾음": "AI: not found in the syllabus",
+ "AI: 근거가 원문과 맞지 않아 표시하지 않음": "AI: quote didn't match the original, not shown",
+ "'AI: 찾음'은 강의계획서에서 그 내용이 적힌 곳을 찾았다는 뜻이고, 인용은 원문과 일치하는 것만 보여요. 확인한 뒤 직접 체크해 주세요.": "'AI: found' means the AI located where the syllabus states this; only quotes that match the original are shown. Check it yourself before ticking."
 }

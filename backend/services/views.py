@@ -121,6 +121,7 @@ class EvaluationView:
     case_token: str = ""  # 화면을 열 때의 상태 토큰. 저장 폼에 실어 동시 수정을 막는다
     appeal_deadline: appeal_service.Deadline | None = None  # 이의 신청 기한 (학칙 정책, 판정이 있을 때만)
     framework: review_frameworks.Framework | None = None  # 교수 판정 화면: 분야별 심사 체크리스트 (리뷰 v3 P1-1)
+    review_hints: dict[str, Any] = field(default_factory=dict)  # 항목 키 → AI 미리 채우기 결과 (ReviewItemResult)
     # 교수 판정 화면: 고를 수 있는 졸업 요건 (학생 프로그램, 리뷰 v3 P1-6). 비어 있으면 선택 칸을 숨긴다
     requirement_program: Any = None
     requirement_options: list[Any] = field(default_factory=list)
@@ -238,6 +239,9 @@ def evaluation_view(session: Session, user: User, evaluation_id: int, *, with_au
         view.feedback = feedback_service.mine(session, user, evaluation.id)
         view.credit = decision_service.credit_conversion(session, evaluation)
         view.framework = review_frameworks.for_department(view.candidate.department_name if view.candidate else None)
+        if view.result is not None:  # AI가 학생 강의계획서에서 찾은 위치 (evaluation-v4부터, 판정을 대신하지 않음)
+            best = next((c for c in view.result.candidates if c.course_id == evaluation.candidate_course_id), None)
+            view.review_hints = {r.key: r for r in best.review_items} if best else {}
     view.decisions = decision_repo.for_evaluation_all(session, evaluation.id)
     view.case_state = case_state.state_of(session, evaluation)
     if decision is not None:

@@ -25,6 +25,18 @@ class ConceptResult(BaseModel):
     target_evidence: list[EvidenceView]
 
 
+class ReviewItemResult(BaseModel):
+    """체크리스트 항목 미리 채우기 결과 (evaluation-v4부터). quote는 원문과 일치할 때만 남는다."""
+
+    key: str
+    status: (
+        str  # found(원문 확인된 인용 있음) · not_found(적혀 있지 않음) · unverified(있다고 했지만 인용이 원문과 다름)
+    )
+    quote: str = ""
+    char_start: int | None = None
+    char_end: int | None = None
+
+
 class CandidateResult(BaseModel):
     course_id: int
     course_code: str
@@ -37,6 +49,7 @@ class CandidateResult(BaseModel):
     summary_en: str = ""
     coverage: float  # 개념 평균 0~1
     concepts: list[ConceptResult]
+    review_items: list[ReviewItemResult] = []  # 분야별 확인 항목 미리 채우기 (교수 판정 화면 참고용)
 
 
 class EvaluationResult(BaseModel):

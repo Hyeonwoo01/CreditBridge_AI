@@ -96,6 +96,6 @@ def test_transcript_link_score() -> None:
 
 def test_prompts_have_versions_and_render() -> None:
     p = load_prompt("evaluation")
-    assert p.version == "evaluation-v3"
+    assert p.version == "evaluation-v4"
     rendered = p.render(target_institution="MSU", candidates="C", credits="3", student_syllabus="S")
     assert '<student_syllabus credits="3">' in rendered and "$" not in rendered.split("<catalog_candidates>")[1][:5]

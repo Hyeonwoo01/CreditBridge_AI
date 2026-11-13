@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from backend.ai.llm_client import Effort, LLMClient, LLMResult, record_usage
 from backend.errors import LLMError
-from backend.schemas.evaluation import CandidateJudgment, ConceptJudgment, EvaluationOutput
+from backend.schemas.evaluation import CandidateJudgment, ConceptJudgment, EvaluationOutput, ReviewItemFinding
 from backend.schemas.extraction import SyllabusExtraction, WeeklyTopic
 from backend.schemas.transcript import TranscriptExtraction, TranscriptLine
 from backend.schemas.transcription import PageTranscription
@@ -214,6 +214,7 @@ class DemoLLM(LLMClient):
                             concepts=concepts,
                             summary=self.SUMMARY,
                             summary_en=self.SUMMARY_EN,
+                            review_items=self._review_items(header.get("review_items", []), student_lines),
                         ),
                     )
                 )
@@ -231,6 +232,21 @@ class DemoLLM(LLMClient):
             if thin
             else [],
         )
+
+    @staticmethod
+    def _review_items(items: list[dict[str, str]], student_lines: list[str]) -> list[ReviewItemFinding]:
+        """체크리스트 항목 미리 채우기 흉내: 찾을 내용의 낱말이 두 개 이상 겹치는 학생 줄을 인용한다."""
+        out = []
+        for item in items:
+            want = tokens(item.get("look_for", ""))
+            best, overlap = "", 0
+            for ln in student_lines:
+                n = len(want & tokens(ln))
+                if n > overlap:
+                    best, overlap = ln, n
+            stated = overlap >= 2
+            out.append(ReviewItemFinding(key=item.get("key", ""), stated=stated, quote=best[:199] if stated else ""))
+        return out
 
     @staticmethod
     def _transcript(text: str) -> TranscriptExtraction:

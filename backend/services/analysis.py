@@ -320,6 +320,7 @@ def _references(
                 text=ref_syllabus.raw_text,
                 # 학과가 과목 CSV로 정한 필수 개념이 먼저, 없으면 기준 강의계획서 청크의 개념
                 concepts=list(course.concepts or []) or [c.concept for c in concepts.get(course.id, [])],
+                department=course.department_name or "",
             )
         )
     return refs
@@ -416,6 +417,7 @@ def evaluate_syllabus(session: Session, syllabus_id: int, *, llm: LLMClient) -> 
                     summary_en=judgment.summary_en,
                     coverage=score.coverage,
                     concepts=concepts,
+                    review_items=matching.review_item_results(judgment, ref, student.raw_text),
                 ),
             )
         )

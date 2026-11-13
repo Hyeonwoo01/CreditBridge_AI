@@ -73,5 +73,5 @@ def test_professor_marks_evidence_and_stats_show_quality(client: TestClient, see
 
     login(client, "rachel@msu.example")
     stats = client.get("/review/stats").text
-    assert "AI 근거 품질" in stats and "evaluation-v3" in stats
+    assert "AI 근거 품질" in stats and "evaluation-v4" in stats
     assert "50%" in stats and "1/2건" in stats  # 교수가 확인한 근거 2개 중 맞음 1개

@@ -24,6 +24,14 @@ class ConceptJudgment(BaseModel):
     reason_en: str = Field(description="The same sentence in English, for faculty reviewers")
 
 
+class ReviewItemFinding(BaseModel):
+    """교수 체크리스트 항목이 학생 강의계획서에 적혀 있는지 (리뷰 v3 P1-1 미리 채우기). 판정이 아니라 찾은 위치만."""
+
+    key: str = Field(description="Review item key exactly as given in the candidate's review_items")
+    stated: bool = Field(description="true only if the student's syllabus explicitly states this information")
+    quote: str = Field(description="One verbatim quote from the student's syllabus (< 200 chars), empty if not stated")
+
+
 class CandidateJudgment(BaseModel):
     course_code: str
     level: Literal["same", "lower", "higher"]
@@ -32,6 +40,9 @@ class CandidateJudgment(BaseModel):
     concepts: list[ConceptJudgment]
     summary: str = Field(description="One or two Korean sentences for the student")
     summary_en: str = Field(description="The same summary in English, for faculty reviewers")
+    review_items: list[ReviewItemFinding] = Field(
+        default_factory=list, description="One entry per review item listed for this candidate"
+    )
 
 
 class EvaluationOutput(BaseModel):

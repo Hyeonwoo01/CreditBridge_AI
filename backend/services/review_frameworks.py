@@ -105,6 +105,40 @@ FRAMEWORKS: dict[str, Framework] = {
     )
 }
 
+# AI가 학생 강의계획서에서 찾아 미리 표시할 수 있는 항목과 찾을 내용 (영어, 프롬프트용). 'evidence'·'ai_inferred'처럼
+# 교수가 직접 하는 확인은 빼고, 문서에 적혀 있는지로 답할 수 있는 항목만 둔다. 바꾸면 평가 프롬프트 버전도 올린다
+LOOK_FOR: dict[str, str] = {
+    "outcomes": "stated learning outcomes or course objectives",
+    "weeks": "a weekly schedule of topics, or the split between lectures and labs/practice",
+    "credit_hours": "credits, contact hours per week, or the length of the term",
+    "proofs": "proofs or theorems taught (for example 'prove', 'theorem', 'derivation')",
+    "problem_types": "types of problems, homework, quizzes or exams and what they cover",
+    "prerequisites": "stated prerequisite courses or prior knowledge",
+    "algorithms": "specific algorithms or data structures taught",
+    "tools": "programming languages, software tools, or lab/practice hours",
+    "projects": "programming assignments or projects and their scope",
+    "lab_hours": "laboratory sessions or lab hours",
+    "lab_skills": "lab techniques, experiment design, lab reports or data analysis",
+    "safety": "lab safety training or safety requirements",
+    "math_tools": "the mathematics used (for example calculus-based or algebra-based)",
+    "lab_or_computation": "lab work or computational exercises and their hours",
+    "problem_sets": "problem sets and their level, or prerequisite courses",
+    "quant": "quantitative or theoretical analysis (models, statistics, calculations)",
+    "cases": "case studies or applied projects",
+    "data_models": "assignments that use data, spreadsheets or models",
+    "clinical_hours": "clinical or practicum hours",
+    "competency": "competency or safety requirements students must meet",
+    "methods": "research methods or how texts and sources are analyzed",
+    "readings": "a reading list or the amount of required reading",
+    "writing": "essays, papers or research writing assignments",
+}
+
+
+def findable(framework: Framework) -> list[tuple[str, str]]:
+    """분야 항목 중 AI가 문서에서 찾아볼 수 있는 것 (항목 키, 찾을 내용)."""
+    return [(k, LOOK_FOR[k]) for k, _ in framework.items if k in LOOK_FOR]
+
+
 # 학과 이름 키워드 → 분야 (영어 학과명 기준, 소문자 비교). 앞에서부터 처음 맞는 것
 _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("math", ("math", "statistic", "수학", "통계")),
